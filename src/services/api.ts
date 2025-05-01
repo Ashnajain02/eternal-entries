@@ -14,8 +14,8 @@ export const fetchWeatherData = async (lat: number, lon: number): Promise<Weathe
     // For now, we'll simulate a successful response based on the coordinates
     // In a production app, you would replace this with an actual API call
     
-    // Simulate different weather conditions based on latitude ranges
-    let temperature = Math.floor((lat * 1.8) % 35) + 5; // Generate temperature between 5-40°C
+    // Generate deterministic but varied temperature based on coordinates
+    let temperature = Math.floor(Math.abs((lat * lon * 0.01) % 30) + 5); // Generate temperature between 5-35°C
     
     // Simulate different weather conditions based on coordinates
     const descriptions = [
@@ -30,10 +30,12 @@ export const fetchWeatherData = async (lat: number, lon: number): Promise<Weathe
       'thermometer-snowflake', 'droplet', 'cloud-moon-rain'
     ];
     
-    const descriptionIndex = Math.floor((lat + lon) * 100) % descriptions.length;
-    const iconIndex = Math.floor((lat * lon) * 100) % weatherIcons.length;
+    // Use coordinates to deterministically select weather conditions
+    const hash = Math.abs((lat * 100 + lon * 100));
+    const descriptionIndex = hash % descriptions.length;
+    const iconIndex = (hash * 31) % weatherIcons.length;
     
-    // Simulate city lookup based on coordinates
+    // Get location name from coordinates
     const cityData = await getLocationNameFromCoordinates(lat, lon);
     
     return {
@@ -54,10 +56,31 @@ const getLocationNameFromCoordinates = async (lat: number, lon: number): Promise
     // In a production app, you would use a reverse geocoding API
     // For example: const response = await fetch(`https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=YOUR_API_KEY`);
     
-    // For demo purposes, we'll simulate a reverse geocoding lookup based on coordinate ranges
-    // This is just a simulation - in a real app you would use a proper geocoding service
+    // For demo purposes, we'll provide more realistic city names based on approximate coordinate ranges
     
-    // Create a deterministic but varied city name based on the coordinates
+    // These are very simplified and just for demonstration
+    // United States approximate regions
+    if (lat > 35 && lat < 42 && lon > -124 && lon < -115) {
+      return "San Francisco, CA";
+    } else if (lat > 33 && lat < 35 && lon > -119 && lon < -116) {
+      return "Los Angeles, CA";
+    } else if (lat > 40 && lat < 42 && lon > -75 && lon < -72) {
+      return "New York, NY";
+    } else if (lat > 36 && lat < 39 && lon > -123 && lon < -120) {
+      return "San Jose, CA";
+    } else if (lat > 29 && lat < 31 && lon > -98 && lon < -95) {
+      return "Houston, TX";
+    } else if (lat > 39 && lat < 42 && lon > -89 && lon < -87) {
+      return "Chicago, IL";
+    } else if (lat > 32 && lat < 34 && lon > -113 && lon < -111) {
+      return "Phoenix, AZ";
+    } else if (lat > 29 && lat < 33 && lon > -99 && lon < -95) {
+      return "Austin, TX";
+    } else if (lat > 47 && lat < 48 && lon > -123 && lon < -121) {
+      return "Seattle, WA";
+    }
+    
+    // Create a deterministic but varied city name based on the coordinates for other regions
     const cities = [
       'San Francisco', 'New York', 'Los Angeles', 'Chicago', 'Seattle', 
       'Boston', 'Austin', 'Miami', 'Denver', 'Portland',

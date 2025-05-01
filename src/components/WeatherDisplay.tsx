@@ -10,7 +10,8 @@ import {
   Droplet, 
   CloudMoonRain,
   Cloud,
-  RefreshCw
+  RefreshCw,
+  MapPin
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -82,7 +83,10 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
           <p className="text-sm font-medium leading-none">
             {weatherData.temperature}°C in {weatherData.location}
           </p>
-          <p className="text-xs text-muted-foreground">{weatherData.description}</p>
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            {weatherData.description}
+          </p>
         </div>
       </div>
       

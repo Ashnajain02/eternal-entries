@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, SpotifyTrack, WeatherData, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -33,10 +32,11 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationRequested, setLocationRequested] = useState(false);
 
   // Get current weather on first load if not already present
   useEffect(() => {
-    if (!weatherData && !isLoadingWeather) {
+    if (!weatherData && !isLoadingWeather && !locationRequested) {
       handleGetWeather();
     }
   }, []);
@@ -44,6 +44,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const handleGetWeather = async () => {
     setIsLoadingWeather(true);
     setLocationError(null);
+    setLocationRequested(true);
     
     try {
       // Use the browser's geolocation API to get the user's coordinates
@@ -55,53 +56,76 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         return;
       }
       
-      // Request location from user
-      navigator.geolocation.getCurrentPosition(
-        // Success callback
-        async (position) => {
-          const { latitude, longitude } = position.coords;
-          try {
-            const data = await fetchWeatherData(latitude, longitude);
-            setWeatherData(data);
-          } catch (error) {
-            console.error('Error fetching weather data:', error);
-            setLocationError("Could not retrieve weather for your location");
+      // Request location from user with a timeout
+      const positionPromise = new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          // Success callback
+          (position) => {
+            resolve(position);
+          },
+          // Error callback
+          (error) => {
+            console.error('Geolocation error:', error);
+            let errorMsg = "Location access denied";
+            
+            switch(error.code) {
+              case error.PERMISSION_DENIED:
+                errorMsg = "You denied permission to access your location";
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMsg = "Location information is unavailable";
+                break;
+              case error.TIMEOUT:
+                errorMsg = "The request to get your location timed out";
+                break;
+              default:
+                errorMsg = "An unknown error occurred";
+            }
+            
+            reject(new Error(errorMsg));
+          },
+          // Options
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
           }
-        },
-        // Error callback
-        (error) => {
-          console.error('Geolocation error:', error);
-          let errorMsg = "Location access denied";
-          
-          switch(error.code) {
-            case error.PERMISSION_DENIED:
-              errorMsg = "You denied permission to access your location";
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMsg = "Location information is unavailable";
-              break;
-            case error.TIMEOUT:
-              errorMsg = "The request to get your location timed out";
-              break;
-            default:
-              errorMsg = "An unknown error occurred";
-          }
-          
-          setLocationError(errorMsg);
-          
+        );
+      });
+      
+      try {
+        const position = await positionPromise;
+        const { latitude, longitude } = position.coords;
+        console.log(`Successfully got coordinates: ${latitude}, ${longitude}`);
+        try {
+          const data = await fetchWeatherData(latitude, longitude);
+          setWeatherData(data);
+        } catch (error) {
+          console.error('Error fetching weather data:', error);
+          setLocationError("Could not retrieve weather for your location");
           // Fall back to default coordinates
-          fetchWeatherData(37.7749, -122.4194).then(data => setWeatherData(data));
-        },
-        // Options
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
+          const fallbackData = await fetchWeatherData(37.7749, -122.4194);
+          setWeatherData(fallbackData);
         }
-      );
+      } catch (error: any) {
+        console.error('Geolocation promise error:', error);
+        setLocationError(error.message || "Could not access your location");
+        
+        // Fall back to default coordinates
+        const data = await fetchWeatherData(37.7749, -122.4194);
+        setWeatherData(data);
+      }
     } catch (error) {
       console.error('Error getting weather:', error);
       setLocationError("An error occurred while fetching weather data");
+      
+      // Final fallback
+      try {
+        const data = await fetchWeatherData(37.7749, -122.4194);
+        setWeatherData(data);
+      } catch (e) {
+        console.error('Even fallback failed:', e);
+      }
     } finally {
       setIsLoadingWeather(false);
     }
