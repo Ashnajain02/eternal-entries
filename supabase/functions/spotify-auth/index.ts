@@ -23,7 +23,45 @@ serve(async (req) => {
   }
   
   try {
-    // Get the authorization header from the request
+    // Parse the request URL
+    const url = new URL(req.url);
+    const path = url.pathname.split("/").pop();
+    
+    // New authorize endpoint that will provide the proper authorization URL
+    if (path === "authorize") {
+      // Get the authorization header from the request
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: "No authorization header" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+        );
+      }
+      
+      // Get redirect_uri and scope from query params
+      const redirect_uri = url.searchParams.get("redirect_uri");
+      const scope = url.searchParams.get("scope");
+      const show_dialog = url.searchParams.get("show_dialog") === "true";
+      
+      if (!redirect_uri || !scope) {
+        return new Response(
+          JSON.stringify({ error: "Missing required parameters" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      // Generate the authorization URL with the proper client ID
+      const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(
+        redirect_uri
+      )}&scope=${scope}${show_dialog ? "&show_dialog=true" : ""}`;
+      
+      return new Response(
+        JSON.stringify({ url: authUrl }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Get the authorization header from the request for other endpoints
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -42,10 +80,6 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
-    
-    // Parse the request URL
-    const url = new URL(req.url);
-    const path = url.pathname.split("/").pop();
     
     if (path === "callback") {
       // Handle the OAuth callback from Spotify
