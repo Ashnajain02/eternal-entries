@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import MoodSelector from './MoodSelector';
 import WeatherDisplay from './WeatherDisplay';
 import SpotifySearch from './SpotifySearch';
@@ -31,6 +32,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | undefined>(initialEntry?.track);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   // Get current weather on first load if not already present
   useEffect(() => {
@@ -41,22 +43,65 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
 
   const handleGetWeather = async () => {
     setIsLoadingWeather(true);
+    setLocationError(null);
+    
     try {
-      // In a real app, we would get the user's location first
+      // Use the browser's geolocation API to get the user's coordinates
+      if (!navigator.geolocation) {
+        setLocationError("Geolocation is not supported by your browser");
+        // Fall back to default coordinates
+        const data = await fetchWeatherData(37.7749, -122.4194); // San Francisco coordinates as fallback
+        setWeatherData(data);
+        return;
+      }
+      
+      // Request location from user
       navigator.geolocation.getCurrentPosition(
+        // Success callback
         async (position) => {
           const { latitude, longitude } = position.coords;
-          const data = await fetchWeatherData(latitude, longitude);
-          setWeatherData(data);
+          try {
+            const data = await fetchWeatherData(latitude, longitude);
+            setWeatherData(data);
+          } catch (error) {
+            console.error('Error fetching weather data:', error);
+            setLocationError("Could not retrieve weather for your location");
+          }
         },
+        // Error callback
         (error) => {
           console.error('Geolocation error:', error);
-          // Fallback to a default location or show error
-          fetchWeatherData(40.7128, -74.0060).then(data => setWeatherData(data));
+          let errorMsg = "Location access denied";
+          
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMsg = "You denied permission to access your location";
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMsg = "Location information is unavailable";
+              break;
+            case error.TIMEOUT:
+              errorMsg = "The request to get your location timed out";
+              break;
+            default:
+              errorMsg = "An unknown error occurred";
+          }
+          
+          setLocationError(errorMsg);
+          
+          // Fall back to default coordinates
+          fetchWeatherData(37.7749, -122.4194).then(data => setWeatherData(data));
+        },
+        // Options
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         }
       );
     } catch (error) {
       console.error('Error getting weather:', error);
+      setLocationError("An error occurred while fetching weather data");
     } finally {
       setIsLoadingWeather(false);
     }
@@ -119,6 +164,14 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           onRefresh={handleGetWeather} 
         />
       </div>
+      
+      {locationError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>
+            {locationError} <Button variant="link" className="p-0 h-auto" onClick={handleGetWeather}>Try again</Button>
+          </AlertDescription>
+        </Alert>
+      )}
       
       <div className="mb-6">
         <MoodSelector selectedMood={selectedMood} onChange={setSelectedMood} />

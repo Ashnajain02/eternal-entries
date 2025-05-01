@@ -9,8 +9,10 @@ import {
   ThermometerSnowflake, 
   Droplet, 
   CloudMoonRain,
-  Cloud
+  Cloud,
+  RefreshCw
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface WeatherDisplayProps {
   weatherData: WeatherData | null;
@@ -59,22 +61,42 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
   if (!weatherData) {
     return (
       <div className={cn("flex items-center space-x-2", className)}>
-        <button onClick={onRefresh} className="text-xs text-muted-foreground hover:text-primary">
-          Get weather data
-        </button>
+        <Button 
+          onClick={onRefresh} 
+          variant="outline" 
+          size="sm" 
+          className="flex items-center gap-1 text-xs"
+        >
+          <RefreshCw className="h-3 w-3" />
+          Get weather
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className={cn("flex items-center space-x-2", className)}>
-      {getWeatherIcon(weatherData.icon)}
-      <div className="space-y-0">
-        <p className="text-sm font-medium leading-none">
-          {weatherData.temperature}°C in {weatherData.location}
-        </p>
-        <p className="text-xs text-muted-foreground">{weatherData.description}</p>
+    <div className={cn("flex items-center space-x-2 group", className)}>
+      <div className="flex items-center space-x-2">
+        {getWeatherIcon(weatherData.icon)}
+        <div className="space-y-0">
+          <p className="text-sm font-medium leading-none">
+            {weatherData.temperature}°C in {weatherData.location}
+          </p>
+          <p className="text-xs text-muted-foreground">{weatherData.description}</p>
+        </div>
       </div>
+      
+      {onRefresh && (
+        <Button 
+          onClick={onRefresh}
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <RefreshCw className="h-3 w-3" />
+          <span className="sr-only">Refresh weather</span>
+        </Button>
+      )}
     </div>
   );
 };

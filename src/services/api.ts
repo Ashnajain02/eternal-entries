@@ -1,7 +1,7 @@
 
 import { SpotifyTrack, WeatherData } from "@/types";
 
-// Simulate weather API call
+// Fetch weather data using actual coordinates
 export const fetchWeatherData = async (lat: number, lon: number): Promise<WeatherData> => {
   try {
     console.log(`Fetching weather data for coordinates: ${lat}, ${lon}`);
@@ -11,7 +11,13 @@ export const fetchWeatherData = async (lat: number, lon: number): Promise<Weathe
     // const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`);
     // const data = await response.json();
     
-    // For now, we'll simulate a successful response
+    // For now, we'll simulate a successful response based on the coordinates
+    // In a production app, you would replace this with an actual API call
+    
+    // Simulate different weather conditions based on latitude ranges
+    let temperature = Math.floor((lat * 1.8) % 35) + 5; // Generate temperature between 5-40°C
+    
+    // Simulate different weather conditions based on coordinates
     const descriptions = [
       'Clear sky', 'Few clouds', 'Scattered clouds', 
       'Light rain', 'Moderate rain', 'Heavy rain',
@@ -24,23 +30,53 @@ export const fetchWeatherData = async (lat: number, lon: number): Promise<Weathe
       'thermometer-snowflake', 'droplet', 'cloud-moon-rain'
     ];
     
-    const randomDescription = descriptions[Math.floor(Math.random() * descriptions.length)];
-    const randomIcon = weatherIcons[Math.floor(Math.random() * weatherIcons.length)];
-    const randomTemp = Math.floor(Math.random() * 30) + 5; // Random temperature between 5-35°C
+    const descriptionIndex = Math.floor((lat + lon) * 100) % descriptions.length;
+    const iconIndex = Math.floor((lat * lon) * 100) % weatherIcons.length;
     
-    // Simulate geolocation reverse lookup for city name
-    const cities = ['New York', 'London', 'Tokyo', 'Paris', 'Sydney', 'Berlin', 'Toronto'];
-    const randomCity = cities[Math.floor(Math.random() * cities.length)];
+    // Simulate city lookup based on coordinates
+    const cityData = await getLocationNameFromCoordinates(lat, lon);
     
     return {
-      temperature: randomTemp,
-      description: randomDescription,
-      icon: randomIcon,
-      location: randomCity
+      temperature,
+      description: descriptions[descriptionIndex],
+      icon: weatherIcons[iconIndex],
+      location: cityData
     };
   } catch (error) {
     console.error('Error fetching weather data:', error);
     throw new Error('Failed to fetch weather data');
+  }
+};
+
+// Helper to get location name from coordinates
+const getLocationNameFromCoordinates = async (lat: number, lon: number): Promise<string> => {
+  try {
+    // In a production app, you would use a reverse geocoding API
+    // For example: const response = await fetch(`https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=YOUR_API_KEY`);
+    
+    // For demo purposes, we'll simulate a reverse geocoding lookup based on coordinate ranges
+    // This is just a simulation - in a real app you would use a proper geocoding service
+    
+    // Create a deterministic but varied city name based on the coordinates
+    const cities = [
+      'San Francisco', 'New York', 'Los Angeles', 'Chicago', 'Seattle', 
+      'Boston', 'Austin', 'Miami', 'Denver', 'Portland',
+      'San Jose', 'Atlanta', 'Dallas', 'Houston', 'Phoenix'
+    ];
+    
+    const states = [
+      'CA', 'NY', 'TX', 'IL', 'WA', 
+      'MA', 'OR', 'FL', 'CO', 'GA'
+    ];
+    
+    const cityIndex = Math.floor(Math.abs(lat * 10) % cities.length);
+    const stateIndex = Math.floor(Math.abs(lon * 10) % states.length);
+    
+    // Return in format "City, State"
+    return `${cities[cityIndex]}, ${states[stateIndex]}`;
+  } catch (error) {
+    console.error('Error getting location name:', error);
+    return 'Unknown Location';
   }
 };
 
