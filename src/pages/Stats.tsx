@@ -23,7 +23,12 @@ const Stats = () => {
     { name: 'Content', value: statsData.moodCounts.content, color: '#60a5fa' },
     { name: 'Neutral', value: statsData.moodCounts.neutral, color: '#a3a3a3' },
     { name: 'Sad', value: statsData.moodCounts.sad, color: '#94a3b8' },
-    { name: 'Anxious', value: statsData.moodCounts.anxious, color: '#fb7185' }
+    { name: 'Anxious', value: statsData.moodCounts.anxious, color: '#fb7185' },
+    { name: 'Angry', value: statsData.moodCounts.angry, color: '#ef4444' },
+    { name: 'Emotional', value: statsData.moodCounts.emotional, color: '#c084fc' },
+    { name: 'In Love', value: statsData.moodCounts["in-love"], color: '#f472b6' },
+    { name: 'Excited', value: statsData.moodCounts.excited, color: '#fbbf24' },
+    { name: 'Tired', value: statsData.moodCounts.tired, color: '#9ca3af' }
   ];
   
   // Count entries by month for the current year
@@ -110,13 +115,18 @@ const Stats = () => {
                   'content': '😊',
                   'neutral': '😐',
                   'sad': '😔',
-                  'anxious': '😰'
+                  'anxious': '😰',
+                  'angry': '😠',
+                  'emotional': '🥹',
+                  'in-love': '😍',
+                  'excited': '🤩',
+                  'tired': '😴'
                 };
                 
                 return (
                   <div className="flex items-center gap-2">
                     <span className="text-3xl">{moodEmojis[topMood as keyof typeof moodEmojis]}</span>
-                    <span className="text-2xl font-bold capitalize">{topMood}</span>
+                    <span className="text-2xl font-bold capitalize">{topMood.replace('-', ' ')}</span>
                   </div>
                 );
               })()}

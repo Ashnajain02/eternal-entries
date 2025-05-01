@@ -88,7 +88,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             uri: entry.spotify_track_uri
           } : undefined,
           createdAt: new Date(entry.created_at).getTime(),
-          updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined
+          updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
+          user_id: entry.user_id
         }));
 
         setEntries(transformedEntries);
@@ -118,7 +119,12 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       content: 0,
       neutral: 0,
       sad: 0,
-      anxious: 0
+      anxious: 0,
+      angry: 0,
+      emotional: 0,
+      'in-love': 0,
+      excited: 0,
+      tired: 0
     };
     
     entries.forEach(entry => {
