@@ -27,6 +27,8 @@ serve(async (req) => {
     const url = new URL(req.url);
     const path = url.pathname.split("/").pop();
     
+    console.log(`Request to ${path} endpoint`); // Debug log
+    
     // New authorize endpoint that will provide the proper authorization URL
     if (path === "authorize") {
       // Get the authorization header from the request
@@ -43,6 +45,8 @@ serve(async (req) => {
       const scope = url.searchParams.get("scope");
       const show_dialog = url.searchParams.get("show_dialog") === "true";
       
+      console.log("Auth request params:", { redirect_uri, scope, show_dialog }); // Debug log
+      
       if (!redirect_uri || !scope) {
         return new Response(
           JSON.stringify({ error: "Missing required parameters" }),
@@ -53,7 +57,9 @@ serve(async (req) => {
       // Generate the authorization URL with the proper client ID
       const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(
         redirect_uri
-      )}&scope=${scope}${show_dialog ? "&show_dialog=true" : ""}`;
+      )}&scope=${encodeURIComponent(scope)}${show_dialog ? "&show_dialog=true" : ""}`;
+      
+      console.log("Generated auth URL:", authUrl); // Debug log
       
       return new Response(
         JSON.stringify({ url: authUrl }),
@@ -93,7 +99,12 @@ serve(async (req) => {
       }
       
       // Exchange the code for an access token
-      const redirectUri = `${url.origin}/spotify-auth/callback`;
+      // Use the same redirect URI as in the authorization request
+      const originUrl = new URL(req.headers.get("Origin") || url.origin);
+      const redirectUri = `${originUrl.origin}/spotify-callback`;
+      
+      console.log("Using redirect URI for token exchange:", redirectUri); // Debug log
+      
       const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
         method: "POST",
         headers: {
@@ -110,6 +121,7 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json();
       
       if (tokenData.error) {
+        console.error("Token exchange error:", tokenData.error); // Debug log
         return new Response(
           JSON.stringify({ error: tokenData.error }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }

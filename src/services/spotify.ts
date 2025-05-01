@@ -13,13 +13,17 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     // Define the required parameters
     const redirectUri = `${window.location.origin}/spotify-callback`;
     const scope = 'user-read-private user-read-email user-top-read';
+    const showDialog = true;
 
     // Get the authorization URL from our edge function with required parameters
-    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`, {
-      headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
-      },
-    });
+    const response = await fetch(
+      `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&show_dialog=${showDialog}`, 
+      {
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      }
+    );
 
     if (!response.ok) {
       // Parse the response to get the error message
@@ -35,6 +39,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     }
 
     const { url } = await response.json();
+    console.log("Opening Spotify auth URL:", url); // Add debug log
     
     // Open in a new tab with appropriate attributes
     const newWindow = window.open(url, '_blank');
