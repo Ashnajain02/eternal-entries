@@ -5,6 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthState } from '@/types/auth';
 import { useToast } from '@/hooks/use-toast';
 
+// Interface for signup metadata
+interface SignUpMetadata {
+  first_name?: string;
+  last_name?: string;
+  [key: string]: any;
+}
+
 const initialState: AuthState = {
   session: null,
   user: null,
@@ -13,7 +20,7 @@ const initialState: AuthState = {
 
 const AuthContext = createContext<{
   authState: AuthState;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, metadata?: SignUpMetadata) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }>({
@@ -54,9 +61,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, metadata?: SignUpMetadata) => {
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: metadata
+        }
+      });
       if (error) throw error;
       toast({
         title: "Success!",
