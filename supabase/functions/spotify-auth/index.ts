@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -148,6 +149,17 @@ serve(async (req) => {
       
       console.log("Token exchange response status:", tokenResponse.status);
       
+      if (!tokenResponse.ok) {
+        const responseText = await tokenResponse.text();
+        console.error("Token exchange error response:", responseText);
+        try {
+          const error = JSON.parse(responseText);
+          throw new Error(error.error_description || error.error);
+        } catch (parseError) {
+          throw new Error(`Token exchange failed: ${tokenResponse.status} ${responseText}`);
+        }
+      }
+      
       const tokenData = await tokenResponse.json();
       
       if (tokenData.error) {
@@ -169,15 +181,25 @@ serve(async (req) => {
       
       console.log("Profile response status:", profileResponse.status);
       
-      const profileData = await profileResponse.json();
-      
-      if (profileData.error) {
-        console.error("Profile fetch error:", profileData.error);
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch Spotify profile" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-        );
+      if (!profileResponse.ok) {
+        const errorText = await profileResponse.text();
+        console.error("Profile fetch error:", errorText);
+        
+        try {
+          const profileError = JSON.parse(errorText);
+          return new Response(
+            JSON.stringify({ error: profileError.error.message || "Failed to fetch Spotify profile" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: profileResponse.status }
+          );
+        } catch (parseError) {
+          return new Response(
+            JSON.stringify({ error: "Failed to fetch Spotify profile" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
       }
+      
+      const profileData = await profileResponse.json();
       
       console.log("Profile fetch successful, username:", profileData.display_name || profileData.id);
       
@@ -223,6 +245,7 @@ serve(async (req) => {
         .single();
       
       if (profileError || !profiles.spotify_refresh_token) {
+        console.error("No refresh token found:", profileError);
         return new Response(
           JSON.stringify({ error: "No refresh token found" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -241,6 +264,24 @@ serve(async (req) => {
           refresh_token: profiles.spotify_refresh_token,
         }),
       });
+      
+      if (!refreshResponse.ok) {
+        const refreshErrorText = await refreshResponse.text();
+        console.error("Refresh token error:", refreshErrorText);
+        
+        try {
+          const refreshError = JSON.parse(refreshErrorText);
+          return new Response(
+            JSON.stringify({ error: refreshError.error_description || refreshError.error }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: refreshResponse.status }
+          );
+        } catch (parseError) {
+          return new Response(
+            JSON.stringify({ error: `Failed to refresh token: ${refreshResponse.status} ${refreshErrorText}` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+      }
       
       const refreshData = await refreshResponse.json();
       
@@ -272,11 +313,14 @@ serve(async (req) => {
         .eq("id", user.id);
       
       if (updateError) {
+        console.error("Error updating tokens:", updateError);
         return new Response(
           JSON.stringify({ error: "Failed to update tokens" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
+      
+      console.log("Token refresh successful, updated tokens in database");
       
       return new Response(
         JSON.stringify({ 
@@ -298,11 +342,14 @@ serve(async (req) => {
         .eq("id", user.id);
       
       if (updateError) {
+        console.error("Error revoking Spotify access:", updateError);
         return new Response(
           JSON.stringify({ error: "Failed to revoke Spotify access" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
+      
+      console.log("Successfully revoked Spotify access for user:", user.id);
       
       return new Response(
         JSON.stringify({ success: true }),
@@ -310,12 +357,14 @@ serve(async (req) => {
       );
     } else if (path === "search") {
       // Get user's Spotify token
-      const { data: { spotify_access_token, spotify_token_expires_at }, error: profileError } = await supabase
-        .rpc('get_user_spotify_token', { user_id: user.id })
-        .select()
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("spotify_access_token, spotify_token_expires_at")
+        .eq("id", user.id)
         .single();
       
-      if (profileError || !spotify_access_token) {
+      if (profileError || !profile.spotify_access_token) {
+        console.error("Spotify token not found:", profileError);
         return new Response(
           JSON.stringify({ error: "Not connected to Spotify" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -323,7 +372,7 @@ serve(async (req) => {
       }
       
       // Check if token is expired
-      const isExpired = await supabase.rpc('is_spotify_token_expired', { user_id: user.id });
+      const isExpired = !profile.spotify_token_expires_at || new Date(profile.spotify_token_expires_at) < new Date();
       
       if (isExpired) {
         return new Response(
@@ -347,17 +396,35 @@ serve(async (req) => {
         `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
         {
           headers: {
-            "Authorization": `Bearer ${spotify_access_token}`,
+            "Authorization": `Bearer ${profile.spotify_access_token}`,
           },
         }
       );
       
+      if (!searchResponse.ok) {
+        const searchErrorText = await searchResponse.text();
+        console.error("Search error:", searchErrorText);
+        
+        try {
+          const searchError = JSON.parse(searchErrorText);
+          return new Response(
+            JSON.stringify({ error: searchError.error.message || "Search failed" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchResponse.status }
+          );
+        } catch (parseError) {
+          return new Response(
+            JSON.stringify({ error: `Search failed: ${searchResponse.status} ${searchErrorText}` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+      }
+      
       const searchData = await searchResponse.json();
       
-      if (searchData.error) {
+      if (!searchData.tracks || !searchData.tracks.items) {
         return new Response(
-          JSON.stringify({ error: searchData.error.message }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchData.error.status }
+          JSON.stringify({ error: "Invalid response from Spotify" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
       
@@ -379,19 +446,26 @@ serve(async (req) => {
       // Get the user's Spotify connection status
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("spotify_username, spotify_token_expires_at")
+        .select("spotify_username, spotify_token_expires_at, spotify_access_token")
         .eq("id", user.id)
         .single();
       
       if (profileError) {
+        console.error("Error getting profile:", profileError);
         return new Response(
           JSON.stringify({ error: "Failed to get profile" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
       
-      const isConnected = !!profile.spotify_username;
+      const isConnected = !!profile.spotify_access_token && !!profile.spotify_username;
       const isExpired = !profile.spotify_token_expires_at || new Date(profile.spotify_token_expires_at) < new Date();
+      
+      console.log("Spotify connection status:", {
+        connected: isConnected,
+        expired: isConnected && isExpired,
+        username: profile.spotify_username || null,
+      });
       
       return new Response(
         JSON.stringify({
@@ -408,7 +482,7 @@ serve(async (req) => {
       );
     }
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("Unhandled error:", error);
     return new Response(
       JSON.stringify({ error: "Internal server error", details: error.message }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }

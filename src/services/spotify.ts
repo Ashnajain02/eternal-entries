@@ -94,6 +94,9 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
     const result = await response.json();
     console.log('Spotify callback successful, result:', result);
     
+    // Ensure we refresh the auth state
+    await supabase.auth.refreshSession();
+    
     return { 
       success: result.success, 
       display_name: result.display_name
@@ -120,19 +123,30 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      // Special handling for token expired errors
-      if (error.error && error.error.includes("expired")) {
-        // Try to refresh the token automatically
-        const refreshed = await refreshSpotifyToken();
-        if (refreshed) {
-          // Retry the search with the refreshed token
-          return searchSpotifyTracks(query);
+      const data = await response.text();
+      // Try to parse as JSON
+      try {
+        const error = JSON.parse(data);
+        // Special handling for token expired errors
+        if (error.error && (error.error.includes("expired") || response.status === 401)) {
+          console.log("Token expired, attempting to refresh...");
+          // Try to refresh the token automatically
+          const refreshed = await refreshSpotifyToken();
+          if (refreshed) {
+            // Retry the search with the refreshed token
+            return searchSpotifyTracks(query);
+          } else {
+            throw new Error("Spotify session expired, please reconnect your account");
+          }
+        }
+        throw new Error(error.error || 'Failed to search Spotify');
+      } catch (parseError) {
+        if (parseError instanceof SyntaxError) {
+          throw new Error(`Failed to search Spotify: ${data}`);
         } else {
-          throw new Error("Spotify session expired, please reconnect your account");
+          throw parseError;
         }
       }
-      throw new Error(error.error || 'Failed to search Spotify');
     }
 
     const { tracks } = await response.json();
@@ -163,11 +177,13 @@ export async function getSpotifyConnectionStatus(): Promise<{
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to check Spotify connection status');
+      console.error('Error checking status:', await response.text());
+      return { connected: false, expired: false, username: null };
     }
 
-    return await response.json();
+    const status = await response.json();
+    console.log('Spotify connection status:', status);
+    return status;
   } catch (error) {
     console.error('Error checking Spotify status:', error);
     return { connected: false, expired: false, username: null };
@@ -177,6 +193,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
 // Refresh the Spotify access token
 export async function refreshSpotifyToken(): Promise<boolean> {
   try {
+    console.log('Attempting to refresh Spotify token');
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
       throw new Error('No active session');
@@ -191,12 +208,13 @@ export async function refreshSpotifyToken(): Promise<boolean> {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('Token refresh failed:', error);
+      const data = await response.text();
+      console.error('Token refresh failed:', data);
       return false;
     }
 
     const result = await response.json();
+    console.log('Token refresh successful:', !!result.access_token);
     return !!result.access_token;
   } catch (error) {
     console.error('Error refreshing Spotify token:', error);
@@ -221,11 +239,16 @@ export async function disconnectSpotify(): Promise<boolean> {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to disconnect from Spotify');
+      const errorData = await response.text();
+      console.error('Error disconnecting from Spotify:', errorData);
+      throw new Error(JSON.parse(errorData).error || 'Failed to disconnect from Spotify');
     }
 
     const result = await response.json();
+    
+    // Force refresh the auth session to ensure UI is updated
+    await supabase.auth.refreshSession();
+    
     return result.success;
   } catch (error) {
     console.error('Error disconnecting from Spotify:', error);

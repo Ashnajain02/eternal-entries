@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Link } from 'react-router-dom';
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface SpotifySearchProps {
   onSelect: (track: SpotifyTrack) => void;
@@ -23,28 +23,34 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
   const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(null);
   const [spotifyUsername, setSpotifyUsername] = useState<string | null>(null);
   const [tokenExpired, setTokenExpired] = useState(false);
+  const { toast } = useToast();
 
-  // Check Spotify connection status when popover opens
+  // Check Spotify connection status when popover opens or component mounts
   useEffect(() => {
-    if (isOpen && spotifyConnected === null) {
+    if (isOpen || spotifyConnected === null) {
       checkSpotifyConnection();
     }
-  }, [isOpen, spotifyConnected]);
+  }, [isOpen]);
 
   const checkSpotifyConnection = async () => {
     try {
+      console.log('Checking Spotify connection status...');
       const status = await getSpotifyConnectionStatus();
+      console.log('Spotify connection check result:', status);
+      
       setSpotifyConnected(status.connected && !status.expired);
       setSpotifyUsername(status.username);
       setTokenExpired(status.expired);
       
-      // If token is expired, try to refresh it automatically
+      // If token is expired but we have a connection, try to refresh it automatically
       if (status.connected && status.expired) {
+        console.log('Spotify token expired, attempting automatic refresh');
         handleRefreshToken();
       }
     } catch (error) {
       console.error('Error checking Spotify connection:', error);
       setSpotifyConnected(false);
+      setTokenExpired(false);
     }
   };
   
@@ -54,13 +60,14 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
       const refreshed = await refreshSpotifyToken();
       if (refreshed) {
         // Update status after refresh
-        checkSpotifyConnection();
+        await checkSpotifyConnection();
         toast({
           title: "Spotify reconnected",
           description: "Your Spotify connection has been refreshed.",
         });
       } else {
         setTokenExpired(true);
+        setSpotifyConnected(false);
         toast({
           title: "Spotify session expired",
           description: "Please reconnect your Spotify account in Settings.",
@@ -69,6 +76,7 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
       }
     } catch (error) {
       console.error('Error refreshing token:', error);
+      setTokenExpired(true);
     } finally {
       setIsRefreshing(false);
     }

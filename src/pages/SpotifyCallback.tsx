@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotify';
@@ -56,7 +57,12 @@ const SpotifyCallback = () => {
           // Close this window if it's a popup
           if (window.opener && !window.opener.closed) {
             // If it's a popup, notify the opener that the connection was successful
-            window.opener.postMessage({ type: 'SPOTIFY_CONNECTED', success: true }, window.location.origin);
+            window.opener.postMessage({ 
+              type: 'SPOTIFY_CONNECTED', 
+              success: true, 
+              display_name: result.display_name 
+            }, window.location.origin);
+            
             setTimeout(() => {
               window.opener.focus();
               window.close();

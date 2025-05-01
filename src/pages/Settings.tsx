@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,7 +56,7 @@ const Settings = () => {
     if (authState.user) {
       fetchSpotifyStatus();
     }
-  }, [authState.user]);
+  }, [authState.user, authState.session]);
 
   // Listen for Spotify connection messages from popup
   useEffect(() => {
@@ -66,13 +65,13 @@ const Settings = () => {
       if (event.origin !== window.location.origin) return;
 
       if (event.data.type === 'SPOTIFY_CONNECTED' && event.data.success) {
-        console.log('Received Spotify connected message from popup');
+        console.log('Received Spotify connected message from popup:', event.data);
         // Refresh the status to show the new connection
         fetchSpotifyStatus();
         
         toast({
           title: 'Spotify Connected',
-          description: 'Your Spotify account has been successfully connected.',
+          description: `Your Spotify account has been successfully connected${event.data.display_name ? ` as ${event.data.display_name}` : ''}.`,
         });
       }
     };
@@ -120,15 +119,7 @@ const Settings = () => {
       
       if (refreshed) {
         // Get updated status
-        const status = await getSpotifyConnectionStatus();
-        
-        setSpotifyStatus({
-          isLoading: false,
-          isRefreshing: false,
-          connected: status.connected,
-          expired: status.expired,
-          username: status.username,
-        });
+        await fetchSpotifyStatus();
         
         toast({
           title: 'Spotify Reconnected',
