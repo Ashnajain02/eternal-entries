@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -46,11 +45,19 @@ serve(async (req) => {
       const show_dialog = url.searchParams.get("show_dialog") === "true";
       
       console.log("Auth request params:", { redirect_uri, scope, show_dialog }); // Debug log
+      console.log("Spotify Client ID available:", !!clientId); // Debug log for client ID
       
       if (!redirect_uri || !scope) {
         return new Response(
           JSON.stringify({ error: "Missing required parameters" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      if (!clientId) {
+        return new Response(
+          JSON.stringify({ error: "Spotify Client ID is not configured" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
       
