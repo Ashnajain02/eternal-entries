@@ -9,6 +9,60 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      journal_entries: {
+        Row: {
+          created_at: string
+          entry_text: string
+          id: string
+          mood: string
+          spotify_track_album: string | null
+          spotify_track_artist: string | null
+          spotify_track_image: string | null
+          spotify_track_name: string | null
+          spotify_track_uri: string | null
+          timestamp_started: string
+          user_id: string
+          weather_description: string | null
+          weather_icon: string | null
+          weather_location: string | null
+          weather_temperature: number | null
+        }
+        Insert: {
+          created_at?: string
+          entry_text: string
+          id?: string
+          mood: string
+          spotify_track_album?: string | null
+          spotify_track_artist?: string | null
+          spotify_track_image?: string | null
+          spotify_track_name?: string | null
+          spotify_track_uri?: string | null
+          timestamp_started?: string
+          user_id: string
+          weather_description?: string | null
+          weather_icon?: string | null
+          weather_location?: string | null
+          weather_temperature?: number | null
+        }
+        Update: {
+          created_at?: string
+          entry_text?: string
+          id?: string
+          mood?: string
+          spotify_track_album?: string | null
+          spotify_track_artist?: string | null
+          spotify_track_image?: string | null
+          spotify_track_name?: string | null
+          spotify_track_uri?: string | null
+          timestamp_started?: string
+          user_id?: string
+          weather_description?: string | null
+          weather_icon?: string | null
+          weather_location?: string | null
+          weather_temperature?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

@@ -32,4 +32,6 @@ export interface JournalEntry {
   weather?: WeatherData;
   track?: SpotifyTrack;
   createdAt: number;
+  user_id?: string;
 }
+

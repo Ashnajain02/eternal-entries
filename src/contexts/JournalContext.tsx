@@ -1,19 +1,23 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { JournalEntry, Mood, SpotifyTrack, WeatherData } from '@/types';
+import { useAuth } from './AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface JournalContextType {
   entries: JournalEntry[];
   currentEntry: JournalEntry | null;
-  addEntry: (entry: JournalEntry) => void;
-  updateEntry: (entry: JournalEntry) => void;
-  deleteEntry: (id: string) => void;
+  addEntry: (entry: JournalEntry) => Promise<void>;
+  updateEntry: (entry: JournalEntry) => Promise<void>;
+  deleteEntry: (id: string) => Promise<void>;
   getEntryById: (id: string) => JournalEntry | undefined;
   getEntriesByDate: (date: string) => JournalEntry[];
   getEntriesByMood: (mood: Mood) => JournalEntry[];
   createNewEntry: (date?: string) => JournalEntry;
   setCurrentEntry: (entry: JournalEntry | null) => void;
   searchEntries: (query: string) => JournalEntry[];
+  isLoading: boolean;
   statsData: {
     totalEntries: number;
     moodCounts: Record<Mood, number>;
@@ -39,27 +43,68 @@ interface JournalProviderProps {
 export const JournalProvider = ({ children }: JournalProviderProps) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState<JournalEntry | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { authState } = useAuth();
+  const { toast } = useToast();
   
-  // Load entries from localStorage on initial render
+  // Load entries from Supabase on auth state change
   useEffect(() => {
-    try {
-      const savedEntries = localStorage.getItem('journal_entries');
-      if (savedEntries) {
-        setEntries(JSON.parse(savedEntries));
+    const fetchEntries = async () => {
+      if (!authState.user) {
+        setEntries([]);
+        setIsLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error loading journal entries:', error);
-    }
-  }, []);
-  
-  // Save entries to localStorage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem('journal_entries', JSON.stringify(entries));
-    } catch (error) {
-      console.error('Error saving journal entries:', error);
-    }
-  }, [entries]);
+
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('journal_entries')
+          .select('*')
+          .eq('user_id', authState.user.id)
+          .order('timestamp_started', { ascending: false });
+
+        if (error) throw error;
+
+        // Transform the data to match our client-side model
+        const transformedEntries: JournalEntry[] = data.map(entry => ({
+          id: entry.id,
+          content: entry.entry_text,
+          date: new Date(entry.timestamp_started).toISOString().split('T')[0],
+          timestamp: entry.timestamp_started,
+          mood: entry.mood as Mood,
+          weather: entry.weather_temperature ? {
+            temperature: entry.weather_temperature,
+            description: entry.weather_description || '',
+            icon: entry.weather_icon || '',
+            location: entry.weather_location || ''
+          } : undefined,
+          track: entry.spotify_track_uri ? {
+            id: entry.spotify_track_uri,
+            name: entry.spotify_track_name || '',
+            artist: entry.spotify_track_artist || '',
+            album: entry.spotify_track_album || '',
+            albumArt: entry.spotify_track_image || '',
+            uri: entry.spotify_track_uri
+          } : undefined,
+          createdAt: new Date(entry.created_at).getTime()
+        }));
+
+        setEntries(transformedEntries);
+      } catch (error: any) {
+        console.error('Error loading journal entries:', error.message);
+        toast({
+          title: "Error loading journal entries",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEntries();
+  }, [authState.user]);
   
   // Generate stats data
   const statsData = React.useMemo(() => {
@@ -91,8 +136,12 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
     
-    sortedEntries.forEach(entry => {
-      const entryDate = new Date(entry.date);
+    // Get unique dates
+    const uniqueDates = new Set(sortedEntries.map(entry => entry.date));
+    const uniqueSortedDates = Array.from(uniqueDates).sort();
+    
+    uniqueSortedDates.forEach((dateStr, index) => {
+      const entryDate = new Date(dateStr);
       
       if (lastDate) {
         // Check if this entry is one day after the last one
@@ -148,18 +197,145 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
   }, [entries]);
   
   // Helper functions
-  const addEntry = (entry: JournalEntry) => {
-    setEntries(prev => [...prev, entry]);
+  const addEntry = async (entry: JournalEntry) => {
+    if (!authState.user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to add journal entries",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .insert([{
+          user_id: authState.user.id,
+          entry_text: entry.content,
+          mood: entry.mood,
+          spotify_track_uri: entry.track?.uri,
+          spotify_track_name: entry.track?.name,
+          spotify_track_artist: entry.track?.artist,
+          spotify_track_album: entry.track?.album,
+          spotify_track_image: entry.track?.albumArt,
+          weather_temperature: entry.weather?.temperature,
+          weather_description: entry.weather?.description,
+          weather_icon: entry.weather?.icon,
+          weather_location: entry.weather?.location,
+          timestamp_started: entry.timestamp
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add the entry to the local state with the server-generated ID
+      const newEntry: JournalEntry = {
+        ...entry,
+        id: data.id,
+        createdAt: new Date(data.created_at).getTime(),
+      };
+
+      setEntries(prev => [newEntry, ...prev]);
+
+      toast({
+        title: "Entry saved",
+        description: "Your journal entry has been saved successfully",
+      });
+    } catch (error: any) {
+      console.error('Error adding journal entry:', error);
+      toast({
+        title: "Error saving entry",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
   
-  const updateEntry = (updatedEntry: JournalEntry) => {
-    setEntries(prev => prev.map(entry => 
-      entry.id === updatedEntry.id ? updatedEntry : entry
-    ));
+  const updateEntry = async (updatedEntry: JournalEntry) => {
+    if (!authState.user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to update journal entries",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('journal_entries')
+        .update({
+          entry_text: updatedEntry.content,
+          mood: updatedEntry.mood,
+          spotify_track_uri: updatedEntry.track?.uri,
+          spotify_track_name: updatedEntry.track?.name,
+          spotify_track_artist: updatedEntry.track?.artist,
+          spotify_track_album: updatedEntry.track?.album,
+          spotify_track_image: updatedEntry.track?.albumArt,
+          weather_temperature: updatedEntry.weather?.temperature,
+          weather_description: updatedEntry.weather?.description,
+          weather_icon: updatedEntry.weather?.icon,
+          weather_location: updatedEntry.weather?.location,
+        })
+        .eq('id', updatedEntry.id);
+
+      if (error) throw error;
+
+      setEntries(prev => prev.map(entry => 
+        entry.id === updatedEntry.id ? updatedEntry : entry
+      ));
+
+      toast({
+        title: "Entry updated",
+        description: "Your journal entry has been updated successfully",
+      });
+    } catch (error: any) {
+      console.error('Error updating journal entry:', error);
+      toast({
+        title: "Error updating entry",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
   
-  const deleteEntry = (id: string) => {
-    setEntries(prev => prev.filter(entry => entry.id !== id));
+  const deleteEntry = async (id: string) => {
+    if (!authState.user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to delete journal entries",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('journal_entries')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setEntries(prev => prev.filter(entry => entry.id !== id));
+
+      toast({
+        title: "Entry deleted",
+        description: "Your journal entry has been deleted successfully",
+      });
+    } catch (error: any) {
+      console.error('Error deleting journal entry:', error);
+      toast({
+        title: "Error deleting entry",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
   
   const getEntryById = (id: string) => {
@@ -190,7 +366,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     const formattedDate = date || now.toISOString().split('T')[0];
     
     const newEntry: JournalEntry = {
-      id: `entry-${Date.now()}`,
+      id: `temp-${Date.now()}`,
       content: '',
       date: formattedDate,
       timestamp: now.toISOString(),
@@ -213,6 +389,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     createNewEntry,
     setCurrentEntry,
     searchEntries,
+    isLoading,
     statsData
   };
   

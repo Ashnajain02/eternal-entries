@@ -30,6 +30,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [weatherData, setWeatherData] = useState<WeatherData | null>(initialEntry?.weather || null);
   const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | undefined>(initialEntry?.track);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Get current weather on first load if not already present
   useEffect(() => {
@@ -61,7 +62,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!content.trim()) {
       toast({
         title: "Cannot save empty entry",
@@ -71,30 +72,38 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       return;
     }
 
-    const updatedEntry: JournalEntry = {
-      ...entry,
-      content,
-      mood: selectedMood,
-      weather: weatherData || undefined,
-      track: selectedTrack,
-    };
+    setIsSaving(true);
 
-    if (initialEntry) {
-      updateEntry(updatedEntry);
-      toast({
-        title: "Journal updated",
-        description: "Your journal entry has been updated successfully."
-      });
-    } else {
-      addEntry(updatedEntry);
-      toast({
-        title: "Journal saved",
-        description: "Your journal entry has been saved successfully."
-      });
-    }
+    try {
+      const updatedEntry: JournalEntry = {
+        ...entry,
+        content,
+        mood: selectedMood,
+        weather: weatherData || undefined,
+        track: selectedTrack,
+      };
 
-    if (onSave) {
-      onSave();
+      if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
+        await updateEntry(updatedEntry);
+        toast({
+          title: "Journal updated",
+          description: "Your journal entry has been updated successfully."
+        });
+      } else {
+        await addEntry(updatedEntry);
+        toast({
+          title: "Journal saved",
+          description: "Your journal entry has been saved successfully."
+        });
+      }
+
+      if (onSave) {
+        onSave();
+      }
+    } catch (error) {
+      console.error('Error saving journal entry:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
   
@@ -135,8 +144,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         <Button variant="outline" onClick={onSave}>
           Cancel
         </Button>
-        <Button onClick={handleSave}>
-          Save Entry
+        <Button onClick={handleSave} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save Entry"}
         </Button>
       </div>
     </Card>
