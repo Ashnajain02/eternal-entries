@@ -1,0 +1,44 @@
+
+import React from 'react';
+import { Mood, MoodOption } from '@/types';
+import { cn } from '@/lib/utils';
+
+interface MoodSelectorProps {
+  selectedMood: Mood;
+  onChange: (mood: Mood) => void;
+  className?: string;
+}
+
+const MoodSelector: React.FC<MoodSelectorProps> = ({ selectedMood, onChange, className }) => {
+  const moodOptions: MoodOption[] = [
+    { value: 'happy', label: 'Happy', emoji: '😄' },
+    { value: 'content', label: 'Content', emoji: '😊' },
+    { value: 'neutral', label: 'Neutral', emoji: '😐' },
+    { value: 'sad', label: 'Sad', emoji: '😔' },
+    { value: 'anxious', label: 'Anxious', emoji: '😰' },
+  ];
+
+  return (
+    <div className={cn("flex flex-row items-center gap-3 p-2", className)}>
+      <p className="text-sm font-medium text-muted-foreground mr-2">How are you feeling?</p>
+      <div className="flex space-x-3">
+        {moodOptions.map((mood) => (
+          <button
+            key={mood.value}
+            onClick={() => onChange(mood.value)}
+            className={cn(
+              "mood-emoji relative",
+              selectedMood === mood.value && "after:absolute after:bottom-[-8px] after:left-1/2 after:w-1.5 after:h-1.5 after:bg-journal-purple after:rounded-full after:transform after:-translate-x-1/2"
+            )}
+            title={mood.label}
+            aria-label={`Select mood: ${mood.label}`}
+          >
+            {mood.emoji}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default MoodSelector;
