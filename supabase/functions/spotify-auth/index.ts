@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -11,6 +12,12 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const clientId = Deno.env.get("SPOTIFY_CLIENT_ID") || "";
 const clientSecret = Deno.env.get("SPOTIFY_CLIENT_SECRET") || "";
+
+console.log("Environment check on startup:");
+console.log("SUPABASE_URL available:", !!supabaseUrl);
+console.log("SUPABASE_ANON_KEY available:", !!supabaseAnonKey);
+console.log("SPOTIFY_CLIENT_ID available:", !!clientId);
+console.log("SPOTIFY_CLIENT_SECRET available:", !!clientSecret);
 
 // Create a Supabase client for the function
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -62,7 +69,7 @@ serve(async (req) => {
       }
       
       // Generate the authorization URL with the proper client ID
-      const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(
+      const authUrl = `https://accounts.spotify.com/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(
         redirect_uri
       )}&scope=${encodeURIComponent(scope)}${show_dialog ? "&show_dialog=true" : ""}`;
       

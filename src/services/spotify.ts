@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { SpotifyTrack } from '@/types';
 
@@ -18,7 +19,10 @@ export async function openSpotifyAuthWindow(): Promise<void> {
 
     // Get the authorization URL from our edge function with required parameters
     const response = await fetch(
-      `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&show_dialog=${showDialog}`, 
+      `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize?` + 
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `scope=${encodeURIComponent(scope)}&` +
+      `show_dialog=${showDialog}`, 
       {
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
