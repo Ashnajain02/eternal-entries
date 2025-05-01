@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { getSpotifyConnectionStatus, openSpotifyAuthWindow, disconnectSpotify, refreshSpotifyToken } from '@/services/spotify';
-import { Loader2, Music, Check, X, RefreshCw } from 'lucide-react';
+import { Loader2, Music, Check, X, RefreshCw, AlertCircle } from 'lucide-react';
 
 const Settings = () => {
   const { authState } = useAuth();
