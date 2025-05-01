@@ -60,6 +60,13 @@ export function getSpotifyAuthorizationUrl(): string {
   )}&scope=${encodeURIComponent(scopes.join(' '))}&show_dialog=true`;
 }
 
+// Open Spotify authorization in a new window/tab
+export function openSpotifyAuthWindow(): void {
+  const authUrl = getSpotifyAuthorizationUrl();
+  // Open in a new tab rather than trying to use an iframe which Spotify blocks
+  window.open(authUrl, '_blank', 'noopener,noreferrer');
+}
+
 // Handle the Spotify OAuth callback
 export async function handleSpotifyCallback(code: string): Promise<{ success: boolean; display_name?: string }> {
   try {

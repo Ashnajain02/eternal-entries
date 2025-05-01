@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
 import { useToast } from '@/hooks/use-toast';
-import { getSpotifyAuthorizationUrl, getSpotifyConnectionStatus, disconnectSpotify } from '@/services/spotify';
+import { getSpotifyConnectionStatus, openSpotifyAuthWindow, disconnectSpotify } from '@/services/spotify';
 import { Loader2, Music, Check, X } from 'lucide-react';
 
 const Settings = () => {
@@ -51,8 +51,23 @@ const Settings = () => {
   }, [authState.user]);
 
   const handleConnectSpotify = () => {
-    const authUrl = getSpotifyAuthorizationUrl();
-    window.location.href = authUrl;
+    try {
+      // Open Spotify authorization in a new tab
+      openSpotifyAuthWindow();
+      
+      // Show toast notification
+      toast({
+        title: 'Spotify Authorization',
+        description: 'Please complete the authentication in the new tab.',
+      });
+    } catch (error) {
+      console.error('Error opening Spotify auth window:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to open Spotify authorization. Please check if popups are allowed in your browser.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDisconnectSpotify = async () => {

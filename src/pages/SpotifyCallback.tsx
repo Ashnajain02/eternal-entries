@@ -47,7 +47,15 @@ const SpotifyCallback = () => {
             title: 'Spotify Connected!',
             description: `Successfully connected as ${result.display_name || 'User'}.`,
           });
-          navigate('/settings');
+          
+          // Close this window if it's a popup
+          if (window.opener && !window.opener.closed) {
+            window.opener.focus();
+            window.close();
+          } else {
+            // Otherwise navigate back to settings
+            navigate('/settings');
+          }
         } else {
           setError('Failed to connect to Spotify.');
           toast({
@@ -95,7 +103,7 @@ const SpotifyCallback = () => {
           <div className="text-green-500">
             <p>Successfully connected to Spotify!</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Redirecting back to settings...
+              You can close this window or wait to be redirected...
             </p>
           </div>
         )}
