@@ -11,7 +11,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     }
 
     // Get the authorization URL from our edge function
-    const response = await fetch(`${window.location.origin}/api/spotify-auth/authorize`, {
+    const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize', {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
@@ -54,7 +54,7 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
     }
 
     // Send the code to our edge function to exchange for tokens
-    const response = await fetch(`${window.location.origin}/api/spotify-auth/callback?code=${code}`, {
+    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${code}`, {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
@@ -85,7 +85,7 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     }
 
     // Search Spotify via our edge function
-    const response = await fetch(`${window.location.origin}/api/spotify-auth/search?q=${encodeURIComponent(query)}`, {
+    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/search?q=${encodeURIComponent(query)}`, {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
@@ -121,7 +121,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
     }
 
     // Get status from our edge function
-    const response = await fetch(`${window.location.origin}/api/spotify-auth/status`, {
+    const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/status', {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
@@ -148,7 +148,7 @@ export async function disconnectSpotify(): Promise<boolean> {
     }
 
     // Call our edge function to revoke access
-    const response = await fetch(`${window.location.origin}/api/spotify-auth/revoke`, {
+    const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/revoke', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
