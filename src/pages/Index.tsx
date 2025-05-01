@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Plus, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
+import SettingsLink from '@/components/SettingsLink';
 
 const Index = () => {
   const { entries, createNewEntry, isLoading } = useJournal();
@@ -77,6 +78,8 @@ const Index = () => {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto space-y-8">
+        <SettingsLink />
+        
         <div>
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl font-bold">Today's Journal</h1>

@@ -73,6 +73,10 @@ export type Database = {
           first_name: string | null
           id: string
           last_name: string | null
+          spotify_access_token: string | null
+          spotify_refresh_token: string | null
+          spotify_token_expires_at: string | null
+          spotify_username: string | null
           updated_at: string
           username: string | null
         }
@@ -82,6 +86,10 @@ export type Database = {
           first_name?: string | null
           id: string
           last_name?: string | null
+          spotify_access_token?: string | null
+          spotify_refresh_token?: string | null
+          spotify_token_expires_at?: string | null
+          spotify_username?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -91,6 +99,10 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
+          spotify_access_token?: string | null
+          spotify_refresh_token?: string | null
+          spotify_token_expires_at?: string | null
+          spotify_username?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -101,7 +113,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_spotify_token: {
+        Args: { user_id: string }
+        Returns: string
+      }
+      is_spotify_token_expired: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,0 +1,325 @@
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+const clientId = Deno.env.get("SPOTIFY_CLIENT_ID") || "";
+const clientSecret = Deno.env.get("SPOTIFY_CLIENT_SECRET") || "";
+
+// Create a Supabase client for the function
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+serve(async (req) => {
+  // Handle CORS preflight request
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders, status: 204 });
+  }
+  
+  try {
+    // Get the authorization header from the request
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "No authorization header" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
+    }
+    
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Verify the JWT token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
+    }
+    
+    // Parse the request URL
+    const url = new URL(req.url);
+    const path = url.pathname.split("/").pop();
+    
+    if (path === "callback") {
+      // Handle the OAuth callback from Spotify
+      const code = url.searchParams.get("code");
+      
+      if (!code) {
+        return new Response(
+          JSON.stringify({ error: "No authorization code provided" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      // Exchange the code for an access token
+      const redirectUri = `${url.origin}/spotify-auth/callback`;
+      const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+        },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: redirectUri,
+        }),
+      });
+      
+      const tokenData = await tokenResponse.json();
+      
+      if (tokenData.error) {
+        return new Response(
+          JSON.stringify({ error: tokenData.error }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      // Get the user's Spotify profile
+      const profileResponse = await fetch("https://api.spotify.com/v1/me", {
+        headers: {
+          "Authorization": `Bearer ${tokenData.access_token}`,
+        },
+      });
+      
+      const profileData = await profileResponse.json();
+      
+      // Calculate token expiration
+      const expiresAt = new Date();
+      expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+      
+      // Save the tokens in the user's profile
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          spotify_access_token: tokenData.access_token,
+          spotify_refresh_token: tokenData.refresh_token,
+          spotify_token_expires_at: expiresAt.toISOString(),
+          spotify_username: profileData.display_name || profileData.id,
+        })
+        .eq("id", user.id);
+      
+      if (updateError) {
+        console.error("Error updating profile:", updateError);
+        return new Response(
+          JSON.stringify({ error: "Failed to save Spotify credentials" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          display_name: profileData.display_name,
+          expires_at: expiresAt.toISOString() 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else if (path === "refresh") {
+      // Get the user's refresh token
+      const { data: profiles, error: profileError } = await supabase
+        .from("profiles")
+        .select("spotify_refresh_token")
+        .eq("id", user.id)
+        .single();
+      
+      if (profileError || !profiles.spotify_refresh_token) {
+        return new Response(
+          JSON.stringify({ error: "No refresh token found" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      // Refresh the access token
+      const refreshResponse = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+        },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: profiles.spotify_refresh_token,
+        }),
+      });
+      
+      const refreshData = await refreshResponse.json();
+      
+      if (refreshData.error) {
+        return new Response(
+          JSON.stringify({ error: refreshData.error }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      // Calculate new expiration time
+      const expiresAt = new Date();
+      expiresAt.setSeconds(expiresAt.getSeconds() + refreshData.expires_in);
+      
+      // Update the tokens in the database
+      const updateData: any = {
+        spotify_access_token: refreshData.access_token,
+        spotify_token_expires_at: expiresAt.toISOString(),
+      };
+      
+      // Update refresh token if provided
+      if (refreshData.refresh_token) {
+        updateData.spotify_refresh_token = refreshData.refresh_token;
+      }
+      
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update(updateData)
+        .eq("id", user.id);
+      
+      if (updateError) {
+        return new Response(
+          JSON.stringify({ error: "Failed to update tokens" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          access_token: refreshData.access_token,
+          expires_at: expiresAt.toISOString() 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else if (path === "revoke") {
+      // Revoke the Spotify access
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          spotify_access_token: null,
+          spotify_refresh_token: null,
+          spotify_token_expires_at: null,
+          spotify_username: null,
+        })
+        .eq("id", user.id);
+      
+      if (updateError) {
+        return new Response(
+          JSON.stringify({ error: "Failed to revoke Spotify access" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else if (path === "search") {
+      // Get user's Spotify token
+      const { data: { spotify_access_token, spotify_token_expires_at }, error: profileError } = await supabase
+        .rpc('get_user_spotify_token', { user_id: user.id })
+        .select()
+        .single();
+      
+      if (profileError || !spotify_access_token) {
+        return new Response(
+          JSON.stringify({ error: "Not connected to Spotify" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      // Check if token is expired
+      const isExpired = await supabase.rpc('is_spotify_token_expired', { user_id: user.id });
+      
+      if (isExpired) {
+        return new Response(
+          JSON.stringify({ error: "Token expired, please refresh" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+        );
+      }
+      
+      // Get query parameters
+      const query = url.searchParams.get("q") || "";
+      
+      if (!query) {
+        return new Response(
+          JSON.stringify({ error: "No search query provided" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      // Search Spotify
+      const searchResponse = await fetch(
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
+        {
+          headers: {
+            "Authorization": `Bearer ${spotify_access_token}`,
+          },
+        }
+      );
+      
+      const searchData = await searchResponse.json();
+      
+      if (searchData.error) {
+        return new Response(
+          JSON.stringify({ error: searchData.error.message }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchData.error.status }
+        );
+      }
+      
+      // Transform the response to match our app's format
+      const tracks = searchData.tracks.items.map((track: any) => ({
+        id: track.id,
+        name: track.name,
+        artist: track.artists.map((a: any) => a.name).join(", "),
+        album: track.album.name,
+        albumArt: track.album.images[0]?.url,
+        uri: track.uri,
+      }));
+      
+      return new Response(
+        JSON.stringify({ tracks }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else if (path === "status") {
+      // Get the user's Spotify connection status
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("spotify_username, spotify_token_expires_at")
+        .eq("id", user.id)
+        .single();
+      
+      if (profileError) {
+        return new Response(
+          JSON.stringify({ error: "Failed to get profile" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      
+      const isConnected = !!profile.spotify_username;
+      const isExpired = !profile.spotify_token_expires_at || new Date(profile.spotify_token_expires_at) < new Date();
+      
+      return new Response(
+        JSON.stringify({
+          connected: isConnected,
+          expired: isConnected && isExpired,
+          username: profile.spotify_username || null,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({ error: "Invalid endpoint" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
+      );
+    }
+  } catch (error) {
+    console.error("Error:", error.message);
+    return new Response(
+      JSON.stringify({ error: "Internal server error", details: error.message }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    );
+  }
+});
