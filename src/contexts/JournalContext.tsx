@@ -87,8 +87,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             uri: entry.spotify_track_uri
           } : undefined,
           createdAt: new Date(entry.created_at).getTime(),
-          // Use optional chaining to handle entries without updated_at
-          updatedAt: entry.updated_at ? new Date(entry.updated_at as string).getTime() : undefined,
+          // Use type assertion to tell TypeScript that updated_at exists
+          updatedAt: (entry as any).updated_at ? new Date((entry as any).updated_at).getTime() : undefined,
           user_id: entry.user_id
         }));
 
