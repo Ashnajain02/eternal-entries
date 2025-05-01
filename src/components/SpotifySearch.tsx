@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { SpotifyTrack } from '@/types';
-import { searchSpotifyTracks, getSpotifyConnectionStatus } from '@/services/spotify';
-import { Music, Search, AlertCircle, ExternalLink } from 'lucide-react';
+import { searchSpotifyTracks, getSpotifyConnectionStatus, refreshSpotifyToken } from '@/services/spotify';
+import { Music, Search, AlertCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -19,29 +19,60 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
   const [results, setResults] = useState<SpotifyTrack[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(null);
   const [spotifyUsername, setSpotifyUsername] = useState<string | null>(null);
-  const [connectionChecked, setConnectionChecked] = useState(false);
+  const [tokenExpired, setTokenExpired] = useState(false);
 
-  // Check Spotify connection status
+  // Check Spotify connection status when popover opens
   useEffect(() => {
-    const checkSpotifyConnection = async () => {
-      try {
-        const status = await getSpotifyConnectionStatus();
-        setSpotifyConnected(status.connected && !status.expired);
-        setSpotifyUsername(status.username);
-      } catch (error) {
-        console.error('Error checking Spotify connection:', error);
-        setSpotifyConnected(false);
-      } finally {
-        setConnectionChecked(true);
-      }
-    };
-
-    if (isOpen && !connectionChecked) {
+    if (isOpen && spotifyConnected === null) {
       checkSpotifyConnection();
     }
-  }, [isOpen, connectionChecked]);
+  }, [isOpen, spotifyConnected]);
+
+  const checkSpotifyConnection = async () => {
+    try {
+      const status = await getSpotifyConnectionStatus();
+      setSpotifyConnected(status.connected && !status.expired);
+      setSpotifyUsername(status.username);
+      setTokenExpired(status.expired);
+      
+      // If token is expired, try to refresh it automatically
+      if (status.connected && status.expired) {
+        handleRefreshToken();
+      }
+    } catch (error) {
+      console.error('Error checking Spotify connection:', error);
+      setSpotifyConnected(false);
+    }
+  };
+  
+  const handleRefreshToken = async () => {
+    setIsRefreshing(true);
+    try {
+      const refreshed = await refreshSpotifyToken();
+      if (refreshed) {
+        // Update status after refresh
+        checkSpotifyConnection();
+        toast({
+          title: "Spotify reconnected",
+          description: "Your Spotify connection has been refreshed.",
+        });
+      } else {
+        setTokenExpired(true);
+        toast({
+          title: "Spotify session expired",
+          description: "Please reconnect your Spotify account in Settings.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Search for tracks when query changes
   useEffect(() => {
@@ -59,12 +90,13 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
         console.error('Error searching tracks:', error);
         
         // Show toast for specific errors
-        if (error.message.includes("reconnect")) {
+        if (error.message && error.message.includes("reconnect")) {
           toast({
             title: "Spotify session expired",
             description: "Please reconnect to Spotify in Settings.",
             variant: "destructive"
           });
+          setTokenExpired(true);
           setSpotifyConnected(false);
         }
       } finally {
@@ -116,7 +148,41 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
           )}
         </PopoverTrigger>
         <PopoverContent className="w-80 p-2" align="start">
-          {connectionChecked && !spotifyConnected ? (
+          {spotifyConnected === null ? (
+            <div className="p-4 text-center">
+              <RefreshCw className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+              <p className="text-sm mt-2">Checking Spotify connection...</p>
+            </div>
+          ) : tokenExpired ? (
+            <div className="p-4 text-center space-y-4">
+              <div className="flex justify-center">
+                <AlertCircle className="h-8 w-8 text-amber-500" />
+              </div>
+              <p className="text-sm">
+                Your Spotify session has expired. Please reconnect.
+              </p>
+              <div className="space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRefreshToken}
+                  disabled={isRefreshing}
+                >
+                  {isRefreshing ? 
+                    <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : 
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  }
+                  Retry
+                </Button>
+                <Link to="/settings">
+                  <Button className="flex items-center gap-2" size="sm">
+                    <span>Reconnect</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : !spotifyConnected ? (
             <div className="p-4 text-center space-y-4">
               <div className="flex justify-center">
                 <AlertCircle className="h-8 w-8 text-muted-foreground" />

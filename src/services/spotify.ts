@@ -109,7 +109,14 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
       const error = await response.json();
       // Special handling for token expired errors
       if (error.error && error.error.includes("expired")) {
-        throw new Error("Spotify session expired, please reconnect your account");
+        // Try to refresh the token automatically
+        const refreshed = await refreshSpotifyToken();
+        if (refreshed) {
+          // Retry the search with the refreshed token
+          return searchSpotifyTracks(query);
+        } else {
+          throw new Error("Spotify session expired, please reconnect your account");
+        }
       }
       throw new Error(error.error || 'Failed to search Spotify');
     }
@@ -150,6 +157,36 @@ export async function getSpotifyConnectionStatus(): Promise<{
   } catch (error) {
     console.error('Error checking Spotify status:', error);
     return { connected: false, expired: false, username: null };
+  }
+}
+
+// Refresh the Spotify access token
+export async function refreshSpotifyToken(): Promise<boolean> {
+  try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      throw new Error('No active session');
+    }
+
+    // Call our edge function to refresh the token
+    const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/refresh', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${sessionData.session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Token refresh failed:', error);
+      return false;
+    }
+
+    const result = await response.json();
+    return !!result.access_token;
+  } catch (error) {
+    console.error('Error refreshing Spotify token:', error);
+    return false;
   }
 }
 
