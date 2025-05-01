@@ -3,6 +3,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { AuthButtons } from '@/components/AuthButtons';
 
 interface NavLinkProps {
   to: string;
@@ -46,6 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <NavLink to="/">Journal</NavLink>
             <NavLink to="/archive">Archive</NavLink>
             <NavLink to="/stats">Stats</NavLink>
+            <AuthButtons />
           </nav>
         </div>
       </header>
