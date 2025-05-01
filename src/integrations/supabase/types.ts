@@ -21,6 +21,7 @@ export type Database = {
           spotify_track_name: string | null
           spotify_track_uri: string | null
           timestamp_started: string
+          updated_at: string | null
           user_id: string
           weather_description: string | null
           weather_icon: string | null
@@ -38,6 +39,7 @@ export type Database = {
           spotify_track_name?: string | null
           spotify_track_uri?: string | null
           timestamp_started?: string
+          updated_at?: string | null
           user_id: string
           weather_description?: string | null
           weather_icon?: string | null
@@ -55,6 +57,7 @@ export type Database = {
           spotify_track_name?: string | null
           spotify_track_uri?: string | null
           timestamp_started?: string
+          updated_at?: string | null
           user_id?: string
           weather_description?: string | null
           weather_icon?: string | null

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { JournalEntry, Mood, SpotifyTrack, WeatherData } from '@/types';
 import { useAuth } from './AuthContext';
@@ -87,8 +88,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             uri: entry.spotify_track_uri
           } : undefined,
           createdAt: new Date(entry.created_at).getTime(),
-          // Use type assertion to tell TypeScript that updated_at exists
-          updatedAt: (entry as any).updated_at ? new Date((entry as any).updated_at).getTime() : undefined,
+          updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
           user_id: entry.user_id
         }));
 
