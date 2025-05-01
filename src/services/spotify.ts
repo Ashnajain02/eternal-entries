@@ -10,8 +10,12 @@ export async function openSpotifyAuthWindow(): Promise<void> {
       throw new Error('No active session');
     }
 
-    // Get the authorization URL from our edge function
-    const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize', {
+    // Define the required parameters
+    const redirectUri = `${window.location.origin}/spotify-callback`;
+    const scope = 'user-read-private user-read-email user-top-read';
+
+    // Get the authorization URL from our edge function with required parameters
+    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`, {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
