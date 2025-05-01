@@ -1,8 +1,9 @@
+
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { AuthButtons } from './AuthButtons';
-import { Journal, Archive, BarChart3, Settings } from 'lucide-react';
+import { Notebook, Archive, BarChart3, Settings } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -33,7 +34,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Journal className="h-4 w-4" />
+                <Notebook className="h-4 w-4" />
                 <span>Journal</span>
               </Link>
               <Link

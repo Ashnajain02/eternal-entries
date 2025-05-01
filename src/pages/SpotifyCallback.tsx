@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotify';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/hooks/use-toast';
 
 const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);

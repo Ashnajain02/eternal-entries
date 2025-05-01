@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/hooks/use-toast';
 import { getSpotifyAuthorizationUrl, getSpotifyConnectionStatus, disconnectSpotify } from '@/services/spotify';
 import { Loader2, Music, Check, X } from 'lucide-react';
 
