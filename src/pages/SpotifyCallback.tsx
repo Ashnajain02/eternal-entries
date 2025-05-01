@@ -5,6 +5,7 @@ import { handleSpotifyCallback } from '@/services/spotify';
 import { Card } from '@/components/ui/card';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -12,10 +13,29 @@ const SpotifyCallback = () => {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { authState } = useAuth();
 
   useEffect(() => {
     const processCallback = async () => {
       try {
+        // Make sure we have an active session before proceeding
+        if (!authState.session) {
+          // Set a small delay to see if the session loads
+          const waitForSession = setTimeout(() => {
+            if (!authState.session) {
+              setError('No active session. Please log in and try again.');
+              toast({
+                title: 'Authentication Required',
+                description: 'Please log in to connect your Spotify account.',
+                variant: 'destructive',
+              });
+              setTimeout(() => navigate('/auth'), 3000);
+            }
+          }, 1500);
+          
+          return () => clearTimeout(waitForSession);
+        }
+
         const url = new URL(window.location.href);
         const code = url.searchParams.get('code');
         const error = url.searchParams.get('error');
@@ -94,8 +114,10 @@ const SpotifyCallback = () => {
       }
     };
 
-    processCallback();
-  }, [navigate, toast]);
+    if (authState.session || !authState.loading) {
+      processCallback();
+    }
+  }, [navigate, toast, authState]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -106,13 +128,14 @@ const SpotifyCallback = () => {
           <div className="flex flex-col items-center justify-center space-y-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-muted-foreground">Processing your Spotify authorization...</p>
+            {authState.loading && <p className="text-sm text-muted-foreground">Waiting for authentication...</p>}
           </div>
         ) : error ? (
           <div className="text-destructive">
             <XCircle className="h-8 w-8 mx-auto mb-2" />
             <p>{error}</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Redirecting back to settings...
+              Redirecting{error.includes('log in') ? ' to login' : ' back to settings'}...
             </p>
           </div>
         ) : success ? (

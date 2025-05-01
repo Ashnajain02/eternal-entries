@@ -67,15 +67,23 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
       console.error('No active session in handleSpotifyCallback:', sessionError);
-      throw new Error('No active session');
+      throw new Error('No active session. Please log in and try again.');
+    }
+
+    // Ensure we have a valid session token
+    const sessionToken = sessionData.session.access_token;
+    if (!sessionToken) {
+      throw new Error('Invalid session token. Please log in again.');
     }
 
     // Send the code to our edge function to exchange for tokens
-    console.log('Sending code to callback endpoint');
+    console.log('Sending code to callback endpoint with valid auth token');
     const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${encodeURIComponent(code)}`, {
       headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
+        Authorization: `Bearer ${sessionToken}`,
       },
+      // Add credentials to ensure cookies are sent
+      credentials: 'include',
     });
 
     console.log('Callback response status:', response.status);
