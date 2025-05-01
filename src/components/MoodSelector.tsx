@@ -12,10 +12,14 @@ interface MoodSelectorProps {
 const MoodSelector: React.FC<MoodSelectorProps> = ({ selectedMood, onChange, className }) => {
   const moodOptions: MoodOption[] = [
     { value: 'happy', label: 'Happy', emoji: '😄' },
-    { value: 'content', label: 'Content', emoji: '😊' },
-    { value: 'neutral', label: 'Neutral', emoji: '😐' },
     { value: 'sad', label: 'Sad', emoji: '😔' },
+    { value: 'neutral', label: 'Neutral', emoji: '😐' },
+    { value: 'angry', label: 'Angry', emoji: '😠' },
+    { value: 'emotional', label: 'Emotional', emoji: '🥹' },
+    { value: 'in-love', label: 'In Love', emoji: '😍' },
     { value: 'anxious', label: 'Anxious', emoji: '😰' },
+    { value: 'excited', label: 'Excited', emoji: '🤩' },
+    { value: 'tired', label: 'Tired', emoji: '😴' },
   ];
 
   return (

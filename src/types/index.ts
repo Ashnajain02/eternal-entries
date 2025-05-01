@@ -1,5 +1,5 @@
 
-export type Mood = 'happy' | 'content' | 'neutral' | 'sad' | 'anxious';
+export type Mood = 'happy' | 'content' | 'neutral' | 'sad' | 'anxious' | 'angry' | 'emotional' | 'in-love' | 'excited' | 'tired';
 
 export interface MoodOption {
   value: Mood;
@@ -32,6 +32,6 @@ export interface JournalEntry {
   weather?: WeatherData;
   track?: SpotifyTrack;
   createdAt: number;
+  updatedAt?: number;
   user_id?: string;
 }
-

@@ -87,7 +87,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             albumArt: entry.spotify_track_image || '',
             uri: entry.spotify_track_uri
           } : undefined,
-          createdAt: new Date(entry.created_at).getTime()
+          createdAt: new Date(entry.created_at).getTime(),
+          updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined
         }));
 
         setEntries(transformedEntries);
@@ -265,6 +266,9 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     }
 
     try {
+      // Add the current timestamp as updated_at
+      const now = new Date();
+      
       const { error } = await supabase
         .from('journal_entries')
         .update({
@@ -279,13 +283,20 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           weather_description: updatedEntry.weather?.description,
           weather_icon: updatedEntry.weather?.icon,
           weather_location: updatedEntry.weather?.location,
+          updated_at: now.toISOString() // Add the updated_at timestamp
         })
         .eq('id', updatedEntry.id);
 
       if (error) throw error;
 
+      // Update the entry with the new updated_at timestamp
+      const updatedEntryWithTimestamp = {
+        ...updatedEntry,
+        updatedAt: now.getTime()
+      };
+      
       setEntries(prev => prev.map(entry => 
-        entry.id === updatedEntry.id ? updatedEntry : entry
+        entry.id === updatedEntry.id ? updatedEntryWithTimestamp : entry
       ));
 
       toast({

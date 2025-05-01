@@ -50,8 +50,13 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     'content': '😊',
     'neutral': '😐',
     'sad': '😔',
-    'anxious': '😰'
-  }[entry.mood];
+    'anxious': '😰',
+    'angry': '😠',
+    'emotional': '🥹',
+    'in-love': '😍',
+    'excited': '🤩',
+    'tired': '😴'
+  }[entry.mood] || '😐';
 
   return (
     <Card className={cn("journal-card", className)}>
@@ -59,6 +64,11 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         <div>
           <h3 className="text-xl font-semibold">{formattedDate}</h3>
           <p className="text-sm text-muted-foreground">{formattedTime}</p>
+          {entry.updatedAt && (
+            <p className="text-xs text-muted-foreground">
+              Updated: {format(new Date(entry.updatedAt), 'MMM d, yyyy h:mm a')}
+            </p>
+          )}
         </div>
         {entry.weather && (
           <WeatherDisplay weatherData={entry.weather} isLoading={false} />
@@ -67,7 +77,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       
       <div className="mb-4 flex items-center gap-2">
         <span className="text-2xl">{moodEmoji}</span>
-        <span className="text-sm text-muted-foreground capitalize">{entry.mood}</span>
+        <span className="text-sm text-muted-foreground capitalize">{entry.mood.replace('-', ' ')}</span>
       </div>
       
       {entry.track && (
