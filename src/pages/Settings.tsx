@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,23 +49,33 @@ const Settings = () => {
     fetchSpotifyStatus();
   }, [authState.user]);
 
-  const handleConnectSpotify = () => {
+  const handleConnectSpotify = async () => {
     try {
       // Open Spotify authorization in a new tab
-      openSpotifyAuthWindow();
+      await openSpotifyAuthWindow();
       
       // Show toast notification
       toast({
         title: 'Spotify Authorization',
-        description: 'Please complete the authentication in the new tab.',
+        description: 'Please complete the authentication in the new tab. If no tab opened, check your popup blocker.',
       });
     } catch (error) {
       console.error('Error opening Spotify auth window:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to open Spotify authorization. Please check if popups are allowed in your browser.',
-        variant: 'destructive',
-      });
+      
+      // Check if the error is related to popup blocking
+      if (error.message && error.message.includes('blocked')) {
+        toast({
+          title: 'Popup Blocked',
+          description: 'Please allow popups for this site and try again.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to open Spotify authorization.',
+          variant: 'destructive',
+        });
+      }
     }
   };
 

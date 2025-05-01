@@ -18,14 +18,27 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to get authorization URL');
+      // Parse the response to get the error message
+      const errorData = await response.text();
+      console.error('Error response from authorize endpoint:', errorData);
+      try {
+        const parsedError = JSON.parse(errorData);
+        throw new Error(parsedError.error || 'Failed to get authorization URL');
+      } catch (parseError) {
+        // If we can't parse JSON, just throw the raw error
+        throw new Error(`Failed to get authorization URL: ${errorData}`);
+      }
     }
 
     const { url } = await response.json();
     
-    // Open in a new tab
-    window.open(url, '_blank', 'noopener,noreferrer');
+    // Open in a new tab with appropriate attributes
+    const newWindow = window.open(url, '_blank');
+    
+    // Check if popup was blocked
+    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      throw new Error('Popup was blocked. Please allow popups for this website.');
+    }
   } catch (error) {
     console.error('Error opening Spotify auth window:', error);
     throw error;
