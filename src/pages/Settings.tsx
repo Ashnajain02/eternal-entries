@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,33 +26,62 @@ const Settings = () => {
     username: null,
   });
 
+  const fetchSpotifyStatus = async () => {
+    try {
+      if (!authState.user) return;
+      
+      console.log('Fetching Spotify status...');
+      const status = await getSpotifyConnectionStatus();
+      console.log('Spotify status received:', status);
+      
+      setSpotifyStatus({
+        isLoading: false,
+        isRefreshing: false,
+        connected: status.connected,
+        expired: status.expired,
+        username: status.username,
+      });
+    } catch (error) {
+      console.error('Error fetching Spotify status:', error);
+      setSpotifyStatus({
+        isLoading: false,
+        isRefreshing: false,
+        connected: false,
+        expired: false,
+        username: null,
+      });
+    }
+  };
+
   useEffect(() => {
-    const fetchSpotifyStatus = async () => {
-      try {
-        if (!authState.user) return;
+    if (authState.user) {
+      fetchSpotifyStatus();
+    }
+  }, [authState.user]);
+
+  // Listen for Spotify connection messages from popup
+  useEffect(() => {
+    const handleSpotifyConnected = (event) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === 'SPOTIFY_CONNECTED' && event.data.success) {
+        console.log('Received Spotify connected message from popup');
+        // Refresh the status to show the new connection
+        fetchSpotifyStatus();
         
-        const status = await getSpotifyConnectionStatus();
-        setSpotifyStatus({
-          isLoading: false,
-          isRefreshing: false,
-          connected: status.connected,
-          expired: status.expired,
-          username: status.username,
-        });
-      } catch (error) {
-        console.error('Error fetching Spotify status:', error);
-        setSpotifyStatus({
-          isLoading: false,
-          isRefreshing: false,
-          connected: false,
-          expired: false,
-          username: null,
+        toast({
+          title: 'Spotify Connected',
+          description: 'Your Spotify account has been successfully connected.',
         });
       }
     };
 
-    fetchSpotifyStatus();
-  }, [authState.user]);
+    window.addEventListener('message', handleSpotifyConnected);
+    return () => {
+      window.removeEventListener('message', handleSpotifyConnected);
+    };
+  }, [toast]);
 
   const handleConnectSpotify = async () => {
     try {

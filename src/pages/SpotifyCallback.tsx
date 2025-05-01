@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotify';
 import { Card } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -40,9 +41,13 @@ const SpotifyCallback = () => {
           return;
         }
 
+        console.log('Processing Spotify callback with code:', code);
         const result = await handleSpotifyCallback(code);
         
         if (result.success) {
+          console.log('Spotify connection successful:', result);
+          setSuccess(true);
+          
           toast({
             title: 'Spotify Connected!',
             description: `Successfully connected as ${result.display_name || 'User'}.`,
@@ -50,11 +55,15 @@ const SpotifyCallback = () => {
           
           // Close this window if it's a popup
           if (window.opener && !window.opener.closed) {
-            window.opener.focus();
-            window.close();
+            // If it's a popup, notify the opener that the connection was successful
+            window.opener.postMessage({ type: 'SPOTIFY_CONNECTED', success: true }, window.location.origin);
+            setTimeout(() => {
+              window.opener.focus();
+              window.close();
+            }, 1000);
           } else {
-            // Otherwise navigate back to settings
-            navigate('/settings');
+            // Otherwise navigate back to settings after a short delay
+            setTimeout(() => navigate('/settings'), 2000);
           }
         } else {
           setError('Failed to connect to Spotify.');
@@ -67,7 +76,7 @@ const SpotifyCallback = () => {
         }
       } catch (err) {
         console.error('Error processing Spotify callback:', err);
-        setError('An unexpected error occurred.');
+        setError('An unexpected error occurred: ' + (err.message || 'Unknown error'));
         toast({
           title: 'Spotify Connection Error',
           description: err.message || 'An unexpected error occurred.',
@@ -94,19 +103,21 @@ const SpotifyCallback = () => {
           </div>
         ) : error ? (
           <div className="text-destructive">
+            <XCircle className="h-8 w-8 mx-auto mb-2" />
             <p>{error}</p>
             <p className="text-sm text-muted-foreground mt-2">
               Redirecting back to settings...
             </p>
           </div>
-        ) : (
+        ) : success ? (
           <div className="text-green-500">
+            <CheckCircle2 className="h-8 w-8 mx-auto mb-2" />
             <p>Successfully connected to Spotify!</p>
             <p className="text-sm text-muted-foreground mt-2">
-              You can close this window or wait to be redirected...
+              {window.opener ? 'You can close this window now.' : 'Redirecting back to settings...'}
             </p>
           </div>
-        )}
+        ) : null}
       </Card>
     </div>
   );

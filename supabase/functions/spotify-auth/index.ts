@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -33,7 +32,7 @@ serve(async (req) => {
     const url = new URL(req.url);
     const path = url.pathname.split("/").pop();
     
-    console.log(`Request to ${path} endpoint`); // Debug log
+    console.log(`Request to ${path} endpoint`);
     
     // New authorize endpoint that will provide the proper authorization URL
     if (path === "authorize") {
@@ -51,8 +50,8 @@ serve(async (req) => {
       const scope = url.searchParams.get("scope");
       const show_dialog = url.searchParams.get("show_dialog") === "true";
       
-      console.log("Auth request params:", { redirect_uri, scope, show_dialog }); // Debug log
-      console.log("Spotify Client ID available:", !!clientId); // Debug log for client ID
+      console.log("Auth request params:", { redirect_uri, scope, show_dialog });
+      console.log("Spotify Client ID available:", !!clientId);
       
       if (!redirect_uri || !scope) {
         return new Response(
@@ -73,7 +72,7 @@ serve(async (req) => {
         redirect_uri
       )}&scope=${encodeURIComponent(scope)}${show_dialog ? "&show_dialog=true" : ""}`;
       
-      console.log("Generated auth URL:", authUrl); // Debug log
+      console.log("Generated auth URL:", authUrl);
       
       return new Response(
         JSON.stringify({ url: authUrl }),
@@ -95,8 +94,9 @@ serve(async (req) => {
     // Verify the JWT token
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
+      console.error("Auth error:", userError);
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized", details: userError?.message }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
@@ -112,12 +112,26 @@ serve(async (req) => {
         );
       }
       
+      console.log("Processing callback with code:", code.substring(0, 5) + "...");
+      
       // Exchange the code for an access token
       // Use the same redirect URI as in the authorization request
       const originUrl = new URL(req.headers.get("Origin") || url.origin);
       const redirectUri = `${originUrl.origin}/spotify-callback`;
       
-      console.log("Using redirect URI for token exchange:", redirectUri); // Debug log
+      console.log("Using redirect URI for token exchange:", redirectUri);
+      
+      if (!clientId || !clientSecret) {
+        console.error("Missing Spotify credentials:", { 
+          clientIdAvailable: !!clientId,
+          clientSecretAvailable: !!clientSecret 
+        });
+        
+        return new Response(
+          JSON.stringify({ error: "Spotify API credentials not configured" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
       
       const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
         method: "POST",
@@ -132,15 +146,19 @@ serve(async (req) => {
         }),
       });
       
+      console.log("Token exchange response status:", tokenResponse.status);
+      
       const tokenData = await tokenResponse.json();
       
       if (tokenData.error) {
-        console.error("Token exchange error:", tokenData.error); // Debug log
+        console.error("Token exchange error:", tokenData);
         return new Response(
-          JSON.stringify({ error: tokenData.error }),
+          JSON.stringify({ error: tokenData.error_description || tokenData.error }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }
+      
+      console.log("Token exchange successful, access token received");
       
       // Get the user's Spotify profile
       const profileResponse = await fetch("https://api.spotify.com/v1/me", {
@@ -149,7 +167,19 @@ serve(async (req) => {
         },
       });
       
+      console.log("Profile response status:", profileResponse.status);
+      
       const profileData = await profileResponse.json();
+      
+      if (profileData.error) {
+        console.error("Profile fetch error:", profileData.error);
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch Spotify profile" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      console.log("Profile fetch successful, username:", profileData.display_name || profileData.id);
       
       // Calculate token expiration
       const expiresAt = new Date();
@@ -169,10 +199,12 @@ serve(async (req) => {
       if (updateError) {
         console.error("Error updating profile:", updateError);
         return new Response(
-          JSON.stringify({ error: "Failed to save Spotify credentials" }),
+          JSON.stringify({ error: "Failed to save Spotify credentials", details: updateError.message }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
+      
+      console.log("Profile updated successfully with Spotify tokens");
       
       return new Response(
         JSON.stringify({ 

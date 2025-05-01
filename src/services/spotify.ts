@@ -44,10 +44,10 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     }
 
     const { url } = await response.json();
-    console.log("Opening Spotify auth URL:", url); // Add debug log
+    console.log("Opening Spotify auth URL:", url);
     
     // Open in a new tab with appropriate attributes
-    const newWindow = window.open(url, '_blank');
+    const newWindow = window.open(url, '_blank', 'width=800,height=600');
     
     // Check if popup was blocked
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
@@ -62,24 +62,38 @@ export async function openSpotifyAuthWindow(): Promise<void> {
 // Handle the callback from Spotify OAuth flow
 export async function handleSpotifyCallback(code: string): Promise<{success: boolean, display_name?: string}> {
   try {
+    console.log('Starting handleSpotifyCallback with code:', code);
+    
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
+      console.error('No active session in handleSpotifyCallback:', sessionError);
       throw new Error('No active session');
     }
 
     // Send the code to our edge function to exchange for tokens
-    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${code}`, {
+    console.log('Sending code to callback endpoint');
+    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${encodeURIComponent(code)}`, {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
     });
 
+    console.log('Callback response status:', response.status);
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to exchange code for tokens');
+      const responseText = await response.text();
+      console.error('Error response from callback endpoint:', responseText);
+      try {
+        const error = JSON.parse(responseText);
+        throw new Error(error.error || 'Failed to exchange code for tokens');
+      } catch (parseError) {
+        throw new Error(`Failed to exchange code: ${responseText}`);
+      }
     }
 
     const result = await response.json();
+    console.log('Spotify callback successful, result:', result);
+    
     return { 
       success: result.success, 
       display_name: result.display_name
