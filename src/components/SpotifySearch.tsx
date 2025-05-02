@@ -37,7 +37,7 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
           toast({
             title: "Spotify Connection Expired",
             description: "Please reconnect your Spotify account in Settings.",
-            variant: "warning"
+            variant: "destructive"  // Changed from "warning" to "destructive"
           });
         }
       } catch (error) {
