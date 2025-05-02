@@ -12,6 +12,7 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
 
     // Add logging to help debug the request
     console.log("Searching for tracks with query:", query);
+    console.log("Using user ID:", sessionData.session.user.id);
     
     // Search Spotify via our edge function
     const { data, error } = await supabase.functions.invoke('spotify-auth', {

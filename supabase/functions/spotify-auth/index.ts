@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -738,7 +739,7 @@ serve(async (req) => {
     else if (action === "status") {
       try {
         // Use the userId from params if provided, otherwise fall back to token user
-        const userIdToCheck = params.user_id || user.id;
+        const userIdToCheck = params.user_id || userId;
         
         console.log("Checking Spotify status for user:", userIdToCheck);
         
@@ -839,7 +840,7 @@ serve(async (req) => {
     else if (action === "refresh") {
       try {
         // Use the userId from params if provided, otherwise fall back to token user
-        const userIdToCheck = params.user_id || user.id;
+        const userIdToCheck = params.user_id || userId;
         
         // Get the user's refresh token
         const { data: profile, error: profileError } = await supabase
@@ -866,4 +867,147 @@ serve(async (req) => {
         
         // Refresh the access token
         const refreshResponse = await fetch("https://accounts.spotify.com/api/token", {
-          method: "
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+          },
+          body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: profile.spotify_refresh_token,
+          }),
+        });
+        
+        if (!refreshResponse.ok) {
+          console.error("Refresh token error:", refreshResponse.status);
+          let errorText = "";
+          try {
+            errorText = await refreshResponse.text();
+          } catch (e) {
+            errorText = "Could not read error response";
+          }
+          return new Response(
+            JSON.stringify({ 
+              error: "Failed to refresh token", 
+              details: errorText 
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: refreshResponse.status }
+          );
+        }
+        
+        const tokenData = await refreshResponse.json();
+        
+        // Calculate token expiration
+        const expiresAt = new Date();
+        expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+        
+        // Update the tokens in the user's profile
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            spotify_access_token: tokenData.access_token,
+            // Some refresh token responses don't include a new refresh token
+            ...(tokenData.refresh_token && { spotify_refresh_token: tokenData.refresh_token }),
+            spotify_token_expires_at: expiresAt.toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", userIdToCheck);
+        
+        if (updateError) {
+          console.error("Error updating tokens:", updateError);
+          return new Response(
+            JSON.stringify({ error: "Failed to update tokens", details: updateError.message }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true,
+            access_token: tokenData.access_token,
+            expires_at: expiresAt.toISOString()
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      } catch (refreshError) {
+        console.error("General error refreshing token:", refreshError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Error refreshing token", 
+            details: refreshError.message 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+    }
+    
+    // Revoke endpoint - disconnect from Spotify
+    else if (action === "revoke") {
+      try {
+        // Use the userId from params if provided, otherwise fall back to token user
+        const userIdToCheck = params.user_id || userId;
+        
+        if (!userIdToCheck) {
+          return new Response(
+            JSON.stringify({ error: "No user ID provided" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          );
+        }
+        
+        // Clear Spotify data from the user's profile
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            spotify_access_token: null,
+            spotify_refresh_token: null,
+            spotify_token_expires_at: null,
+            spotify_username: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", userIdToCheck);
+        
+        if (updateError) {
+          console.error("Error clearing Spotify data:", updateError);
+          return new Response(
+            JSON.stringify({ 
+              error: "Failed to clear Spotify data", 
+              details: updateError.message 
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+        
+        return new Response(
+          JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      } catch (revokeError) {
+        console.error("Error disconnecting from Spotify:", revokeError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Error disconnecting from Spotify", 
+            details: revokeError.message 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+    }
+    
+    // If we reach here, the action wasn't recognized
+    return new Response(
+      JSON.stringify({ error: `Unknown action: ${action}` }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+    );
+  } catch (err) {
+    console.error("Unhandled error in edge function:", err);
+    
+    return new Response(
+      JSON.stringify({ 
+        error: "Unhandled error in edge function", 
+        details: err.message,
+        stack: err.stack
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    );
+  }
+});
