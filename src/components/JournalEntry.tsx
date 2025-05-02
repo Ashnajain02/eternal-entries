@@ -10,7 +10,7 @@ import MoodSelector from './MoodSelector';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
 import { Pencil, Trash, Play, Music } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface JournalEntryProps {
   entry: JournalEntryType;

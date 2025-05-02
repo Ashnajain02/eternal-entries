@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, SpotifyTrack, WeatherData, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import MoodSelector from './MoodSelector';
 import WeatherDisplay from './WeatherDisplay';
