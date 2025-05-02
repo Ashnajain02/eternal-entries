@@ -81,34 +81,43 @@ export async function handleSpotifyCallback(code: string): Promise<{
     // Add timestamp to prevent caching
     const timestamp = new Date().getTime();
     
-    // Use the supabase.functions.invoke method instead of fetch
-    const { data, error } = await supabase.functions.invoke('spotify-auth', {
-      body: {
-        action: 'callback',
-        code,
-        redirect_uri: redirectUri,
-        t: timestamp
-      }
-    });
+    // Use the supabase.functions.invoke method with proper error handling
+    try {
+      const { data, error } = await supabase.functions.invoke('spotify-auth', {
+        body: {
+          action: 'callback',
+          code,
+          redirect_uri: redirectUri,
+          t: timestamp
+        }
+      });
 
-    if (error) {
-      console.error('Error from callback function:', error);
+      if (error) {
+        console.error('Error from callback function:', error);
+        return { 
+          success: false, 
+          error: error.message || 'Failed to exchange code for tokens' 
+        };
+      }
+
+      if (!data) {
+        return { success: false, error: 'No data returned from callback function' };
+      }
+      
+      console.log('Successfully exchanged code for tokens, display name:', data.display_name);
+      
+      return { 
+        success: data.success, 
+        display_name: data.display_name
+      };
+    } catch (functionError: any) {
+      console.error('Edge function error:', functionError);
       return { 
         success: false, 
-        error: error.message || 'Failed to exchange code for tokens' 
+        error: 'Edge function error', 
+        error_description: functionError.message 
       };
     }
-
-    if (!data) {
-      return { success: false, error: 'No data returned from callback function' };
-    }
-    
-    console.log('Successfully exchanged code for tokens, display name:', data.display_name);
-    
-    return { 
-      success: data.success, 
-      display_name: data.display_name
-    };
   } catch (error: any) {
     console.error('Error handling Spotify callback:', error);
     return { success: false, error: error.message || 'Unknown error occurred' };
