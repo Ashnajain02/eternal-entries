@@ -190,3 +190,4 @@ gcp_jwt_path = "supabase/gcp-key.json"
 [functions]
 [functions.spotify-auth]
 verify_jwt = false
+

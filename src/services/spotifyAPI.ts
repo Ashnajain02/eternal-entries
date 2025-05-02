@@ -14,19 +14,19 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     // Add detailed logging to help debug the request
     console.log("Searching for tracks with query:", query);
     console.log("Using user ID:", sessionData.session.user.id);
-    console.log("Request payload:", {
+    
+    // Create the request payload
+    const payload = {
       action: 'search',
-      q: 'coldplay',
+      q: query, // Send the actual query parameter passed to this function
       user_id: sessionData.session.user.id
-    });
+    };
+    
+    console.log("Request payload:", payload);
     
     // Search Spotify via our edge function with improved error handling
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
-      body: {
-        action: 'search', // This matches what the edge function expects
-        q: 'coldplay', // Using the parameter name 'q' to match what the function expects
-        user_id: sessionData.session.user.id
-      },
+      body: payload,
       // Explicitly add the authorization header to ensure it's being sent correctly
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`
