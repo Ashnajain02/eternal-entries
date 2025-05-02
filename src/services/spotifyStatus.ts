@@ -16,14 +16,12 @@ export async function getSpotifyConnectionStatus(): Promise<{
       return { connected: false, expired: false, username: null };
     }
 
-    // First try a direct database query with nocache enabled for better reliability
+    // First try a direct database query
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('spotify_username, spotify_token_expires_at, spotify_access_token')
       .eq('id', sessionData.session.user.id)
-      .single()
-      // Remove the abortSignal method as it doesn't exist on PostgrestBuilder
-      .options({ cache: 'no-store' }); // Force no caching
+      .single();
     
     // If direct query fails, try the RPC call which has less caching
     if (profileError || !profile || !profile.spotify_username) {
@@ -39,7 +37,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
           'Pragma': 'no-cache',
           'Expires': '0'
         },
-        // Add a signal with timeout here instead of on the supabase query
+        // Add a signal with timeout
         signal: AbortSignal.timeout(5000)
       });
 
