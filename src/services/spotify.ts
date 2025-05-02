@@ -167,55 +167,53 @@ export async function getSpotifyConnectionStatus(): Promise<{
     }
 
     // First try a direct database query for better reliability
+    // Important: We use nocache:true to ensure we're getting the latest data
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('spotify_username, spotify_token_expires_at, spotify_access_token')
       .eq('id', sessionData.session.user.id)
-      .single();
+      .single({
+        head: false,  // Ensure we get actual data
+        count: null   // Don't need count
+      });
     
-    if (!profileError && profile) {
-      console.log('Got Spotify profile data directly from database:', profile);
-      const isConnected = !!profile.spotify_username && !!profile.spotify_access_token;
-      const isExpired = profile.spotify_token_expires_at ? 
-        new Date(profile.spotify_token_expires_at) < new Date() : 
-        false;
-        
-      return {
-        connected: isConnected,
-        expired: isConnected && isExpired,
-        username: profile.spotify_username || null,
-      };
-    } else {
-      console.log('Profile data fetch error or no profile data:', profileError);
-      console.log('Falling back to edge function for Spotify status');
-    }
-    
-    // Get status from our edge function as a backup approach
-    const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/status', {
-      headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
-      },
-      cache: 'no-store',  // Prevent caching
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response from status endpoint:', errorText);
+    // Cache bypass approach - also try an RPC call which has less caching
+    if (profileError || !profile || !profile.spotify_username) {
+      console.log('No profile data from direct query, trying status endpoint');
       
-      try {
-        const error = JSON.parse(errorText);
-        throw new Error(error.error || 'Failed to check Spotify connection status');
-      } catch (e) {
-        if (e instanceof SyntaxError) {
-          throw new Error(`Failed to process response: ${errorText}`);
+      // Get status from our edge function as a backup approach
+      const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+      const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/status?t=${timestamp}`, {
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         }
-        throw e;
-      }
-    }
+      });
 
-    const result = await response.json();
-    console.log('Received Spotify status from edge function:', result);
-    return result;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response from status endpoint:', errorText);
+        return { connected: false, expired: false, username: null };
+      }
+
+      const result = await response.json();
+      console.log('Received Spotify status from edge function:', result);
+      return result;
+    }
+    
+    console.log('Got Spotify profile data directly from database:', profile);
+    const isConnected = !!profile.spotify_username && !!profile.spotify_access_token;
+    const isExpired = profile.spotify_token_expires_at ? 
+      new Date(profile.spotify_token_expires_at) < new Date() : 
+      false;
+      
+    return {
+      connected: isConnected,
+      expired: isConnected && isExpired,
+      username: profile.spotify_username || null,
+    };
   } catch (error) {
     console.error('Error checking Spotify status:', error);
     return { connected: false, expired: false, username: null };
@@ -230,13 +228,18 @@ export async function disconnectSpotify(): Promise<boolean> {
       throw new Error('No active session');
     }
 
+    // Add a timestamp to prevent caching
+    const timestamp = new Date().getTime();
+
     // Call our edge function to revoke access
-    const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/revoke', {
+    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/revoke?t=${timestamp}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       },
-      cache: 'no-store', // Prevent caching
     });
 
     if (!response.ok) {

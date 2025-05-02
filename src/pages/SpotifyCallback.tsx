@@ -81,10 +81,11 @@ URL protocol: ${url.protocol}
           });
           
           // Wait a moment for the database to update
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 1500));
           
-          // Always navigate back to settings with a refresh flag to ensure the status is refreshed
-          navigate('/settings?spotify_connected=true');
+          // Force a hard refresh to ensure all state is updated properly
+          // This is more reliable than navigation with parameters
+          window.location.href = '/settings?spotify_connected=true&t=' + new Date().getTime();
         } else {
           // Enhanced error handling
           const errorMessage = result.error || 'Failed to connect to Spotify.';
@@ -117,7 +118,8 @@ URL protocol: ${url.protocol}
   }, [navigate, toast]);
 
   const handleGoToSettings = () => {
-    navigate('/settings?spotify_connected=true');
+    // Force a hard refresh to ensure all state is updated properly
+    window.location.href = '/settings?spotify_connected=true&t=' + new Date().getTime();
   };
 
   return (

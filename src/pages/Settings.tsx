@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,12 +40,34 @@ const Settings = () => {
       if (justConnected) {
         console.log("Detected successful Spotify connection from URL param, refreshing status...");
         // Add a small delay to allow the database to update
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
       console.log("Fetching Spotify connection status...");
-      const status = await getSpotifyConnectionStatus();
-      console.log("Received Spotify status:", status);
+      
+      // Fetch multiple times to ensure we get the latest data
+      // This is a workaround for potential cache or timing issues
+      let attempts = 0;
+      let status;
+      
+      while (attempts < 3) {
+        status = await getSpotifyConnectionStatus();
+        console.log(`Spotify status attempt ${attempts + 1}:`, status);
+        
+        // If connected, we're good
+        if (status.connected) break;
+        
+        // Otherwise wait a bit and try again
+        if (attempts < 2) {
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+        
+        attempts++;
+      }
+      
+      if (!status) {
+        throw new Error("Failed to get connection status after multiple attempts");
+      }
       
       setSpotifyStatus({
         isLoading: false,
@@ -102,8 +123,31 @@ const Settings = () => {
   useEffect(() => {
     fetchSpotifyStatus();
     
-    // Also refetch when location changes (to catch redirects from spotify-callback)
+    // Force a status refresh when the component mounts and whenever the URL parameters change
+    // This helps ensure we catch the connection state after a redirect back from Spotify
   }, [fetchSpotifyStatus, location.search]);
+  
+  // Additional effect to detect when spotify_connected=true is in URL and force a refresh
+  useEffect(() => {
+    const justConnected = searchParams.get('spotify_connected') === 'true';
+    if (justConnected) {
+      console.log("Spotify connection detected in URL, forcing status refresh");
+      fetchSpotifyStatus(true);
+      
+      // Set up an interval to check a few times
+      const checkInterval = setInterval(() => {
+        if (!spotifyStatus.connected) {
+          console.log("Retrying Spotify status check...");
+          fetchSpotifyStatus(false);
+        } else {
+          clearInterval(checkInterval);
+        }
+      }, 1500);
+      
+      // Clean up
+      return () => clearInterval(checkInterval);
+    }
+  }, [searchParams, fetchSpotifyStatus, spotifyStatus.connected]);
 
   const handleConnectSpotify = async () => {
     try {
