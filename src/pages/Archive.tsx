@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useJournal } from '@/contexts/JournalContext';
@@ -86,8 +87,8 @@ const Archive = () => {
           const monthMatches = entryDate.getMonth() === month;
           const dayMatches = entryDate.getDate() === day;
           
-          // If year is selected, filter by exact date
-          if (selectedYear !== null) {
+          // If year is selected and it's not "any", filter by exact date
+          if (selectedYear !== null && selectedYear !== "any") {
             const year = parseInt(selectedYear);
             return monthMatches && dayMatches && entryDate.getFullYear() === year;
           }
@@ -115,7 +116,7 @@ const Archive = () => {
     } else if (searchMode === 'specificDate' && selectedMonth !== null && selectedDay !== null) {
       const monthName = format(new Date(2000, parseInt(selectedMonth), 1), 'MMMM');
       
-      if (selectedYear !== null) {
+      if (selectedYear !== null && selectedYear !== "any") {
         return `Entries from ${monthName} ${selectedDay}, ${selectedYear}`;
       }
       return `Entries from ${monthName} ${selectedDay} Across the Years`;
@@ -232,7 +233,7 @@ const Archive = () => {
                   <SelectValue placeholder="Year (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any Year</SelectItem>
+                  <SelectItem value="any">Any Year</SelectItem>
                   {years.map((year) => (
                     <SelectItem key={year} value={year.toString()}>
                       {year}
