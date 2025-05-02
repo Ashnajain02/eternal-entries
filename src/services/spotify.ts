@@ -10,8 +10,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
       throw new Error('No active session');
     }
 
-    // Define the required parameters with exact matching redirect URI
-    // Must match exactly what's registered in Spotify Developer Dashboard
+    // Define the required parameters
     const redirectUri = `${window.location.origin}/spotify-callback`;
     const scope = 'user-read-private user-read-email user-top-read';
     const showDialog = true;
@@ -28,8 +27,6 @@ export async function openSpotifyAuthWindow(): Promise<void> {
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
         },
-        // Add cache control to prevent caching
-        cache: 'no-store',
       }
     );
 
@@ -47,10 +44,10 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     }
 
     const { url } = await response.json();
-    console.log("Opening Spotify auth URL:", url);
+    console.log("Opening Spotify auth URL:", url); // Add debug log
     
     // Open in a new tab with appropriate attributes
-    const newWindow = window.open(url, '_blank', 'width=800,height=600');
+    const newWindow = window.open(url, '_blank');
     
     // Check if popup was blocked
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
@@ -65,92 +62,29 @@ export async function openSpotifyAuthWindow(): Promise<void> {
 // Handle the callback from Spotify OAuth flow
 export async function handleSpotifyCallback(code: string): Promise<{success: boolean, display_name?: string}> {
   try {
-    console.log('Starting handleSpotifyCallback with code:', code.substring(0, 5) + '...');
-    
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
-      console.error('No active session in handleSpotifyCallback:', sessionError);
-      throw new Error('No active session. Please log in and try again.');
-    }
-
-    // Ensure we have a valid session token
-    const sessionToken = sessionData.session.access_token;
-    if (!sessionToken) {
-      throw new Error('Invalid session token. Please log in again.');
+      throw new Error('No active session');
     }
 
     // Send the code to our edge function to exchange for tokens
-    console.log('Sending code to callback endpoint with valid auth token');
-    
-    // Add timeout to prevent indefinite waiting
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
-    
-    try {
-      // Use the same exact redirect URI that was used in the authorization request
-      const redirectUri = `${window.location.origin}/spotify-callback`;
-      
-      // Call the edge function with the authorization code and redirect URI
-      const callbackEndpoint = `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback`;
-      console.log('Calling endpoint with redirect URI:', redirectUri);
-      
-      const response = await fetch(
-        `${callbackEndpoint}?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`, 
-        {
-          headers: {
-            Authorization: `Bearer ${sessionToken}`,
-            'Content-Type': 'application/json',
-          },
-          signal: controller.signal,
-          method: 'GET',
-          // Add cache control to prevent caching
-          cache: 'no-store',
-        }
-      );
+    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${code}`, {
+      headers: {
+        Authorization: `Bearer ${sessionData.session.access_token}`,
+      },
+    });
 
-      clearTimeout(timeoutId);
-      
-      console.log('Callback response status:', response.status);
-      
-      if (!response.ok) {
-        const responseText = await response.text();
-        console.error('Error response from callback endpoint:', responseText);
-        try {
-          const error = JSON.parse(responseText);
-          throw new Error(error.error || 'Failed to exchange code for tokens');
-        } catch (parseError) {
-          throw new Error(`Failed to exchange code: ${responseText || response.statusText}`);
-        }
-      }
-
-      const result = await response.json();
-      console.log('Spotify callback successful, result:', result);
-      
-      // Ensure we refresh the auth state
-      await supabase.auth.refreshSession();
-      
-      return { 
-        success: result.success, 
-        display_name: result.display_name
-      };
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-      
-      if (fetchError.name === 'AbortError') {
-        throw new Error('Network request timed out. Please try again.');
-      }
-      
-      console.error('Fetch error in handleSpotifyCallback:', fetchError);
-      
-      // Try to fetch the session again to see if it's still valid
-      const { data: refreshSessionData, error: refreshSessionError } = await supabase.auth.getSession();
-      if (refreshSessionError || !refreshSessionData.session) {
-        throw new Error('Your session has expired. Please log in again.');
-      }
-      
-      throw new Error(fetchError.message || 'Network error while connecting to Spotify');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to exchange code for tokens');
     }
-  } catch (error: any) {
+
+    const result = await response.json();
+    return { 
+      success: result.success, 
+      display_name: result.display_name
+    };
+  } catch (error) {
     console.error('Error handling Spotify callback:', error);
     throw error;
   }
@@ -169,34 +103,15 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
-      cache: 'no-store',
     });
 
     if (!response.ok) {
-      const data = await response.text();
-      // Try to parse as JSON
-      try {
-        const error = JSON.parse(data);
-        // Special handling for token expired errors
-        if (error.error && (error.error.includes("expired") || response.status === 401)) {
-          console.log("Token expired, attempting to refresh...");
-          // Try to refresh the token automatically
-          const refreshed = await refreshSpotifyToken();
-          if (refreshed) {
-            // Retry the search with the refreshed token
-            return searchSpotifyTracks(query);
-          } else {
-            throw new Error("Spotify session expired, please reconnect your account");
-          }
-        }
-        throw new Error(error.error || 'Failed to search Spotify');
-      } catch (parseError) {
-        if (parseError instanceof SyntaxError) {
-          throw new Error(`Failed to search Spotify: ${data}`);
-        } else {
-          throw parseError;
-        }
+      const error = await response.json();
+      // Special handling for token expired errors
+      if (error.error && error.error.includes("expired")) {
+        throw new Error("Spotify session expired, please reconnect your account");
       }
+      throw new Error(error.error || 'Failed to search Spotify');
     }
 
     const { tracks } = await response.json();
@@ -224,54 +139,17 @@ export async function getSpotifyConnectionStatus(): Promise<{
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
-      cache: 'no-store',
     });
 
     if (!response.ok) {
-      console.error('Error checking status:', await response.text());
-      return { connected: false, expired: false, username: null };
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to check Spotify connection status');
     }
 
-    const status = await response.json();
-    console.log('Spotify connection status:', status);
-    return status;
+    return await response.json();
   } catch (error) {
     console.error('Error checking Spotify status:', error);
     return { connected: false, expired: false, username: null };
-  }
-}
-
-// Refresh the Spotify access token
-export async function refreshSpotifyToken(): Promise<boolean> {
-  try {
-    console.log('Attempting to refresh Spotify token');
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !sessionData.session) {
-      throw new Error('No active session');
-    }
-
-    // Call our edge function to refresh the token
-    const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/refresh', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
-      },
-      // Add cache control to prevent caching
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      const data = await response.text();
-      console.error('Token refresh failed:', data);
-      return false;
-    }
-
-    const result = await response.json();
-    console.log('Token refresh successful:', !!result.access_token);
-    return !!result.access_token;
-  } catch (error) {
-    console.error('Error refreshing Spotify token:', error);
-    return false;
   }
 }
 
@@ -289,21 +167,14 @@ export async function disconnectSpotify(): Promise<boolean> {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
-      // Add cache control to prevent caching
-      cache: 'no-store',
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Error disconnecting from Spotify:', errorData);
-      throw new Error(JSON.parse(errorData).error || 'Failed to disconnect from Spotify');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to disconnect from Spotify');
     }
 
     const result = await response.json();
-    
-    // Force refresh the auth session to ensure UI is updated
-    await supabase.auth.refreshSession();
-    
     return result.success;
   } catch (error) {
     console.error('Error disconnecting from Spotify:', error);
