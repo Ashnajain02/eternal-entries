@@ -7,24 +7,43 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
   try {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
+      console.error("No active Supabase session:", sessionError);
       throw new Error('No active session');
     }
 
-    // Add logging to help debug the request
+    // Add detailed logging to help debug the request
     console.log("Searching for tracks with query:", query);
     console.log("Using user ID:", sessionData.session.user.id);
+    console.log("Request payload:", {
+      action: 'search',
+      q: query,
+      user_id: sessionData.session.user.id
+    });
     
-    // Search Spotify via our edge function - FIXED ACTION NAME
+    // Search Spotify via our edge function with improved error handling
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: {
-        action: 'search', // Changed from 'searchTracks' to 'search' to match what the edge function expects
+        action: 'search', // This matches what the edge function expects
         q: query, // Using the parameter name 'q' to match what the function expects
         user_id: sessionData.session.user.id
       }
     });
 
+    // Detailed logging of the response
+    if (data) {
+      console.log("Spotify search successful, tracks returned:", data?.tracks?.length || 0);
+    }
+    
     if (error) {
       console.error('Error from search function:', error);
+      
+      // Add detailed information about the error object
+      console.log("Error details:", {
+        message: error.message,
+        name: error.name,
+        statusCode: error.statusCode,
+        stack: error.stack
+      });
       
       // Special handling for token expired errors
       if (error.message && (error.message.includes("expired") || error.message.includes("token"))) {
