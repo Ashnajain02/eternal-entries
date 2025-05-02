@@ -5,6 +5,7 @@ import { handleSpotifyCallback } from '@/services/spotifyAuth';
 import { Card } from '@/components/ui/card';
 import { Loader2, Check, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -14,6 +15,32 @@ const SpotifyCallback = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const verifyProfileUpdate = async (userId: string) => {
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('spotify_username, spotify_access_token')
+        .eq('id', userId)
+        .single();
+        
+      if (profileError) {
+        setDebugInfo(prev => `${prev}\nProfile verification failed: ${profileError.message}`);
+        return false;
+      } else {
+        const verification = {
+          hasUsername: !!profileData?.spotify_username,
+          hasToken: !!profileData?.spotify_access_token,
+          username: profileData?.spotify_username
+        };
+        setDebugInfo(prev => `${prev}\nProfile verification: ${JSON.stringify(verification)}`);
+        return verification.hasToken && verification.hasUsername;
+      }
+    } catch (err) {
+      setDebugInfo(prev => `${prev}\nProfile verification error: ${err.message}`);
+      return false;
+    }
+  };
+
   useEffect(() => {
     // Only run once - important to prevent multiple token exchanges
     if (processingStarted) return;
@@ -21,6 +48,18 @@ const SpotifyCallback = () => {
 
     const processCallback = async () => {
       try {
+        // Get user session first to check if we're authenticated
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !sessionData.session) {
+          setDebugInfo("No active session found when processing callback");
+          setError("You must be signed in to connect Spotify");
+          setTimeout(() => navigate('/auth'), 3000);
+          return;
+        }
+        
+        const userId = sessionData.session.user.id;
+        setDebugInfo(`Active session for user: ${userId}`);
+        
         // Get the full URL, decode any percent-encoded characters
         const url = new URL(window.location.href);
         const params = new URLSearchParams(url.search);
@@ -28,13 +67,12 @@ const SpotifyCallback = () => {
         const errorParam = params.get('error');
         
         // Log basic diagnostics but don't expose in UI
-        console.log("Processing Spotify callback with code present:", !!code);
-        console.log("Error present:", !!errorParam);
-        console.log("Code (first 10 chars):", code ? code.substring(0, 10) + "..." : "null");
+        setDebugInfo(prev => `${prev}\nCode present: ${!!code}`);
+        setDebugInfo(prev => `${prev}\nError present: ${!!errorParam}`);
         
         if (errorParam) {
           console.error("Spotify auth error parameter:", errorParam);
-          setDebugInfo(`Auth error: ${errorParam}`);
+          setDebugInfo(prev => `${prev}\nAuth error: ${errorParam}`);
           toast({
             title: 'Spotify Connection Failed',
             description: `Authorization error: ${errorParam}`,
@@ -46,7 +84,7 @@ const SpotifyCallback = () => {
 
         if (!code) {
           console.error("No authorization code provided");
-          setDebugInfo("Missing auth code in URL");
+          setDebugInfo(prev => `${prev}\nMissing auth code in URL`);
           toast({
             title: 'Spotify Connection Failed',
             description: 'No authorization code was provided.',
@@ -56,15 +94,14 @@ const SpotifyCallback = () => {
           return;
         }
 
-        console.log("Attempting to exchange code for tokens...");
-        setDebugInfo("Exchanging code for tokens...");
+        setDebugInfo(prev => `${prev}\nExchanging code for tokens...`);
         
         // Make multiple attempts to exchange the code for tokens
         let attempts = 0;
         let result = null;
         
         while (attempts < 3 && !result?.success) {
-          console.log(`Token exchange attempt ${attempts + 1}...`);
+          setDebugInfo(prev => `${prev}\nToken exchange attempt ${attempts + 1}...`);
           
           result = await handleSpotifyCallback(code);
           console.log(`Attempt ${attempts + 1} result:`, result);
@@ -84,7 +121,33 @@ const SpotifyCallback = () => {
             description: `Successfully connected as ${result.display_name || 'User'}.`,
           });
           
-          setDebugInfo(prev => `${prev}\nConnection successful! Username: ${result.display_name || 'Unknown'}`);
+          setDebugInfo(prev => `${prev}\nConnection reported successful! Username: ${result.display_name || 'Unknown'}`);
+          
+          // Check if the profile was actually updated in the database
+          const verified = await verifyProfileUpdate(userId);
+          setDebugInfo(prev => `${prev}\nProfile updated successfully: ${verified}`);
+          
+          if (!verified) {
+            setDebugInfo(prev => `${prev}\nWarning: Profile verification failed despite success response`);
+            // Try manual update
+            setDebugInfo(prev => `${prev}\nAttempting manual profile update...`);
+            try {
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .update({
+                  spotify_username: result.display_name
+                })
+                .eq('id', userId);
+                
+              if (updateError) {
+                setDebugInfo(prev => `${prev}\nManual update failed: ${updateError.message}`);
+              } else {
+                setDebugInfo(prev => `${prev}\nManual username update succeeded`);
+              }
+            } catch (err) {
+              setDebugInfo(prev => `${prev}\nManual update error: ${err.message}`);
+            }
+          }
           
           // Wait a moment for the database to update
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -107,10 +170,10 @@ const SpotifyCallback = () => {
           });
           setTimeout(() => navigate('/settings'), 3000);
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error('Error processing Spotify callback:', err);
         setError(err.message || 'An unexpected error occurred.');
-        setDebugInfo(`Exception: ${err.message || 'Unknown error'}`);
+        setDebugInfo(prev => `${prev}\nException: ${err.message || 'Unknown error'}`);
         
         toast({
           title: 'Spotify Connection Error',
@@ -156,11 +219,10 @@ const SpotifyCallback = () => {
           </div>
         )}
         
-        {debugInfo && (
-          <div className="mt-6 p-3 bg-muted rounded-md">
-            <p className="text-xs text-left font-mono whitespace-pre-line">{debugInfo}</p>
-          </div>
-        )}
+        {/* Always show debug info in this version to help troubleshoot */}
+        <div className="mt-6 p-3 bg-muted rounded-md">
+          <p className="text-xs text-left font-mono whitespace-pre-line">{debugInfo}</p>
+        </div>
       </Card>
     </div>
   );

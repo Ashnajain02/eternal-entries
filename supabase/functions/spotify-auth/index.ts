@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -75,6 +76,12 @@ serve(async (req) => {
       console.log(`URL-based request to ${action} endpoint with params:`, params);
     }
     
+    // If user_id is provided in params, use it for verification
+    const userId = params.user_id || user.id;
+    if (params.user_id && params.user_id !== user.id) {
+      console.warn(`User ID mismatch: ${params.user_id} (param) vs ${user.id} (token)`);
+    }
+    
     // Authorize endpoint - provide proper Spotify authorization URL
     if (action === "authorize") {
       const redirect_uri = params.redirect_uri;
@@ -127,7 +134,7 @@ serve(async (req) => {
         codePresent: !!code, 
         codeLength: code ? code.length : 0,
         redirect_uri,
-        userId: user.id
+        userId: userId
       });
       
       if (!code) {
@@ -148,6 +155,35 @@ serve(async (req) => {
       });
       
       try {
+        // First, check if the profile exists
+        const { data: profileData, error: profileCheckError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", userId)
+          .maybeSingle();
+          
+        if (profileCheckError) {
+          console.error("Error checking if profile exists:", profileCheckError);
+        } else if (!profileData) {
+          console.log(`Profile does not exist for user ${userId}, creating one`);
+          const { error: createProfileError } = await supabase
+            .from("profiles")
+            .insert({ id: userId });
+            
+          if (createProfileError) {
+            console.error("Failed to create profile:", createProfileError);
+            return new Response(
+              JSON.stringify({ 
+                error: "Failed to create user profile", 
+                details: createProfileError.message 
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+            );
+          } else {
+            console.log("Successfully created profile for user");
+          }
+        }
+      
         // Exchange the code for an access token
         console.log("Sending token exchange request to Spotify API...");
         const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
@@ -242,7 +278,7 @@ serve(async (req) => {
           expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
           
           // Save the tokens in the user's profile
-          console.log("Updating profile record in database for user:", user.id);
+          console.log("Updating profile record in database for user:", userId);
           console.log("With data:", {
             spotify_access_token: "PRESENT",
             spotify_refresh_token: "PRESENT",
@@ -250,6 +286,7 @@ serve(async (req) => {
             spotify_username: profileData.display_name || profileData.id
           });
           
+          // Choose between update or insert based on our previous check
           const { data: updateData, error: updateError } = await supabase
             .from("profiles")
             .update({
@@ -258,7 +295,7 @@ serve(async (req) => {
               spotify_token_expires_at: expiresAt.toISOString(),
               spotify_username: profileData.display_name || profileData.id,
             })
-            .eq("id", user.id);
+            .eq("id", userId);
           
           if (updateError) {
             console.error("Error updating profile:", updateError);
@@ -267,7 +304,7 @@ serve(async (req) => {
             const { data: existingProfile, error: selectError } = await supabase
               .from("profiles")
               .select("id")
-              .eq("id", user.id)
+              .eq("id", userId)
               .maybeSingle();
               
             if (selectError) {
@@ -277,11 +314,11 @@ serve(async (req) => {
               
               if (!existingProfile) {
                 // Try to insert a new profile if it doesn't exist
-                console.log("Attempting to insert new profile for user:", user.id);
+                console.log("Attempting to insert new profile for user:", userId);
                 const { error: insertError } = await supabase
                   .from("profiles")
                   .insert({
-                    id: user.id,
+                    id: userId,
                     spotify_access_token: tokenData.access_token,
                     spotify_refresh_token: tokenData.refresh_token,
                     spotify_token_expires_at: expiresAt.toISOString(),
@@ -315,17 +352,43 @@ serve(async (req) => {
           }
           
           // Do a double check to verify the profile was updated
-          const { data: verifyProfile } = await supabase
+          const { data: verifyProfile, error: verifyError } = await supabase
             .from("profiles")
             .select("spotify_username, spotify_access_token")
-            .eq("id", user.id)
+            .eq("id", userId)
             .single();
             
-          console.log("Verification of profile update:", {
-            hasUsername: !!verifyProfile?.spotify_username,
-            hasToken: !!verifyProfile?.spotify_access_token,
-            username: verifyProfile?.spotify_username
-          });
+          if (verifyError) {
+            console.error("Error verifying profile update:", verifyError);
+          } else {
+            console.log("Verification of profile update:", {
+              hasUsername: !!verifyProfile?.spotify_username,
+              hasToken: !!verifyProfile?.spotify_access_token,
+              username: verifyProfile?.spotify_username
+            });
+            
+            if (!verifyProfile?.spotify_username || !verifyProfile?.spotify_access_token) {
+              console.error("Profile verification failed! Database update didn't take effect");
+              
+              // Try one more time with a direct update
+              const { error: retryError } = await supabase.rpc(
+                "update_profile_spotify_data",
+                {
+                  p_user_id: userId,
+                  p_access_token: tokenData.access_token,
+                  p_refresh_token: tokenData.refresh_token,
+                  p_expires_at: expiresAt.toISOString(),
+                  p_username: profileData.display_name || profileData.id
+                }
+              );
+              
+              if (retryError) {
+                console.error("RPC update retry failed:", retryError);
+              } else {
+                console.log("Used RPC function for update as fallback");
+              }
+            }
+          }
           
           return new Response(
             JSON.stringify({ 
@@ -360,13 +423,16 @@ serve(async (req) => {
     // Status endpoint - check Spotify connection status
     else if (action === "status") {
       try {
-        console.log("Checking Spotify status for user:", user.id);
+        // Use the userId from params if provided, otherwise fall back to token user
+        const userIdToCheck = params.user_id || user.id;
+        
+        console.log("Checking Spotify status for user:", userIdToCheck);
         
         // Get the user's Spotify connection status
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("spotify_username, spotify_token_expires_at, spotify_access_token")
-          .eq("id", user.id)
+          .eq("id", userIdToCheck)
           .maybeSingle();
         
         if (profileError) {
@@ -374,6 +440,31 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({ error: "Failed to get profile", details: profileError.message }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+        
+        if (!profile) {
+          console.log("No profile found for user:", userIdToCheck);
+          
+          // Try to create a profile for the user
+          const { error: createError } = await supabase
+            .from("profiles")
+            .insert({ id: userIdToCheck });
+            
+          if (createError) {
+            console.error("Error creating profile:", createError);
+          } else {
+            console.log("Created new profile for user");
+          }
+          
+          return new Response(
+            JSON.stringify({
+              connected: false,
+              expired: false,
+              username: null,
+              profile_exists: false
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
           );
         }
         
@@ -391,6 +482,7 @@ serve(async (req) => {
             connected: isConnected,
             expired: isConnected && isExpired,
             username: profile?.spotify_username || null,
+            profile_exists: true
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
         );
@@ -409,11 +501,14 @@ serve(async (req) => {
     // Refresh endpoint - refresh tokens
     else if (action === "refresh") {
       try {
+        // Use the userId from params if provided, otherwise fall back to token user
+        const userIdToCheck = params.user_id || user.id;
+        
         // Get the user's refresh token
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("spotify_refresh_token")
-          .eq("id", user.id)
+          .eq("id", userIdToCheck)
           .single();
         
         if (profileError) {
@@ -486,7 +581,7 @@ serve(async (req) => {
         const { error: updateError } = await supabase
           .from("profiles")
           .update(updateData)
-          .eq("id", user.id);
+          .eq("id", userIdToCheck);
         
         if (updateError) {
           console.error("Error updating tokens in database:", updateError);
@@ -518,6 +613,9 @@ serve(async (req) => {
     // Revoke endpoint - disconnect from Spotify
     else if (action === "revoke") {
       try {
+        // Use the userId from params if provided, otherwise fall back to token user
+        const userIdToCheck = params.user_id || user.id;
+        
         // Revoke the Spotify access
         const { error: updateError } = await supabase
           .from("profiles")
@@ -527,7 +625,7 @@ serve(async (req) => {
             spotify_token_expires_at: null,
             spotify_username: null,
           })
-          .eq("id", user.id);
+          .eq("id", userIdToCheck);
         
         if (updateError) {
           console.error("Error revoking Spotify access:", updateError);
@@ -535,6 +633,21 @@ serve(async (req) => {
             JSON.stringify({ error: "Failed to revoke Spotify access", details: updateError.message }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
           );
+        }
+        
+        // Verify the update
+        const { data: verifyData, error: verifyError } = await supabase
+          .from("profiles")
+          .select("spotify_access_token")
+          .eq("id", userIdToCheck)
+          .single();
+          
+        if (verifyError) {
+          console.error("Error verifying token revocation:", verifyError);
+        } else {
+          console.log("Revocation verification:", {
+            token_cleared: verifyData.spotify_access_token === null
+          });
         }
         
         return new Response(
@@ -556,11 +669,14 @@ serve(async (req) => {
     // Search endpoint - search Spotify tracks
     else if (action === "search") {
       try {
+        // Use the userId from params if provided, otherwise fall back to token user
+        const userIdToCheck = params.user_id || user.id;
+        
         // Get user's Spotify token
         const { data, error: profileError } = await supabase
           .from("profiles")
           .select("spotify_access_token, spotify_token_expires_at")
-          .eq("id", user.id)
+          .eq("id", userIdToCheck)
           .single();
         
         if (profileError) {
@@ -617,7 +733,7 @@ serve(async (req) => {
           if (searchResponse.status === 401) {
             // Try refresh flow if possible
             try {
-              const refreshResult = await refreshAndRetrySearch(user.id, query);
+              const refreshResult = await refreshAndRetrySearch(userIdToCheck, query);
               return new Response(
                 JSON.stringify({ tracks: refreshResult }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }

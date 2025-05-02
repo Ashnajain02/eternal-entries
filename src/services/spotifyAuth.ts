@@ -31,7 +31,8 @@ export async function openSpotifyAuthWindow(): Promise<void> {
         redirect_uri: redirectUri,
         scope: scopes.join(' '),
         show_dialog: 'true',
-        t: timestamp.toString()
+        t: timestamp.toString(),
+        user_id: sessionData.session.user.id // Pass user ID explicitly
       },
     });
 
@@ -74,7 +75,8 @@ export async function handleSpotifyCallback(code: string): Promise<{
       return { success: false, error: 'No active session' };
     }
 
-    console.log('Active session found for user:', sessionData.session.user.id);
+    const userId = sessionData.session.user.id;
+    console.log('Active session found for user:', userId);
     console.log('Exchanging code for tokens with code length:', code.length);
     
     // Ensure we're using the exact same redirect URI as in the authorization request
@@ -83,6 +85,31 @@ export async function handleSpotifyCallback(code: string): Promise<{
     
     // Add timestamp to prevent caching
     const timestamp = new Date().getTime();
+    
+    // Check if the profile exists before trying to update it
+    const { data: profileExists, error: profileCheckError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
+      
+    if (profileCheckError) {
+      console.error('Error checking if profile exists:', profileCheckError);
+    } else if (!profileExists) {
+      console.log('Profile does not exist for user, creating one');
+      const { error: createProfileError } = await supabase
+        .from('profiles')
+        .insert({ id: userId });
+        
+      if (createProfileError) {
+        console.error('Failed to create profile:', createProfileError);
+        return {
+          success: false,
+          error: 'Failed to create user profile',
+          error_description: createProfileError.message
+        };
+      }
+    }
     
     // Use the supabase.functions.invoke method with proper error handling
     try {
@@ -93,7 +120,8 @@ export async function handleSpotifyCallback(code: string): Promise<{
           action: 'callback',
           code,
           redirect_uri: redirectUri,
-          t: timestamp
+          t: timestamp,
+          user_id: userId // Explicitly pass the user ID
         }
       });
 
@@ -116,7 +144,7 @@ export async function handleSpotifyCallback(code: string): Promise<{
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('spotify_username, spotify_access_token')
-        .eq('id', sessionData.session.user.id)
+        .eq('id', userId)
         .single();
         
       if (profileError) {
@@ -127,13 +155,32 @@ export async function handleSpotifyCallback(code: string): Promise<{
           hasToken: !!profileData?.spotify_access_token,
           username: profileData?.spotify_username
         });
+        
+        // If the profile verification shows the data wasn't saved, try a direct update
+        if (!profileData?.spotify_access_token || !profileData?.spotify_username) {
+          console.log('Profile update verification failed, attempting direct update');
+          
+          const { error: manualUpdateError } = await supabase
+            .from('profiles')
+            .update({
+              spotify_username: data.display_name,
+              spotify_token_expires_at: data.expires_at
+            })
+            .eq('id', userId);
+            
+          if (manualUpdateError) {
+            console.error('Manual profile update failed:', manualUpdateError);
+          } else {
+            console.log('Manual profile update succeeded');
+          }
+        }
       }
       
       return { 
         success: data.success, 
         display_name: data.display_name
       };
-    } catch (functionError: any) {
+    } catch (functionError) {
       console.error('Edge function error:', functionError);
       return { 
         success: false, 
@@ -141,7 +188,7 @@ export async function handleSpotifyCallback(code: string): Promise<{
         error_description: functionError.message 
       };
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error handling Spotify callback:', error);
     return { success: false, error: error.message || 'Unknown error occurred' };
   }
@@ -162,7 +209,8 @@ export async function disconnectSpotify(): Promise<boolean> {
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: {
         action: 'revoke',
-        t: timestamp
+        t: timestamp,
+        user_id: sessionData.session.user.id // Explicitly pass the user ID
       }
     });
 
