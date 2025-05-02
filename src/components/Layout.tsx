@@ -16,6 +16,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return location.pathname === pathname;
   };
 
+  // Check if the current route is the auth page
+  const isAuthPage = location.pathname === '/auth';
+
   return (
     <div className="min-h-screen bg-background antialiased">
       <div className="fixed inset-x-0 top-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
@@ -24,50 +27,53 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             Song Weather Journal
           </Link>
           <div className="flex items-center space-x-4">
-            <nav className="flex items-center space-x-2">
-              <Link
-                to="/"
-                className={cn(
-                  "flex items-center gap-2 transition-colors",
-                  isActive("/")
-                    ? "text-primary font-medium"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Notebook className="h-4 w-4" />
-                <span>Journal</span>
-              </Link>
-              <Link
-                to="/archive"
-                className={cn(
-                  "flex items-center gap-2 transition-colors",
-                  isActive("/archive")
-                    ? "text-primary font-medium"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Archive className="h-4 w-4" />
-                <span>Archive</span>
-              </Link>
-              <Link
-                to="/stats"
-                className={cn(
-                  "flex items-center gap-2 transition-colors",
-                  isActive("/stats")
-                    ? "text-primary font-medium"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <BarChart3 className="h-4 w-4" />
-                <span>Stats</span>
-              </Link>
-              <Link to="/settings" className={cn("flex items-center gap-2 transition-colors", 
-                isActive("/settings") ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground"
-              )}>
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
-              </Link>
-            </nav>
+            {/* Only show navigation when NOT on auth page */}
+            {!isAuthPage && (
+              <nav className="flex items-center space-x-2">
+                <Link
+                  to="/"
+                  className={cn(
+                    "flex items-center gap-2 transition-colors",
+                    isActive("/")
+                      ? "text-primary font-medium"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Notebook className="h-4 w-4" />
+                  <span>Journal</span>
+                </Link>
+                <Link
+                  to="/archive"
+                  className={cn(
+                    "flex items-center gap-2 transition-colors",
+                    isActive("/archive")
+                      ? "text-primary font-medium"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Archive className="h-4 w-4" />
+                  <span>Archive</span>
+                </Link>
+                <Link
+                  to="/stats"
+                  className={cn(
+                    "flex items-center gap-2 transition-colors",
+                    isActive("/stats")
+                      ? "text-primary font-medium"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Stats</span>
+                </Link>
+                <Link to="/settings" className={cn("flex items-center gap-2 transition-colors", 
+                  isActive("/settings") ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground"
+                )}>
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
+                </Link>
+              </nav>
+            )}
             <AuthButtons />
           </div>
         </div>
