@@ -17,7 +17,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
       'user-top-read'
     ];
     
-    // Determine redirect URI based on environment
+    // IMPORTANT: Use the EXACT format that was registered in the Spotify Developer Dashboard
     const redirectUri = `${window.location.origin}/spotify-callback`;
     
     console.log('Opening Spotify auth with redirect URI:', redirectUri);
@@ -62,6 +62,7 @@ export async function handleSpotifyCallback(code: string): Promise<{
   success: boolean;
   display_name?: string;
   error?: string;
+  error_description?: string;
 }> {
   try {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -84,7 +85,11 @@ export async function handleSpotifyCallback(code: string): Promise<{
       
       try {
         const error = JSON.parse(errorText);
-        return { success: false, error: error.error || 'Failed to exchange code for tokens' };
+        return { 
+          success: false, 
+          error: error.error || 'Failed to exchange code for tokens',
+          error_description: error.error_description
+        };
       } catch (e) {
         return { success: false, error: `Failed to process response: ${errorText}` };
       }

@@ -22,14 +22,19 @@ const SpotifyCallback = () => {
         const code = params.get('code');
         const errorParam = params.get('error');
 
-        // Enhanced debug info
+        // Super detailed debug info
         const debugDetails = `
 Callback URL: ${url.toString()}
 Code present: ${!!code}
 Error present: ${!!errorParam}
 Error value: ${errorParam || 'none'}
 Origin: ${window.location.origin}
+Current hostname: ${window.location.hostname}
+Expected redirect URI format: ${window.location.origin}/spotify-callback
+Project URL domain: ${window.location.host}
 Timestamp: ${new Date().toISOString()}
+URL pathname: ${url.pathname}
+URL protocol: ${url.protocol}
         `;
         
         setDebugInfo(debugDetails);
@@ -80,7 +85,10 @@ Timestamp: ${new Date().toISOString()}
         } else {
           // Enhanced error handling
           const errorMessage = result.error || 'Failed to connect to Spotify.';
-          setError(`${errorMessage} - This may be due to invalid client credentials or a misconfigured redirect URI.`);
+          const errorDesc = result.error_description || '';
+          const fullError = `${errorMessage}${errorDesc ? `: ${errorDesc}` : ''}`;
+          
+          setError(`${fullError} - This may be due to invalid client credentials or a misconfigured redirect URI.`);
           toast({
             title: 'Spotify Connection Failed',
             description: errorMessage,
