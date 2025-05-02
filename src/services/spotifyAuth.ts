@@ -26,13 +26,16 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     
     // Make sure to properly handle auth headers for the edge function
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
+      headers: {
+        Authorization: `Bearer ${sessionData.session.access_token}` // Explicitly passing the access token
+      },
       body: {
         action: 'authorize',
         redirect_uri: redirectUri,
         scope: scopes.join(' '),
         show_dialog: 'true',
         t: timestamp.toString(),
-        user_id: sessionData.session.user.id // Pass user ID explicitly
+        user_id: sessionData.session.user.id
       },
     });
 
@@ -83,6 +86,7 @@ export async function handleSpotifyCallback(code: string): Promise<{
     const accessToken = sessionData.session.access_token;
     console.log('Active session found for user:', userId);
     console.log('Access token available:', !!accessToken);
+    console.log('Access token length:', accessToken ? accessToken.length : 0);
     
     // Check if the profile exists and create if needed (fallback)
     console.log('Ensuring profile exists before continuing...');
@@ -106,6 +110,7 @@ export async function handleSpotifyCallback(code: string): Promise<{
     
     // IMPORTANT: Explicitly set Authorization header for the edge function
     console.log('Invoking spotify-auth edge function with action: callback');
+    console.log('Using Authorization header with access token length:', accessToken ? accessToken.length : 0);
     
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       headers: {

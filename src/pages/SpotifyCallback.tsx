@@ -36,6 +36,7 @@ const SpotifyCallback = () => {
         const accessToken = sessionData.session.access_token;
         setDebugInfo(`Active session for user: ${userId}`);
         setDebugInfo(prev => `${prev}\nAccess token present: ${!!accessToken}`);
+        setDebugInfo(prev => `${prev}\nAccess token length: ${accessToken ? accessToken.length : 0}`);
         
         // Explicitly check if profile exists and create if needed
         setDebugInfo(prev => `${prev}\nChecking if profile exists...`);
