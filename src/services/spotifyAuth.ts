@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 // Open Spotify authorization in a new window/tab
@@ -20,13 +19,20 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     const redirectUri = `${window.location.origin}/spotify-callback`;
     
     console.log('Opening Spotify auth with redirect URI:', redirectUri);
+    console.log('Current window location:', window.location.href);
+    console.log('Window origin:', window.location.origin);
+    
+    // Create a more resilient URL for the edge function
+    const edgeFunctionUrl = `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize`;
+    const params = new URLSearchParams({
+      redirect_uri: redirectUri,
+      scope: scopes.join(' '),
+      show_dialog: 'true'
+    });
     
     // Call our edge function to get the auth URL with required parameters
     const response = await fetch(
-      `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize?` + 
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `scope=${encodeURIComponent(scopes.join(' '))}&` +
-      `show_dialog=true`, 
+      `${edgeFunctionUrl}?${params.toString()}`, 
       {
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
@@ -50,7 +56,11 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     console.log('Received auth URL:', url);
     
     // Open in a new tab with appropriate attributes
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const spotifyWindow = window.open(url, '_blank', 'noopener,noreferrer');
+    
+    if (!spotifyWindow) {
+      throw new Error('Popup blocked. Please allow popups for this site.');
+    }
   } catch (error) {
     console.error('Error opening Spotify auth window:', error);
     throw error;

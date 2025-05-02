@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { openSpotifyAuthWindow, getSpotifyConnectionStatus, disconnectSpotify } from '@/services/spotify';
+import { openSpotifyAuthWindow, disconnectSpotify } from '@/services/spotifyAuth';
 import { Loader2, Music, Check, X, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface SpotifyStatusProps {
   isLoading: boolean;
@@ -27,9 +28,14 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
   isRefreshing
 }) => {
   const { toast } = useToast();
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const handleConnectSpotify = async () => {
     try {
+      setIsConnecting(true);
+      setConnectionError(null);
+      
       // Open Spotify authorization in a new tab
       await openSpotifyAuthWindow();
       
@@ -40,6 +46,9 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
       });
     } catch (error: any) {
       console.error('Error opening Spotify auth window:', error);
+      
+      // Set a more user-friendly error message
+      setConnectionError(error.message || 'Failed to connect to Spotify');
       
       // Check if the error is related to popup blocking
       if (error.message && error.message.includes('blocked')) {
@@ -55,6 +64,8 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
           variant: 'destructive',
         });
       }
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -135,6 +146,14 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
         </div>
       </div>
       
+      {connectionError && (
+        <Alert variant="destructive" className="mb-2">
+          <AlertDescription>
+            {connectionError}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div>
         {spotifyStatus.isLoading ? (
           <div className="flex justify-center">
@@ -161,10 +180,21 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex justify-end">
-            <Button onClick={handleConnectSpotify}>
-              Connect Spotify
-            </Button>
+          <div className="flex flex-col gap-4">
+            <div className="text-sm text-muted-foreground">
+              <p>Connect your Spotify account to enable music integration with your journal entries.</p>
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleConnectSpotify}
+                disabled={isConnecting}
+              >
+                {isConnecting ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                Connect Spotify
+              </Button>
+            </div>
           </div>
         )}
       </div>
