@@ -78,37 +78,59 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
 
     // Send the code to our edge function to exchange for tokens
     console.log('Sending code to callback endpoint with valid auth token');
-    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${encodeURIComponent(code)}`, {
-      headers: {
-        Authorization: `Bearer ${sessionToken}`,
-      },
-      // Add credentials to ensure cookies are sent
-      credentials: 'include',
-    });
-
-    console.log('Callback response status:', response.status);
     
-    if (!response.ok) {
-      const responseText = await response.text();
-      console.error('Error response from callback endpoint:', responseText);
-      try {
-        const error = JSON.parse(responseText);
-        throw new Error(error.error || 'Failed to exchange code for tokens');
-      } catch (parseError) {
-        throw new Error(`Failed to exchange code: ${responseText}`);
+    // Add timeout to prevent indefinite waiting
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+    
+    try {
+      const response = await fetch(
+        `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${encodeURIComponent(code)}`, 
+        {
+          headers: {
+            Authorization: `Bearer ${sessionToken}`,
+          },
+          signal: controller.signal,
+          // Ensure cookies are sent
+          credentials: 'include',
+        }
+      );
+
+      clearTimeout(timeoutId);
+      
+      console.log('Callback response status:', response.status);
+      
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error('Error response from callback endpoint:', responseText);
+        try {
+          const error = JSON.parse(responseText);
+          throw new Error(error.error || 'Failed to exchange code for tokens');
+        } catch (parseError) {
+          throw new Error(`Failed to exchange code: ${responseText || response.statusText}`);
+        }
       }
-    }
 
-    const result = await response.json();
-    console.log('Spotify callback successful, result:', result);
-    
-    // Ensure we refresh the auth state
-    await supabase.auth.refreshSession();
-    
-    return { 
-      success: result.success, 
-      display_name: result.display_name
-    };
+      const result = await response.json();
+      console.log('Spotify callback successful, result:', result);
+      
+      // Ensure we refresh the auth state
+      await supabase.auth.refreshSession();
+      
+      return { 
+        success: result.success, 
+        display_name: result.display_name
+      };
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Network request timed out. Please try again.');
+      }
+      
+      console.error('Fetch error in handleSpotifyCallback:', fetchError);
+      throw new Error(fetchError.message || 'Network error while connecting to Spotify');
+    }
   } catch (error) {
     console.error('Error handling Spotify callback:', error);
     throw error;

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotify';
@@ -18,6 +17,12 @@ const SpotifyCallback = () => {
   useEffect(() => {
     const processCallback = async () => {
       try {
+        console.log("Processing Spotify callback, auth state:", { 
+          authenticated: !!authState.session,
+          loading: authState.loading,
+          userId: authState.session?.user?.id 
+        });
+        
         // Make sure we have an active session before proceeding
         if (!authState.session) {
           // Set a small delay to see if the session loads
@@ -63,42 +68,55 @@ const SpotifyCallback = () => {
         }
 
         console.log('Processing Spotify callback with code:', code);
-        const result = await handleSpotifyCallback(code);
         
-        if (result.success) {
-          console.log('Spotify connection successful:', result);
-          setSuccess(true);
+        try {
+          const result = await handleSpotifyCallback(code);
           
-          toast({
-            title: 'Spotify Connected!',
-            description: `Successfully connected as ${result.display_name || 'User'}.`,
-          });
-          
-          // Close this window if it's a popup
-          if (window.opener && !window.opener.closed) {
-            // If it's a popup, notify the opener that the connection was successful
-            window.opener.postMessage({ 
-              type: 'SPOTIFY_CONNECTED', 
-              success: true, 
-              display_name: result.display_name 
-            }, window.location.origin);
+          if (result.success) {
+            console.log('Spotify connection successful:', result);
+            setSuccess(true);
             
-            setTimeout(() => {
-              window.opener.focus();
-              window.close();
-            }, 1000);
+            toast({
+              title: 'Spotify Connected!',
+              description: `Successfully connected as ${result.display_name || 'User'}.`,
+            });
+            
+            // Close this window if it's a popup
+            if (window.opener && !window.opener.closed) {
+              // If it's a popup, notify the opener that the connection was successful
+              window.opener.postMessage({ 
+                type: 'SPOTIFY_CONNECTED', 
+                success: true, 
+                display_name: result.display_name 
+              }, window.location.origin);
+              
+              setTimeout(() => {
+                window.opener.focus();
+                window.close();
+              }, 1000);
+            } else {
+              // Otherwise navigate back to settings after a short delay
+              setTimeout(() => navigate('/settings'), 2000);
+            }
           } else {
-            // Otherwise navigate back to settings after a short delay
-            setTimeout(() => navigate('/settings'), 2000);
+            setError('Failed to connect to Spotify.');
+            toast({
+              title: 'Spotify Connection Failed',
+              description: 'There was a problem connecting your Spotify account.',
+              variant: 'destructive',
+            });
+            setTimeout(() => navigate('/settings'), 3000);
           }
-        } else {
-          setError('Failed to connect to Spotify.');
+        } catch (fetchError) {
+          console.error('Error in fetch operation:', fetchError);
+          const errorMessage = fetchError.message || 'Network error while connecting to Spotify';
+          setError(`Error: ${errorMessage}`);
           toast({
-            title: 'Spotify Connection Failed',
-            description: 'There was a problem connecting your Spotify account.',
+            title: 'Connection Error',
+            description: errorMessage,
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 3000);
+          // Don't redirect immediately on fetch error
         }
       } catch (err) {
         console.error('Error processing Spotify callback:', err);
@@ -108,7 +126,7 @@ const SpotifyCallback = () => {
           description: err.message || 'An unexpected error occurred.',
           variant: 'destructive',
         });
-        setTimeout(() => navigate('/settings'), 3000);
+        setTimeout(() => navigate('/settings'), 5000);
       } finally {
         setIsLoading(false);
       }
@@ -135,7 +153,11 @@ const SpotifyCallback = () => {
             <XCircle className="h-8 w-8 mx-auto mb-2" />
             <p>{error}</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Redirecting{error.includes('log in') ? ' to login' : ' back to settings'}...
+              {error.includes('log in') ? 
+                'Redirecting to login...' : 
+                (error.includes('Network') || error.includes('fetch')) ? 
+                'Please check your connection and try again.' : 
+                'Redirecting back to settings...'}
             </p>
           </div>
         ) : success ? (
