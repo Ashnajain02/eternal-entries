@@ -22,7 +22,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
       .select('spotify_username, spotify_token_expires_at, spotify_access_token')
       .eq('id', sessionData.session.user.id)
       .single()
-      .abortSignal(AbortSignal.timeout(3000)) // Add timeout to prevent hanging
+      // Remove the abortSignal method as it doesn't exist on PostgrestBuilder
       .options({ cache: 'no-store' }); // Force no caching
     
     // If direct query fails, try the RPC call which has less caching
@@ -38,7 +38,9 @@ export async function getSpotifyConnectionStatus(): Promise<{
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
-        }
+        },
+        // Add a signal with timeout here instead of on the supabase query
+        signal: AbortSignal.timeout(5000)
       });
 
       if (!response.ok) {
