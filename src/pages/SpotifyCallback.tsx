@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { handleSpotifyCallback } from '@/services/spotify';
+import { handleSpotifyCallback } from '@/services/spotifyAuth';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +38,7 @@ Project URL domain: ${window.location.host}
 Timestamp: ${new Date().toISOString()}
 URL pathname: ${url.pathname}
 URL protocol: ${url.protocol}
+Code length: ${code ? code.length : 0}
         `;
         
         setDebugInfo(debugDetails);
@@ -68,6 +69,8 @@ URL protocol: ${url.protocol}
         }
 
         console.log("Attempting to exchange code for tokens...");
+        console.log("Code starts with:", code.substring(0, 10) + "...");
+        
         const result = await handleSpotifyCallback(code);
         console.log("Spotify callback result:", result);
         
@@ -92,7 +95,7 @@ URL protocol: ${url.protocol}
           const errorDesc = result.error_description || '';
           const fullError = `${errorMessage}${errorDesc ? `: ${errorDesc}` : ''}`;
           
-          setError(`${fullError} - This may be due to invalid client credentials or a misconfigured redirect URI.`);
+          setError(`${fullError} - Please check your Spotify developer dashboard configuration.`);
           toast({
             title: 'Spotify Connection Failed',
             description: errorMessage,
@@ -119,8 +122,7 @@ URL protocol: ${url.protocol}
 
   const handleGoToSettings = () => {
     // Force a hard refresh to ensure all state is updated properly
-    const timestamp = new Date().getTime();
-    window.location.replace(`/settings?spotify_connected=true&t=${timestamp}`);
+    window.location.href = '/settings';
   };
 
   return (

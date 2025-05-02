@@ -107,6 +107,14 @@ serve(async (req) => {
     if (path === "callback") {
       // Handle the OAuth callback from Spotify
       const code = url.searchParams.get("code");
+      // Get the redirect_uri that was used for the original authorization request
+      const redirect_uri = url.searchParams.get("redirect_uri");
+      
+      console.log("Callback request params:", { 
+        codePresent: !!code, 
+        codeLength: code ? code.length : 0,
+        redirect_uri 
+      });
       
       if (!code) {
         return new Response(
@@ -115,12 +123,11 @@ serve(async (req) => {
         );
       }
       
-      // Extract origin from the request headers or default to URL origin
-      const originUrl = new URL(req.headers.get("Origin") || url.origin);
-      const redirectUri = `${originUrl.origin}/spotify-callback`;
+      // Use the provided redirect_uri or fallback to constructing one
+      const redirectUri = redirect_uri || `${url.origin}/spotify-callback`;
       
       console.log("Using redirect URI for token exchange:", redirectUri);
-      console.log("Client credentials:", { 
+      console.log("Client credentials available:", { 
         clientIdLength: clientId.length,
         clientSecretLength: clientSecret ? clientSecret.length : 0
       });
@@ -142,10 +149,13 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json();
       
       if (tokenData.error) {
-        console.error("Token exchange error:", tokenData.error);
-        console.error("Token exchange error description:", tokenData.error_description);
+        console.error("Token exchange error:", tokenData);
         return new Response(
-          JSON.stringify({ error: tokenData.error, error_description: tokenData.error_description }),
+          JSON.stringify({ 
+            error: tokenData.error, 
+            error_description: tokenData.error_description,
+            details: `Redirect URI: ${redirectUri}, Code length: ${code.length}`
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }

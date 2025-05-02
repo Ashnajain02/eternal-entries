@@ -67,17 +67,27 @@ export async function handleSpotifyCallback(code: string): Promise<{
   try {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
+      console.error('No active session when handling Spotify callback:', sessionError);
       return { success: false, error: 'No active session' };
     }
 
-    console.log('Exchanging code for tokens...');
-
+    console.log('Exchanging code for tokens with code length:', code.length);
+    
+    // Ensure we're using the exact same redirect URI as in the authorization request
+    const redirectUri = `${window.location.origin}/spotify-callback`;
+    console.log('Using redirect URI for token exchange:', redirectUri);
+    
     // Send the code to our edge function to exchange for tokens
-    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${code}`, {
+    const callbackUrl = `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    console.log('Calling callback endpoint at:', callbackUrl);
+    
+    const response = await fetch(callbackUrl, {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       },
-      cache: 'no-store', // Prevent caching
     });
 
     if (!response.ok) {
@@ -97,6 +107,8 @@ export async function handleSpotifyCallback(code: string): Promise<{
     }
 
     const result = await response.json();
+    console.log('Successfully exchanged code for tokens, display name:', result.display_name);
+    
     return { 
       success: result.success, 
       display_name: result.display_name
