@@ -172,10 +172,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
       .from('profiles')
       .select('spotify_username, spotify_token_expires_at, spotify_access_token')
       .eq('id', sessionData.session.user.id)
-      .single({
-        head: false,  // Ensure we get actual data
-        count: null   // Don't need count
-      });
+      .single();
     
     // Cache bypass approach - also try an RPC call which has less caching
     if (profileError || !profile || !profile.spotify_username) {
