@@ -27,6 +27,8 @@ export async function openSpotifyAuthWindow(): Promise<void> {
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
         },
+        // Add cache control to prevent caching
+        cache: 'no-store',
       }
     );
 
@@ -84,15 +86,25 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
     
     try {
+      // Use a more reliable fetch with proper headers
+      const callbackEndpoint = `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback`;
+      console.log('Calling endpoint:', callbackEndpoint);
+      
       const response = await fetch(
-        `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${encodeURIComponent(code)}`, 
+        `${callbackEndpoint}?code=${encodeURIComponent(code)}`, 
         {
           headers: {
             Authorization: `Bearer ${sessionToken}`,
+            'Content-Type': 'application/json',
           },
           signal: controller.signal,
+          method: 'GET',
+          // Add cache control to prevent caching
+          cache: 'no-store',
           // Ensure cookies are sent
           credentials: 'include',
+          // Enable CORS mode
+          mode: 'cors',
         }
       );
 

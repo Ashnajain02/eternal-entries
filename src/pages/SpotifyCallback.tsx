@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotify';
@@ -10,12 +11,17 @@ const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { authState } = useAuth();
 
   useEffect(() => {
     const processCallback = async () => {
+      // Don't process if we're already handling the callback
+      if (isProcessing) return;
+      
+      setIsProcessing(true);
       try {
         console.log("Processing Spotify callback, auth state:", { 
           authenticated: !!authState.session,
@@ -25,27 +31,28 @@ const SpotifyCallback = () => {
         
         // Make sure we have an active session before proceeding
         if (!authState.session) {
-          // Set a small delay to see if the session loads
-          const waitForSession = setTimeout(() => {
-            if (!authState.session) {
-              setError('No active session. Please log in and try again.');
-              toast({
-                title: 'Authentication Required',
-                description: 'Please log in to connect your Spotify account.',
-                variant: 'destructive',
-              });
-              setTimeout(() => navigate('/auth'), 3000);
-            }
-          }, 1500);
-          
-          return () => clearTimeout(waitForSession);
+          console.log("No session detected, waiting for session load...");
+          // Wait longer for session to load as it might be delayed
+          if (authState.loading) {
+            console.log("Auth is still loading, will wait...");
+            return; // Exit but don't set error yet - we'll retry when authState changes
+          } else {
+            setError('No active session. Please log in and try again.');
+            toast({
+              title: 'Authentication Required',
+              description: 'Please log in to connect your Spotify account.',
+              variant: 'destructive',
+            });
+            setTimeout(() => navigate('/auth'), 3000);
+            return;
+          }
         }
 
         const url = new URL(window.location.href);
         const code = url.searchParams.get('code');
-        const error = url.searchParams.get('error');
+        const errorParam = url.searchParams.get('error');
 
-        if (error) {
+        if (errorParam) {
           setError('Authorization was denied or an error occurred.');
           toast({
             title: 'Spotify Connection Failed',
@@ -129,13 +136,15 @@ const SpotifyCallback = () => {
         setTimeout(() => navigate('/settings'), 5000);
       } finally {
         setIsLoading(false);
+        setIsProcessing(false);
       }
     };
 
-    if (authState.session || !authState.loading) {
+    // Only process if we have a session or auth loading has completed
+    if (!isProcessing && (!authState.loading || authState.session)) {
       processCallback();
     }
-  }, [navigate, toast, authState]);
+  }, [navigate, toast, authState, isProcessing]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">

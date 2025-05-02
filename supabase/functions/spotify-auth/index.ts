@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -225,10 +224,19 @@ serve(async (req) => {
           // If profile doesn't exist, create it first
           if (!existingProfile) {
             console.log("Profile doesn't exist, creating new profile for:", user.id);
+            
+            // First get user data from auth.users
+            const { data: userData, error: userDataError } = await supabase.auth.admin.getUserById(user.id);
+            if (userDataError) {
+              console.error("Error getting user data:", userDataError);
+              throw userDataError;
+            }
+            
             const { error: createError } = await supabase
               .from("profiles")
               .insert({
                 id: user.id,
+                username: userData.user.email,
                 spotify_access_token: tokenData.access_token,
                 spotify_refresh_token: tokenData.refresh_token,
                 spotify_token_expires_at: expiresAt.toISOString(),
