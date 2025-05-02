@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -105,6 +104,7 @@ serve(async (req) => {
     if (path === "callback") {
       // Handle the OAuth callback from Spotify
       const code = url.searchParams.get("code");
+      const providedRedirectUri = url.searchParams.get("redirect_uri");
       
       if (!code) {
         return new Response(
@@ -116,10 +116,13 @@ serve(async (req) => {
       console.log("Processing callback with code:", code.substring(0, 5) + "...");
       console.log("User ID for Spotify connection:", user.id);
       
-      // Exchange the code for an access token
-      // Use the same redirect URI as in the authorization request
-      const originUrl = new URL(req.headers.get("Origin") || url.origin);
-      const redirectUri = `${originUrl.origin}/spotify-callback`;
+      // Use the redirect URI provided by the client if available,
+      // otherwise construct one from the Origin header
+      let redirectUri = providedRedirectUri;
+      if (!redirectUri) {
+        const originUrl = new URL(req.headers.get("Origin") || url.origin);
+        redirectUri = `${originUrl.origin}/spotify-callback`;
+      }
       
       console.log("Using redirect URI for token exchange:", redirectUri);
       

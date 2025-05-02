@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotify';
 import { Card } from '@/components/ui/card';
 import { Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
@@ -16,11 +15,13 @@ const SpotifyCallback = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { authState } = useAuth();
+  const [searchParams] = useSearchParams();
+  const [codeProcessed, setCodeProcessed] = useState(false);
 
   useEffect(() => {
     const processCallback = async () => {
-      // Don't process if we're already handling the callback
-      if (isProcessing) return;
+      // Don't process if we're already handling the callback or code was already processed
+      if (isProcessing || codeProcessed) return;
       
       setIsProcessing(true);
       try {
@@ -36,6 +37,7 @@ const SpotifyCallback = () => {
           // Wait longer for session to load as it might be delayed
           if (authState.loading) {
             console.log("Auth is still loading, will wait...");
+            setIsProcessing(false);
             return; // Exit but don't set error yet - we'll retry when authState changes
           } else {
             setError('No active session. Please log in and try again.');
@@ -49,9 +51,8 @@ const SpotifyCallback = () => {
           }
         }
 
-        const url = new URL(window.location.href);
-        const code = url.searchParams.get('code');
-        const errorParam = url.searchParams.get('error');
+        const code = searchParams.get('code');
+        const errorParam = searchParams.get('error');
 
         if (errorParam) {
           setError('Authorization was denied or an error occurred.');
@@ -75,10 +76,16 @@ const SpotifyCallback = () => {
           return;
         }
 
-        console.log('Processing Spotify callback with code:', code);
+        console.log('Processing Spotify callback with code:', code.substring(0, 5) + '...');
         
         try {
           const result = await handleSpotifyCallback(code);
+          
+          // Mark the code as processed immediately to prevent reuse
+          setCodeProcessed(true);
+          
+          // Remove the code from the URL to prevent reuse on page refresh
+          window.history.replaceState({}, document.title, '/spotify-callback');
           
           if (result.success) {
             console.log('Spotify connection successful:', result);
@@ -158,10 +165,10 @@ const SpotifyCallback = () => {
     };
 
     // Only process if we have a session or auth loading has completed
-    if (!isProcessing && (!authState.loading || authState.session)) {
+    if (!codeProcessed && (!isProcessing) && (!authState.loading || authState.session)) {
       processCallback();
     }
-  }, [navigate, toast, authState, isProcessing, retryCount]);
+  }, [navigate, toast, authState, isProcessing, retryCount, searchParams, codeProcessed]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">

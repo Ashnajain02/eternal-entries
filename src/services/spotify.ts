@@ -10,7 +10,8 @@ export async function openSpotifyAuthWindow(): Promise<void> {
       throw new Error('No active session');
     }
 
-    // Define the required parameters
+    // Define the required parameters with exact matching redirect URI
+    // Must match exactly what's registered in Spotify Developer Dashboard
     const redirectUri = `${window.location.origin}/spotify-callback`;
     const scope = 'user-read-private user-read-email user-top-read';
     const showDialog = true;
@@ -64,7 +65,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
 // Handle the callback from Spotify OAuth flow
 export async function handleSpotifyCallback(code: string): Promise<{success: boolean, display_name?: string}> {
   try {
-    console.log('Starting handleSpotifyCallback with code:', code);
+    console.log('Starting handleSpotifyCallback with code:', code.substring(0, 5) + '...');
     
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
@@ -86,12 +87,15 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
     
     try {
-      // Use a more reliable fetch with proper headers
+      // Use the same exact redirect URI that was used in the authorization request
+      const redirectUri = `${window.location.origin}/spotify-callback`;
+      
+      // Call the edge function with the authorization code and redirect URI
       const callbackEndpoint = `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback`;
-      console.log('Calling endpoint:', callbackEndpoint);
+      console.log('Calling endpoint with redirect URI:', redirectUri);
       
       const response = await fetch(
-        `${callbackEndpoint}?code=${encodeURIComponent(code)}`, 
+        `${callbackEndpoint}?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`, 
         {
           headers: {
             Authorization: `Bearer ${sessionToken}`,
