@@ -34,3 +34,6 @@ enabled = true
 [functions]
 [functions.spotify-auth]
 verify_jwt = true
+
+[functions.auth-test]
+verify_jwt = false

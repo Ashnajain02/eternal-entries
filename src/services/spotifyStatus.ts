@@ -17,7 +17,10 @@ export async function getSpotifyConnectionStatus(): Promise<{
     }
 
     const userId = sessionData.session.user.id;
+    const accessToken = sessionData.session.access_token;
     console.log('Found active session for user:', userId);
+    console.log('Access token available:', !!accessToken);
+    console.log('Access token length:', accessToken ? accessToken.length : 0);
 
     // Add a cache-busting timestamp to ensure we get fresh data
     const timestamp = new Date().getTime();
@@ -122,17 +125,22 @@ export async function getSpotifyConnectionStatus(): Promise<{
     // Fallback to edge function if direct database query fails
     try {
       console.log(`Calling edge function for Spotify status with timestamp: ${timestamp}`);
+      console.log(`Using authorization header with token: Bearer ${accessToken.substring(0, 10)}...`);
       
       const { data, error } = await supabase.functions.invoke('spotify-auth', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        },
         body: {
           action: 'status',
           t: timestamp,
-          user_id: sessionData.session.user.id
+          user_id: userId
         }
       });
       
       if (error) {
         console.error('Error from status function:', error);
+        console.error('Full error object:', JSON.stringify(error));
         throw new Error(error.message);
       }
       

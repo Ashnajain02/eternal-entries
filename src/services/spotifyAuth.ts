@@ -26,6 +26,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     const timestamp = new Date().getTime();
     
     // Make sure to properly handle auth headers for the edge function
+    // IMPORTANT: The Authorization header must be exactly 'Bearer <token>'
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`
@@ -42,6 +43,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
 
     if (error) {
       console.error('Error from authorize function:', error);
+      console.error('Full error object:', JSON.stringify(error));
       throw new Error(error.message || 'Failed to get authorization URL');
     }
 
@@ -109,13 +111,13 @@ export async function handleSpotifyCallback(code: string): Promise<{
     // Add timestamp to prevent caching
     const timestamp = new Date().getTime();
     
-    // IMPORTANT: Explicitly set Authorization header for the edge function
+    // IMPORTANT: Explicitly set Authorization header with proper Bearer format
     console.log('Invoking spotify-auth edge function with action: callback');
     console.log('Using Authorization header with access token length:', accessToken ? accessToken.length : 0);
     
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       headers: {
-        Authorization: `Bearer ${accessToken}` // Explicitly pass the access token
+        Authorization: `Bearer ${accessToken}` // Explicitly pass the access token with Bearer prefix
       },
       body: {
         action: 'callback',
@@ -128,6 +130,7 @@ export async function handleSpotifyCallback(code: string): Promise<{
 
     if (error) {
       console.error('Error from callback function:', error);
+      console.error('Full error object:', JSON.stringify(error));
       return { 
         success: false, 
         error: error.message || 'Failed to exchange code for tokens' 
@@ -197,6 +200,7 @@ export async function disconnectSpotify(): Promise<boolean> {
 
     if (error) {
       console.error('Error from revoke function:', error);
+      console.error('Full error object:', JSON.stringify(error));
       throw new Error(error.message || 'Failed to disconnect from Spotify');
     }
 

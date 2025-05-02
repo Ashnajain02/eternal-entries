@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { openSpotifyAuthWindow, disconnectSpotify } from '@/services/spotifyAuth';
 import { Loader2, Music, Check, X, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import AuthTest from './AuthTest';
 
 interface SpotifyStatusProps {
   isLoading: boolean;
@@ -30,6 +31,7 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [showAuthTest, setShowAuthTest] = useState(false);
 
   const handleConnectSpotify = async () => {
     try {
@@ -197,6 +199,18 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
             </div>
           </div>
         )}
+      </div>
+      
+      <div className="border-t pt-4 mt-2">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setShowAuthTest(!showAuthTest)}
+          className="text-xs"
+        >
+          {showAuthTest ? 'Hide' : 'Show'} Authentication Test
+        </Button>
+        {showAuthTest && <AuthTest />}
       </div>
     </div>
   );

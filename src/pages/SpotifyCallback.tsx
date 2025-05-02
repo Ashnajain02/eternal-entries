@@ -37,6 +37,7 @@ const SpotifyCallback = () => {
         setDebugInfo(`Active session for user: ${userId}`);
         setDebugInfo(prev => `${prev}\nAccess token present: ${!!accessToken}`);
         setDebugInfo(prev => `${prev}\nAccess token length: ${accessToken ? accessToken.length : 0}`);
+        setDebugInfo(prev => `${prev}\nAccess token first 20 chars: ${accessToken ? accessToken.substring(0, 20) + '...' : 'none'}`);
         
         // Explicitly check if profile exists and create if needed
         setDebugInfo(prev => `${prev}\nChecking if profile exists...`);
@@ -120,6 +121,7 @@ const SpotifyCallback = () => {
         setDebugInfo(prev => `${prev}\nExchanging code for tokens...`);
         setDebugInfo(prev => `${prev}\nAuthorization header present: true`);
         setDebugInfo(prev => `${prev}\nAuthorization header token length: ${accessToken.length}`);
+        setDebugInfo(prev => `${prev}\nAuthorization header format: Bearer ${accessToken.substring(0, 10)}...`);
         
         // Make multiple attempts to exchange the code for tokens
         let attempts = 0;
