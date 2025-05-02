@@ -20,6 +20,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     const redirectUri = `${window.location.origin}/spotify-callback`;
     
     console.log('Opening Spotify auth with redirect URI:', redirectUri);
+    console.log('Using access token with length:', sessionData.session.access_token.length);
     
     // Add timestamp to prevent caching
     const timestamp = new Date().getTime();
@@ -27,7 +28,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     // Make sure to properly handle auth headers for the edge function
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}` // Explicitly passing the access token
+        Authorization: `Bearer ${sessionData.session.access_token}`
       },
       body: {
         action: 'authorize',

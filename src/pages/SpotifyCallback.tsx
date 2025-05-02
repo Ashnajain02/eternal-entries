@@ -118,6 +118,8 @@ const SpotifyCallback = () => {
 
         setDebugInfo(prev => `${prev}\nCode value: ${code.substring(0, 10)}...`);
         setDebugInfo(prev => `${prev}\nExchanging code for tokens...`);
+        setDebugInfo(prev => `${prev}\nAuthorization header present: true`);
+        setDebugInfo(prev => `${prev}\nAuthorization header token length: ${accessToken.length}`);
         
         // Make multiple attempts to exchange the code for tokens
         let attempts = 0;
