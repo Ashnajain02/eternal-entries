@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -38,7 +39,10 @@ const SpotifyCallback = () => {
             console.log("Auth is still loading, will wait...");
             return; // Exit but don't set error yet - we'll retry when authState changes
           } else {
-            setError('No active session. Please log in and try again.');
+            const errorMsg = 'No active session. Please log in and try again.';
+            setError(errorMsg);
+            console.error(errorMsg);
+            
             toast({
               title: 'Authentication Required',
               description: 'Please log in to connect your Spotify account.',
@@ -54,7 +58,10 @@ const SpotifyCallback = () => {
         const errorParam = url.searchParams.get('error');
 
         if (errorParam) {
-          setError('Authorization was denied or an error occurred.');
+          const errorMsg = `Authorization was denied: ${errorParam}`;
+          setError(errorMsg);
+          console.error(errorMsg);
+          
           toast({
             title: 'Spotify Connection Failed',
             description: 'Authorization was denied or an error occurred.',
@@ -65,17 +72,20 @@ const SpotifyCallback = () => {
         }
 
         if (!code) {
-          setError('No authorization code was provided.');
+          const errorMsg = 'No authorization code was provided.';
+          setError(errorMsg);
+          console.error(errorMsg);
+          
           toast({
             title: 'Spotify Connection Failed',
-            description: 'No authorization code was provided.',
+            description: errorMsg,
             variant: 'destructive',
           });
           setTimeout(() => navigate('/settings'), 3000);
           return;
         }
 
-        console.log('Processing Spotify callback with code:', code);
+        console.log('Processing Spotify callback with code:', code.substring(0, 5) + '...');
         
         try {
           const result = await handleSpotifyCallback(code);
@@ -120,6 +130,11 @@ const SpotifyCallback = () => {
           const errorMessage = fetchError.message || 'Network error while connecting to Spotify';
           setError(`Error: ${errorMessage}`);
           
+          // Show detailed error information if available
+          if (fetchError.details) {
+            setErrorDetails(JSON.stringify(fetchError.details));
+          }
+          
           // Show a more descriptive toast
           toast({
             title: 'Connection Error',
@@ -145,6 +160,10 @@ const SpotifyCallback = () => {
       } catch (err: any) {
         console.error('Error processing Spotify callback:', err);
         setError('An unexpected error occurred: ' + (err.message || 'Unknown error'));
+        if (err.details) {
+          setErrorDetails(JSON.stringify(err.details));
+        }
+        
         toast({
           title: 'Spotify Connection Error',
           description: err.message || 'An unexpected error occurred.',
@@ -178,6 +197,11 @@ const SpotifyCallback = () => {
           <div className="text-destructive">
             <XCircle className="h-8 w-8 mx-auto mb-2" />
             <p>{error}</p>
+            {errorDetails && (
+              <div className="mt-4 p-2 bg-muted rounded-md overflow-auto text-left">
+                <p className="text-xs font-mono break-all">{errorDetails}</p>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground mt-2">
               {error.includes('log in') ? 
                 'Redirecting to login...' : 

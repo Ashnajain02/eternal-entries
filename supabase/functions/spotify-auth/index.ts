@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -134,6 +133,18 @@ serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
+      
+      // Add a debug check to verify the auth session
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession(token);
+      if (sessionError) {
+        console.error("Session verification error:", sessionError);
+        return new Response(
+          JSON.stringify({ error: "Unauthorized", details: "Auth session missing!" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+        );
+      }
+      
+      console.log("Session verified, user authenticated:", !!sessionData.session);
       
       try {
         const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
