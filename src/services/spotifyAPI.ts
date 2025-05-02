@@ -16,7 +16,7 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     console.log("Using user ID:", sessionData.session.user.id);
     console.log("Request payload:", {
       action: 'search',
-      q: query,
+      q: 'coldplay',
       user_id: sessionData.session.user.id
     });
     
