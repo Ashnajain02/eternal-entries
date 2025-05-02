@@ -10,9 +10,6 @@ import { Button } from '@/components/ui/button';
 const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [username, setUsername] = useState<string | null>(null);
   const [processingStarted, setProcessingStarted] = useState<boolean>(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -29,52 +26,34 @@ const SpotifyCallback = () => {
         const params = new URLSearchParams(url.search);
         const code = params.get('code');
         const errorParam = params.get('error');
-
-        // Super detailed debug info
-        const debugDetails = `
-Callback URL: ${url.toString()}
-Code present: ${!!code}
-Error present: ${!!errorParam}
-Error value: ${errorParam || 'none'}
-Origin: ${window.location.origin}
-Current hostname: ${window.location.hostname}
-Expected redirect URI format: ${window.location.origin}/spotify-callback
-Project URL domain: ${window.location.host}
-Timestamp: ${new Date().toISOString()}
-URL pathname: ${url.pathname}
-URL protocol: ${url.protocol}
-Code length: ${code ? code.length : 0}
-        `;
         
-        setDebugInfo(debugDetails);
-        console.log("Spotify callback data:", debugDetails);
+        // Log basic diagnostics but don't expose in UI
+        console.log("Processing Spotify callback with code present:", !!code);
+        console.log("Error present:", !!errorParam);
         
         if (errorParam) {
           console.error("Spotify auth error parameter:", errorParam);
-          setError(`Authorization was denied: ${errorParam}`);
           toast({
             title: 'Spotify Connection Failed',
             description: `Authorization error: ${errorParam}`,
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 5000);
+          setTimeout(() => navigate('/settings'), 1500);
           return;
         }
 
         if (!code) {
           console.error("No authorization code provided");
-          setError('No authorization code was provided.');
           toast({
             title: 'Spotify Connection Failed',
             description: 'No authorization code was provided.',
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 5000);
+          setTimeout(() => navigate('/settings'), 1500);
           return;
         }
 
         console.log("Attempting to exchange code for tokens...");
-        console.log("Code starts with:", code.substring(0, 10) + "...");
         
         // Make multiple attempts to exchange the code for tokens
         let attempts = 0;
@@ -94,44 +73,38 @@ Code length: ${code ? code.length : 0}
           attempts++;
         }
         
-        if (result.success) {
-          setSuccess(true);
-          setUsername(result.display_name || null);
-          
+        if (result?.success) {
           toast({
             title: 'Spotify Connected!',
             description: `Successfully connected as ${result.display_name || 'User'}.`,
           });
           
-          // Wait a moment for the database to update (longer wait)
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          // Wait a moment for the database to update
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
           // Use hard navigation with cache-busting timestamp to ensure full page reload
           const timestamp = new Date().getTime();
           window.location.replace(`/settings?spotify_connected=true&t=${timestamp}`);
         } else {
           // Enhanced error handling
-          const errorMessage = result.error || 'Failed to connect to Spotify.';
-          const errorDesc = result.error_description || '';
-          const fullError = `${errorMessage}${errorDesc ? `: ${errorDesc}` : ''}`;
+          const errorMessage = result?.error || 'Failed to connect to Spotify.';
+          const errorDesc = result?.error_description || '';
           
-          setError(`${fullError} - Please check your Spotify developer dashboard configuration.`);
           toast({
             title: 'Spotify Connection Failed',
             description: errorMessage,
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 5000);
+          setTimeout(() => navigate('/settings'), 1500);
         }
       } catch (err: any) {
         console.error('Error processing Spotify callback:', err);
-        setError(err.message || 'An unexpected error occurred.');
         toast({
           title: 'Spotify Connection Error',
           description: err.message || 'An unexpected error occurred.',
           variant: 'destructive',
         });
-        setTimeout(() => navigate('/settings'), 5000);
+        setTimeout(() => navigate('/settings'), 1500);
       } finally {
         setIsLoading(false);
       }
@@ -139,11 +112,6 @@ Code length: ${code ? code.length : 0}
 
     processCallback();
   }, [navigate, toast, processingStarted]);
-
-  const handleGoToSettings = () => {
-    // Force a hard refresh to ensure all state is updated properly
-    window.location.href = '/settings';
-  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
@@ -161,51 +129,17 @@ Code length: ${code ? code.length : 0}
               <AlertTriangle className="h-8 w-8 mr-2" />
               <p className="text-lg font-medium">{error}</p>
             </div>
-            
-            {debugInfo && (
-              <div className="mt-4 p-3 bg-muted rounded-md text-left">
-                <p className="text-sm font-medium mb-1">Debug Information:</p>
-                <pre className="text-xs overflow-auto whitespace-pre-wrap">
-                  {debugInfo}
-                </pre>
-              </div>
-            )}
             <p className="text-sm text-muted-foreground mt-4">
-              Redirecting back to settings in a few seconds...
+              Redirecting back to settings...
             </p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={handleGoToSettings}
-            >
-              Go to Settings
-            </Button>
           </div>
-        ) : success ? (
+        ) : (
           <div className="text-green-500 flex flex-col items-center">
             <Check className="h-12 w-12 mb-2" />
-            <p className="text-lg">Successfully connected to Spotify{username ? ` as ${username}` : ''}!</p>
+            <p className="text-lg">Successfully connected to Spotify!</p>
             <p className="text-sm text-muted-foreground mt-2">
               Redirecting to settings page...
             </p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={handleGoToSettings}
-            >
-              Go to Settings
-            </Button>
-          </div>
-        ) : (
-          <div className="text-amber-500">
-            <p>Processing complete but no status available.</p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={handleGoToSettings}
-            >
-              Go to Settings
-            </Button>
           </div>
         )}
       </Card>

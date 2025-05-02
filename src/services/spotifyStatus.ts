@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Check connection status with Spotify - improved with direct database query and fallback mechanisms
+// Check connection status with Spotify - improved with direct database query and cache-busting
 export async function getSpotifyConnectionStatus(): Promise<{
   connected: boolean;
   expired: boolean;
@@ -16,8 +16,11 @@ export async function getSpotifyConnectionStatus(): Promise<{
       return { connected: false, expired: false, username: null };
     }
 
+    // Add a cache-busting timestamp to ensure we get fresh data
+    const timestamp = new Date().getTime();
+    
     try {
-      // First try a direct database query - this is the most reliable method
+      // First try a direct database query with cache prevention
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('spotify_username, spotify_token_expires_at, spotify_access_token')
@@ -25,7 +28,12 @@ export async function getSpotifyConnectionStatus(): Promise<{
         .single();
       
       if (!profileError && profile) {
-        console.log('Got Spotify profile data directly from database:', profile);
+        console.log('Got Spotify profile data from database:', {
+          username: profile.spotify_username,
+          hasToken: !!profile.spotify_access_token,
+          expiresAt: profile.spotify_token_expires_at
+        });
+        
         const isConnected = !!profile.spotify_username && !!profile.spotify_access_token;
         const isExpired = profile.spotify_token_expires_at ? 
           new Date(profile.spotify_token_expires_at) < new Date() : 
@@ -43,15 +51,12 @@ export async function getSpotifyConnectionStatus(): Promise<{
       console.warn('Error fetching Spotify info from database:', dbError);
       // Continue to fallback
     }
-
-    // Instead of using RPC, we'll make a direct database query or use the edge function
-    // Remove the problematic RPC call that was causing TypeScript errors
     
     // Skip directly to edge function fallback with timeout and failure handling
     try {
-      const timestamp = new Date().getTime(); // Add timestamp to prevent caching
+      console.log(`Calling edge function for Spotify status with timestamp: ${timestamp}`);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
       
       const response = await fetch(
         `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/status?t=${timestamp}`, 

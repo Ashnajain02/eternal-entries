@@ -39,36 +39,15 @@ const Settings = () => {
       // Check if we just came from a successful connection
       const justConnected = searchParams.get('spotify_connected') === 'true';
       if (justConnected) {
-        console.log("Detected successful Spotify connection from URL param, refreshing status...");
+        console.log("Detected successful Spotify connection from URL param");
         // Add a small delay to allow the database to update
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
       console.log("Fetching Spotify connection status...");
       
-      // Fetch multiple times to ensure we get the latest data
-      // This is a workaround for potential cache or timing issues
-      let attempts = 0;
-      let status;
-      
-      while (attempts < 3) {
-        status = await getSpotifyConnectionStatus();
-        console.log(`Spotify status attempt ${attempts + 1}:`, status);
-        
-        // If connected, we're good
-        if (status.connected) break;
-        
-        // Otherwise wait a bit and try again
-        if (attempts < 2) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        
-        attempts++;
-      }
-      
-      if (!status) {
-        throw new Error("Failed to get connection status after multiple attempts");
-      }
+      const status = await getSpotifyConnectionStatus();
+      console.log('Spotify connection status result:', status);
       
       setSpotifyStatus({
         isLoading: false,
@@ -129,19 +108,21 @@ const Settings = () => {
   // Main effect for status checking
   useEffect(() => {
     fetchSpotifyStatus();
-  }, [fetchSpotifyStatus, location.search]);
+  }, [fetchSpotifyStatus]);
   
-  // Additional effect to detect when spotify_connected=true is in URL and force a refresh
+  // Additional effect to detect when spotify_connected=true is in URL and force multiple refresh attempts
   useEffect(() => {
     const justConnected = searchParams.get('spotify_connected') === 'true';
-    if (justConnected) {
+    const timestamp = searchParams.get('t'); // Check for timestamp to ensure it's a fresh connection
+    
+    if (justConnected && timestamp) {
       console.log("Spotify connection detected in URL, forcing status refresh");
       
       // Initial attempt
       fetchSpotifyStatus(true).then(connected => {
         // If not connected on first try, set up retry mechanism
         if (!connected && retryCount < 5) {
-          console.log(`Spotify status not connected, setting up retry #${retryCount + 1}`);
+          console.log(`Spotify status not connected, scheduling retry #${retryCount + 1}`);
           
           // Retry with increasing delay
           const retryTimer = setTimeout(() => {

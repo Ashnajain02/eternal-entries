@@ -20,15 +20,17 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     const redirectUri = `${window.location.origin}/spotify-callback`;
     
     console.log('Opening Spotify auth with redirect URI:', redirectUri);
-    console.log('Current window location:', window.location.href);
-    console.log('Window origin:', window.location.origin);
+    
+    // Add timestamp to prevent caching
+    const timestamp = new Date().getTime();
     
     // Create a more resilient URL for the edge function
     const edgeFunctionUrl = `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize`;
     const params = new URLSearchParams({
       redirect_uri: redirectUri,
       scope: scopes.join(' '),
-      show_dialog: 'true'
+      show_dialog: 'true',
+      t: timestamp.toString() // Add timestamp to prevent caching
     });
     
     // Call our edge function to get the auth URL with required parameters
@@ -37,8 +39,10 @@ export async function openSpotifyAuthWindow(): Promise<void> {
       {
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         },
-        cache: 'no-store', // Prevent caching
       }
     );
 
@@ -54,7 +58,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     }
 
     const { url } = await response.json();
-    console.log('Received auth URL:', url);
+    console.log('Received auth URL');
     
     // Open in a new tab with appropriate attributes
     const spotifyWindow = window.open(url, '_blank', 'noopener,noreferrer');
@@ -88,9 +92,12 @@ export async function handleSpotifyCallback(code: string): Promise<{
     const redirectUri = `${window.location.origin}/spotify-callback`;
     console.log('Using redirect URI for token exchange:', redirectUri);
     
+    // Add timestamp to prevent caching
+    const timestamp = new Date().getTime();
+    
     // Send the code to our edge function to exchange for tokens
-    const callbackUrl = `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
-    console.log('Calling callback endpoint at:', callbackUrl);
+    const callbackUrl = `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}&t=${timestamp}`;
+    console.log('Calling callback endpoint');
     
     const response = await fetch(callbackUrl, {
       headers: {
