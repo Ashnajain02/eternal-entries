@@ -5,49 +5,82 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
 import { useToast } from '@/hooks/use-toast';
-import { getSpotifyConnectionStatus, openSpotifyAuthWindow, disconnectSpotify } from '@/services/spotify';
-import { Loader2, Music, Check, X } from 'lucide-react';
+import { getSpotifyConnectionStatus, openSpotifyAuthWindow, disconnectSpotify, refreshSpotifyToken } from '@/services/spotify';
+import { Loader2, Music, Check, X, RefreshCw, AlertCircle } from 'lucide-react';
 
 const Settings = () => {
   const { authState } = useAuth();
   const { toast } = useToast();
   const [spotifyStatus, setSpotifyStatus] = useState<{
     isLoading: boolean;
+    isRefreshing: boolean;
     connected: boolean;
     expired: boolean;
     username: string | null;
   }>({
     isLoading: true,
+    isRefreshing: false,
     connected: false,
     expired: false,
     username: null,
   });
 
+  const fetchSpotifyStatus = async () => {
+    try {
+      if (!authState.user) return;
+      
+      console.log('Fetching Spotify status...');
+      const status = await getSpotifyConnectionStatus();
+      console.log('Spotify status received:', status);
+      
+      setSpotifyStatus({
+        isLoading: false,
+        isRefreshing: false,
+        connected: status.connected,
+        expired: status.expired,
+        username: status.username,
+      });
+    } catch (error) {
+      console.error('Error fetching Spotify status:', error);
+      setSpotifyStatus({
+        isLoading: false,
+        isRefreshing: false,
+        connected: false,
+        expired: false,
+        username: null,
+      });
+    }
+  };
+
   useEffect(() => {
-    const fetchSpotifyStatus = async () => {
-      try {
-        if (!authState.user) return;
+    if (authState.user) {
+      fetchSpotifyStatus();
+    }
+  }, [authState.user, authState.session]);
+
+  // Listen for Spotify connection messages from popup
+  useEffect(() => {
+    const handleSpotifyConnected = (event) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === 'SPOTIFY_CONNECTED' && event.data.success) {
+        console.log('Received Spotify connected message from popup:', event.data);
+        // Refresh the status to show the new connection
+        fetchSpotifyStatus();
         
-        const status = await getSpotifyConnectionStatus();
-        setSpotifyStatus({
-          isLoading: false,
-          connected: status.connected,
-          expired: status.expired,
-          username: status.username,
-        });
-      } catch (error) {
-        console.error('Error fetching Spotify status:', error);
-        setSpotifyStatus({
-          isLoading: false,
-          connected: false,
-          expired: false,
-          username: null,
+        toast({
+          title: 'Spotify Connected',
+          description: `Your Spotify account has been successfully connected${event.data.display_name ? ` as ${event.data.display_name}` : ''}.`,
         });
       }
     };
 
-    fetchSpotifyStatus();
-  }, [authState.user]);
+    window.addEventListener('message', handleSpotifyConnected);
+    return () => {
+      window.removeEventListener('message', handleSpotifyConnected);
+    };
+  }, [toast]);
 
   const handleConnectSpotify = async () => {
     try {
@@ -79,6 +112,33 @@ const Settings = () => {
     }
   };
 
+  const handleRefreshSpotifyToken = async () => {
+    try {
+      setSpotifyStatus(prev => ({ ...prev, isRefreshing: true }));
+      const refreshed = await refreshSpotifyToken();
+      
+      if (refreshed) {
+        // Get updated status
+        await fetchSpotifyStatus();
+        
+        toast({
+          title: 'Spotify Reconnected',
+          description: 'Your Spotify connection has been refreshed successfully.',
+        });
+      } else {
+        throw new Error('Failed to refresh token');
+      }
+    } catch (error) {
+      console.error('Error refreshing Spotify token:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh Spotify connection. Please try reconnecting.',
+        variant: 'destructive',
+      });
+      setSpotifyStatus(prev => ({ ...prev, isRefreshing: false }));
+    }
+  };
+
   const handleDisconnectSpotify = async () => {
     try {
       setSpotifyStatus(prev => ({ ...prev, isLoading: true }));
@@ -87,6 +147,7 @@ const Settings = () => {
       if (result) {
         setSpotifyStatus({
           isLoading: false,
+          isRefreshing: false,
           connected: false,
           expired: false,
           username: null,
@@ -161,10 +222,17 @@ const Settings = () => {
                         {spotifyStatus.isLoading ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : spotifyStatus.connected ? (
-                          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-                            <Check className="h-4 w-4" />
-                            <span>Connected</span>
-                          </div>
+                          spotifyStatus.expired ? (
+                            <div className="flex items-center gap-2 text-sm text-amber-500">
+                              <AlertCircle className="h-4 w-4" />
+                              <span>Expired</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                              <Check className="h-4 w-4" />
+                              <span>Connected</span>
+                            </div>
+                          )
                         ) : (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <X className="h-4 w-4" />
@@ -186,13 +254,27 @@ const Settings = () => {
                             <div>{spotifyStatus.username || 'Unknown user'}</div>
                           </div>
                           
-                          <div className="flex justify-end">
+                          <div className="flex justify-end space-x-2">
+                            {spotifyStatus.expired && (
+                              <Button 
+                                variant="outline" 
+                                onClick={handleRefreshSpotifyToken}
+                                disabled={spotifyStatus.isRefreshing}
+                              >
+                                {spotifyStatus.isRefreshing ? (
+                                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                )}
+                                Refresh Connection
+                              </Button>
+                            )}
                             <Button 
                               variant="outline" 
                               onClick={handleDisconnectSpotify}
-                              disabled={spotifyStatus.isLoading}
+                              disabled={spotifyStatus.isLoading || spotifyStatus.isRefreshing}
                             >
-                              {spotifyStatus.isLoading ? (
+                              {(spotifyStatus.isLoading && !spotifyStatus.isRefreshing) ? (
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                               ) : null}
                               Disconnect
