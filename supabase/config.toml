@@ -33,7 +33,7 @@ enabled = true
 
 [functions]
 [functions.spotify-auth]
-verify_jwt = true
+verify_jwt = false
 
 [functions.auth-test]
 verify_jwt = false

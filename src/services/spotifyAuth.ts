@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 // Open Spotify authorization in a new window/tab
@@ -25,11 +24,14 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     // Add timestamp to prevent caching
     const timestamp = new Date().getTime();
     
+    // IMPORTANT: Explicitly log the full authorization header format being sent
+    const authHeader = `Bearer ${sessionData.session.access_token}`;
+    console.log('Authorization header format:', 'Bearer ' + sessionData.session.access_token.substring(0, 10) + '...');
+    
     // Make sure to properly handle auth headers for the edge function
-    // IMPORTANT: The Authorization header must be exactly 'Bearer <token>'
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`
+        Authorization: authHeader
       },
       body: {
         action: 'authorize',
@@ -111,13 +113,15 @@ export async function handleSpotifyCallback(code: string): Promise<{
     // Add timestamp to prevent caching
     const timestamp = new Date().getTime();
     
-    // IMPORTANT: Explicitly set Authorization header with proper Bearer format
+    // IMPORTANT: Explicitly set and log the full Authorization header
+    const authHeader = `Bearer ${accessToken}`;
+    console.log('Authorization header format:', 'Bearer ' + accessToken.substring(0, 10) + '...');
+    
     console.log('Invoking spotify-auth edge function with action: callback');
-    console.log('Using Authorization header with access token length:', accessToken ? accessToken.length : 0);
     
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       headers: {
-        Authorization: `Bearer ${accessToken}` // Explicitly pass the access token with Bearer prefix
+        Authorization: authHeader
       },
       body: {
         action: 'callback',

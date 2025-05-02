@@ -9,11 +9,13 @@ const AuthTest: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tokenInfo, setTokenInfo] = useState<any>(null);
 
   const testAuth = async () => {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setTokenInfo(null);
     
     try {
       // First, get the current session
@@ -30,6 +32,15 @@ const AuthTest: React.FC = () => {
       console.log('Access token available:', !!accessToken);
       console.log('Access token length:', accessToken.length);
       console.log('First 20 chars of token:', accessToken.substring(0, 20) + '...');
+      
+      // Display token info in the UI for diagnostics
+      setTokenInfo({
+        tokenLength: accessToken.length,
+        tokenPrefix: accessToken.substring(0, 20) + '...',
+        tokenSuffix: '...' + accessToken.substring(accessToken.length - 20),
+        userId: sessionData.session.user.id,
+        email: sessionData.session.user.email
+      });
 
       // Call the auth-test function
       const { data, error } = await supabase.functions.invoke('auth-test', {
@@ -67,8 +78,17 @@ const AuthTest: React.FC = () => {
             {error}
           </div>
         )}
+        {tokenInfo && (
+          <div className="p-3 bg-muted rounded-md mb-4 text-xs">
+            <h4 className="font-medium mb-2">Token Information:</h4>
+            <pre className="whitespace-pre-wrap">
+              {JSON.stringify(tokenInfo, null, 2)}
+            </pre>
+          </div>
+        )}
         {result && (
           <div className="p-3 bg-muted rounded-md mb-4">
+            <h4 className="font-medium mb-2">Auth Test Result:</h4>
             <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(result, null, 2)}</pre>
           </div>
         )}
