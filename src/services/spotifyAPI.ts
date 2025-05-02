@@ -11,34 +11,25 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     }
 
     // Search Spotify via our edge function
-    const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/search?q=${encodeURIComponent(query)}`, {
-      headers: {
-        Authorization: `Bearer ${sessionData.session.access_token}`,
-      },
-      cache: 'no-store', // Prevent caching
+    const { data, error } = await supabase.functions.invoke('spotify-auth', {
+      body: {
+        action: 'search',
+        q: query
+      }
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response from search endpoint:', errorText);
+    if (error) {
+      console.error('Error from search function:', error);
       
-      try {
-        const error = JSON.parse(errorText);
-        // Special handling for token expired errors
-        if (error.error && (error.error.includes("expired") || error.error.includes("token"))) {
-          throw new Error("Spotify session expired, please reconnect your account");
-        }
-        throw new Error(error.error || 'Failed to search Spotify');
-      } catch (e) {
-        if (e instanceof SyntaxError) {
-          throw new Error(`Failed to process response: ${errorText}`);
-        }
-        throw e;
+      // Special handling for token expired errors
+      if (error.message && (error.message.includes("expired") || error.message.includes("token"))) {
+        throw new Error("Spotify session expired, please reconnect your account");
       }
+      
+      throw new Error(error.message || 'Failed to search Spotify');
     }
 
-    const { tracks } = await response.json();
-    return tracks;
+    return data?.tracks || [];
   } catch (error) {
     console.error('Error searching Spotify:', error);
     throw error;

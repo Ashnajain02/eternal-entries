@@ -29,63 +29,7 @@ serve(async (req) => {
   }
   
   try {
-    // Parse the request URL
-    const url = new URL(req.url);
-    const path = url.pathname.split("/").pop();
-    
-    console.log(`Request to ${path} endpoint`);
-    
-    // New authorize endpoint that will provide the proper authorization URL
-    if (path === "authorize") {
-      // Get the authorization header from the request
-      const authHeader = req.headers.get("Authorization");
-      if (!authHeader) {
-        return new Response(
-          JSON.stringify({ error: "No authorization header" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
-        );
-      }
-      
-      // Get redirect_uri and scope from query params
-      const redirect_uri = url.searchParams.get("redirect_uri");
-      const scope = url.searchParams.get("scope");
-      const show_dialog = url.searchParams.get("show_dialog") === "true";
-      
-      console.log("Auth request params:", { redirect_uri, scope, show_dialog });
-      
-      if (!redirect_uri || !scope) {
-        return new Response(
-          JSON.stringify({ error: "Missing required parameters" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-        );
-      }
-      
-      if (!clientId) {
-        return new Response(
-          JSON.stringify({ error: "Spotify Client ID is not configured" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-        );
-      }
-      
-      // Generate the authorization URL with the proper client ID
-      // Important: Ensure clientId is not a timestamp or other unexpected value
-      console.log("Client ID type:", typeof clientId);
-      console.log("Client ID length:", clientId.length);
-      console.log("First 5 chars of Client ID:", clientId.substring(0, 5));
-      
-      const authUrl = `https://accounts.spotify.com/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(
-        redirect_uri
-      )}&scope=${encodeURIComponent(scope)}${show_dialog ? "&show_dialog=true" : ""}`;
-      
-      console.log("Generated auth URL:", authUrl);
-      
-      return new Response(
-        JSON.stringify({ url: authUrl }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    // Get the authorization header from the request for other endpoints
+    // Get the token from the request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -104,12 +48,69 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
+
+    // Parse request body to get the action and parameters
+    let action, params;
+    const contentType = req.headers.get("content-type") || "";
     
-    if (path === "callback") {
+    if (contentType.includes("application/json")) {
+      const body = await req.json();
+      action = body.action;
+      params = body;
+    } else {
+      // For backward compatibility with URL-based params
+      const url = new URL(req.url);
+      action = url.pathname.split("/").pop();
+      params = Object.fromEntries(url.searchParams);
+    }
+    
+    console.log(`Request to ${action} endpoint with params:`, params);
+    
+    // Authorize endpoint - provide proper Spotify authorization URL
+    if (action === "authorize") {
+      const redirect_uri = params.redirect_uri;
+      const scope = params.scope;
+      const show_dialog = params.show_dialog === "true";
+      
+      console.log("Auth request params:", { redirect_uri, scope, show_dialog });
+      
+      if (!redirect_uri || !scope) {
+        return new Response(
+          JSON.stringify({ error: "Missing required parameters" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      if (!clientId) {
+        return new Response(
+          JSON.stringify({ error: "Spotify Client ID is not configured" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      
+      // Generate the authorization URL with the proper client ID
+      console.log("Client ID type:", typeof clientId);
+      console.log("Client ID length:", clientId.length);
+      console.log("First 5 chars of Client ID:", clientId.substring(0, 5));
+      
+      const authUrl = `https://accounts.spotify.com/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(
+        redirect_uri
+      )}&scope=${encodeURIComponent(scope)}${show_dialog ? "&show_dialog=true" : ""}`;
+      
+      console.log("Generated auth URL:", authUrl);
+      
+      return new Response(
+        JSON.stringify({ url: authUrl }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Callback endpoint - exchange code for tokens
+    else if (action === "callback") {
       // Handle the OAuth callback from Spotify
-      const code = url.searchParams.get("code");
+      const code = params.code;
       // Get the redirect_uri that was used for the original authorization request
-      const redirect_uri = url.searchParams.get("redirect_uri");
+      const redirect_uri = params.redirect_uri;
       
       console.log("Callback request params:", { 
         codePresent: !!code, 
@@ -126,7 +127,7 @@ serve(async (req) => {
       }
       
       // Use the provided redirect_uri or fallback to constructing one
-      const redirectUri = redirect_uri || `${url.origin}/spotify-callback`;
+      const redirectUri = redirect_uri || `${new URL(req.url).origin}/spotify-callback`;
       
       console.log("Using redirect URI for token exchange:", redirectUri);
       console.log("Client credentials available:", { 
@@ -230,7 +231,10 @@ serve(async (req) => {
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    } else if (path === "refresh") {
+    }
+    
+    // Refresh endpoint - refresh tokens
+    else if (action === "refresh") {
       // Get the user's refresh token
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
@@ -301,7 +305,10 @@ serve(async (req) => {
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    } else if (path === "revoke") {
+    }
+    
+    // Revoke endpoint - disconnect from Spotify
+    else if (action === "revoke") {
       // Revoke the Spotify access
       const { error: updateError } = await supabase
         .from("profiles")
@@ -324,7 +331,10 @@ serve(async (req) => {
         JSON.stringify({ success: true }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    } else if (path === "search") {
+    }
+    
+    // Search endpoint - search Spotify tracks
+    else if (action === "search") {
       // Get user's Spotify token
       const { data, error: profileError } = await supabase
         .from("profiles")
@@ -349,8 +359,8 @@ serve(async (req) => {
         );
       }
       
-      // Get query parameters
-      const query = url.searchParams.get("q") || "";
+      // Get query parameter
+      const query = params.q || "";
       
       if (!query) {
         return new Response(
@@ -410,7 +420,10 @@ serve(async (req) => {
         JSON.stringify({ tracks }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    } else if (path === "status") {
+    }
+    
+    // Status endpoint - check Spotify connection status
+    else if (action === "status") {
       console.log("Checking Spotify status for user:", user.id);
       
       // Get the user's Spotify connection status
@@ -445,9 +458,12 @@ serve(async (req) => {
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    } else {
+    }
+    
+    // Invalid endpoint
+    else {
       return new Response(
-        JSON.stringify({ error: "Invalid endpoint" }),
+        JSON.stringify({ error: "Invalid action" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
       );
     }

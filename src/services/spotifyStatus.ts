@@ -52,37 +52,30 @@ export async function getSpotifyConnectionStatus(): Promise<{
       // Continue to fallback
     }
     
-    // Skip directly to edge function fallback with timeout and failure handling
+    // Fallback to edge function
     try {
       console.log(`Calling edge function for Spotify status with timestamp: ${timestamp}`);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
       
-      const response = await fetch(
-        `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/status?t=${timestamp}`, 
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${sessionData.session.access_token}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-          },
-          signal: controller.signal
+      const { data, error } = await supabase.functions.invoke('spotify-auth', {
+        body: {
+          action: 'status',
+          t: timestamp
         }
-      );
+      });
       
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('Received Spotify status from edge function:', result);
-        return result;
-      } else {
-        throw new Error(`Edge function returned status: ${response.status}`);
+      if (error) {
+        console.error('Error from status function:', error);
+        throw new Error(error.message);
       }
-    } catch (fetchError) {
-      console.error('Edge function fallback failed:', fetchError);
+      
+      console.log('Received Spotify status from edge function:', data);
+      return {
+        connected: !!data?.connected,
+        expired: !!data?.expired,
+        username: data?.username || null
+      };
+    } catch (functionError) {
+      console.error('Edge function fallback failed:', functionError);
       // All methods failed, return disconnected state
     }
 
