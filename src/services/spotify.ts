@@ -20,6 +20,8 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     // Determine redirect URI based on environment
     const redirectUri = `${window.location.origin}/spotify-callback`;
     
+    console.log('Opening Spotify auth with redirect URI:', redirectUri);
+    
     // Call our edge function to get the auth URL with required parameters
     const response = await fetch(
       `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize?` + 
@@ -45,6 +47,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     }
 
     const { url } = await response.json();
+    console.log('Received auth URL:', url);
     
     // Open in a new tab with appropriate attributes
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -55,12 +58,18 @@ export async function openSpotifyAuthWindow(): Promise<void> {
 }
 
 // Handle the callback from Spotify OAuth flow
-export async function handleSpotifyCallback(code: string): Promise<{success: boolean, display_name?: string}> {
+export async function handleSpotifyCallback(code: string): Promise<{
+  success: boolean;
+  display_name?: string;
+  error?: string;
+}> {
   try {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
-      throw new Error('No active session');
+      return { success: false, error: 'No active session' };
     }
+
+    console.log('Exchanging code for tokens...');
 
     // Send the code to our edge function to exchange for tokens
     const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/callback?code=${code}`, {
@@ -70,8 +79,15 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to exchange code for tokens');
+      const errorText = await response.text();
+      console.error('Error response from callback endpoint:', errorText);
+      
+      try {
+        const error = JSON.parse(errorText);
+        return { success: false, error: error.error || 'Failed to exchange code for tokens' };
+      } catch (e) {
+        return { success: false, error: `Failed to process response: ${errorText}` };
+      }
     }
 
     const result = await response.json();
@@ -79,9 +95,9 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
       success: result.success, 
       display_name: result.display_name
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling Spotify callback:', error);
-    throw error;
+    return { success: false, error: error.message || 'Unknown error occurred' };
   }
 }
 
@@ -101,12 +117,22 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      // Special handling for token expired errors
-      if (error.error && (error.error.includes("expired") || error.error.includes("token"))) {
-        throw new Error("Spotify session expired, please reconnect your account");
+      const errorText = await response.text();
+      console.error('Error response from search endpoint:', errorText);
+      
+      try {
+        const error = JSON.parse(errorText);
+        // Special handling for token expired errors
+        if (error.error && (error.error.includes("expired") || error.error.includes("token"))) {
+          throw new Error("Spotify session expired, please reconnect your account");
+        }
+        throw new Error(error.error || 'Failed to search Spotify');
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          throw new Error(`Failed to process response: ${errorText}`);
+        }
+        throw e;
       }
-      throw new Error(error.error || 'Failed to search Spotify');
     }
 
     const { tracks } = await response.json();
@@ -129,6 +155,8 @@ export async function getSpotifyConnectionStatus(): Promise<{
       return { connected: false, expired: false, username: null };
     }
 
+    console.log('Checking Spotify connection status...');
+    
     // Get status from our edge function
     const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/status', {
       headers: {
@@ -137,8 +165,18 @@ export async function getSpotifyConnectionStatus(): Promise<{
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to check Spotify connection status');
+      const errorText = await response.text();
+      console.error('Error response from status endpoint:', errorText);
+      
+      try {
+        const error = JSON.parse(errorText);
+        throw new Error(error.error || 'Failed to check Spotify connection status');
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          throw new Error(`Failed to process response: ${errorText}`);
+        }
+        throw e;
+      }
     }
 
     return await response.json();
@@ -165,8 +203,18 @@ export async function disconnectSpotify(): Promise<boolean> {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to disconnect from Spotify');
+      const errorText = await response.text();
+      console.error('Error response from revoke endpoint:', errorText);
+      
+      try {
+        const error = JSON.parse(errorText);
+        throw new Error(error.error || 'Failed to disconnect from Spotify');
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          throw new Error(`Failed to process response: ${errorText}`);
+        }
+        throw e;
+      }
     }
 
     const result = await response.json();

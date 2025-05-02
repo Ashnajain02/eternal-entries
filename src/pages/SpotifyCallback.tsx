@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -21,29 +22,38 @@ const SpotifyCallback = () => {
         const code = params.get('code');
         const errorParam = params.get('error');
 
+        // Save debug info
+        setDebugInfo(`Callback URL: ${url.toString()}\nCode present: ${!!code}\nError present: ${!!errorParam}`);
+        console.log("Spotify callback URL:", url.toString());
+        console.log("Authorization code present:", !!code);
+        
         if (errorParam) {
-          setError('Authorization was denied or an error occurred.');
+          console.error("Spotify auth error parameter:", errorParam);
+          setError(`Authorization was denied: ${errorParam}`);
           toast({
             title: 'Spotify Connection Failed',
-            description: 'Authorization was denied or an error occurred.',
+            description: `Authorization error: ${errorParam}`,
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 3000);
+          setTimeout(() => navigate('/settings'), 5000);
           return;
         }
 
         if (!code) {
+          console.error("No authorization code provided");
           setError('No authorization code was provided.');
           toast({
             title: 'Spotify Connection Failed',
             description: 'No authorization code was provided.',
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 3000);
+          setTimeout(() => navigate('/settings'), 5000);
           return;
         }
 
+        console.log("Attempting to exchange code for tokens...");
         const result = await handleSpotifyCallback(code);
+        console.log("Spotify callback result:", result);
         
         if (result.success) {
           toast({
@@ -60,13 +70,13 @@ const SpotifyCallback = () => {
             navigate('/settings');
           }
         } else {
-          setError('Failed to connect to Spotify.');
+          setError(result.error || 'Failed to connect to Spotify.');
           toast({
             title: 'Spotify Connection Failed',
-            description: 'There was a problem connecting your Spotify account.',
+            description: result.error || 'There was a problem connecting your Spotify account.',
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 3000);
+          setTimeout(() => navigate('/settings'), 5000);
         }
       } catch (err: any) {
         console.error('Error processing Spotify callback:', err);
@@ -76,7 +86,7 @@ const SpotifyCallback = () => {
           description: err.message || 'An unexpected error occurred.',
           variant: 'destructive',
         });
-        setTimeout(() => navigate('/settings'), 3000);
+        setTimeout(() => navigate('/settings'), 5000);
       } finally {
         setIsLoading(false);
       }
@@ -96,10 +106,18 @@ const SpotifyCallback = () => {
             <p className="text-muted-foreground">Processing your Spotify authorization...</p>
           </div>
         ) : error ? (
-          <div className="text-destructive">
-            <p>{error}</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Redirecting back to settings...
+          <div>
+            <p className="text-destructive mb-4">{error}</p>
+            {debugInfo && (
+              <div className="mt-4 p-3 bg-muted rounded-md text-left">
+                <p className="text-sm font-medium mb-1">Debug Information:</p>
+                <pre className="text-xs overflow-auto whitespace-pre-wrap">
+                  {debugInfo}
+                </pre>
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground mt-4">
+              Redirecting back to settings in a few seconds...
             </p>
           </div>
         ) : (
