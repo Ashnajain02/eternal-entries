@@ -65,6 +65,9 @@ export async function handleSpotifyCallback(code: string): Promise<{
   display_name?: string;
   error?: string;
   error_description?: string;
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: string;
 }> {
   try {
     console.log('Starting Spotify callback handler with code length:', code.length);
@@ -142,36 +145,17 @@ export async function handleSpotifyCallback(code: string): Promise<{
           hasToken: !!profileData?.spotify_access_token,
           username: profileData?.spotify_username
         });
-        
-        // If the profile verification shows the data wasn't saved properly, try a direct update
-        if (!profileData?.spotify_access_token || !profileData?.spotify_username) {
-          console.log('Profile data appears incomplete, attempting RPC update...');
-          
-          // Try the database function for more reliability
-          const { error: rpcError } = await supabase.rpc(
-            'update_profile_spotify_data',
-            {
-              p_user_id: userId,
-              p_access_token: data.access_token || '',
-              p_refresh_token: data.refresh_token || '',
-              p_expires_at: data.expires_at || new Date(Date.now() + 3600000).toISOString(),
-              p_username: data.display_name || 'Spotify User'
-            }
-          );
-          
-          if (rpcError) {
-            console.error('RPC update failed:', rpcError);
-          } else {
-            console.log('RPC update successful');
-          }
-        }
       }
       
+      // Return the full data from the callback, including tokens for potential manual updates
       return { 
         success: data.success, 
-        display_name: data.display_name
+        display_name: data.display_name,
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: data.expires_at
       };
-    } catch (functionError) {
+    } catch (functionError: any) {
       console.error('Edge function error:', functionError);
       return { 
         success: false, 

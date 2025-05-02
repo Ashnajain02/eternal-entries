@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotifyAuth';
+import { verifySpotifyProfileUpdate, manualProfileUpdate } from '@/services/spotifyCallback';
 import { Card } from '@/components/ui/card';
 import { Loader2, Check, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -14,72 +15,6 @@ const SpotifyCallback = () => {
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  const verifyProfileUpdate = async (userId: string, displayName: string) => {
-    try {
-      // First check if the profile exists and has the data
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('spotify_username, spotify_access_token')
-        .eq('id', userId)
-        .single();
-        
-      if (profileError) {
-        setDebugInfo(prev => `${prev}\nProfile verification failed: ${profileError.message}`);
-        
-        // Try to manually update using the RPC function as a last resort
-        setDebugInfo(prev => `${prev}\nAttempting database function update_profile_spotify_data...`);
-        
-        // Get the tokens from a session scope call
-        const { data: tokenData, error: tokenError } = await supabase.functions.invoke('spotify-auth', {
-          body: {
-            action: 'get_tokens_for_userid',
-            user_id: userId
-          }
-        });
-        
-        if (tokenError || !tokenData) {
-          setDebugInfo(prev => `${prev}\nFailed to get tokens: ${tokenError?.message || 'No data'}`);
-          return false;
-        }
-        
-        // Use RPC to update the profile
-        const expiresAt = new Date();
-        expiresAt.setSeconds(expiresAt.getSeconds() + (tokenData.expires_in || 3600));
-        
-        const { data: rpcResult, error: rpcError } = await supabase.rpc(
-          'update_profile_spotify_data',
-          {
-            p_user_id: userId,
-            p_access_token: tokenData.access_token,
-            p_refresh_token: tokenData.refresh_token || '',
-            p_expires_at: expiresAt.toISOString(),
-            p_username: displayName
-          }
-        );
-        
-        if (rpcError) {
-          setDebugInfo(prev => `${prev}\nRPC update failed: ${rpcError.message}`);
-          return false;
-        }
-        
-        setDebugInfo(prev => `${prev}\nRPC update result: ${rpcResult ? 'SUCCESS' : 'FAILED'}`);
-        return rpcResult;
-      }
-      
-      const verification = {
-        hasUsername: !!profileData?.spotify_username,
-        hasToken: !!profileData?.spotify_access_token,
-        username: profileData?.spotify_username
-      };
-      
-      setDebugInfo(prev => `${prev}\nProfile verification: ${JSON.stringify(verification)}`);
-      return verification.hasToken && verification.hasUsername;
-    } catch (err: any) {
-      setDebugInfo(prev => `${prev}\nProfile verification error: ${err.message}`);
-      return false;
-    }
-  };
 
   useEffect(() => {
     // Only run once - important to prevent multiple token exchanges
@@ -118,6 +53,25 @@ const SpotifyCallback = () => {
             
           if (createError) {
             setDebugInfo(prev => `${prev}\nError creating profile: ${createError.message}`);
+            
+            // Try RPC function as fallback for profile creation
+            setDebugInfo(prev => `${prev}\nTrying RPC function for profile creation...`);
+            const { error: rpcError } = await supabase.rpc(
+              'update_profile_spotify_data',
+              {
+                p_user_id: userId,
+                p_access_token: '',
+                p_refresh_token: '',
+                p_expires_at: new Date().toISOString(),
+                p_username: ''
+              }
+            );
+            
+            if (rpcError) {
+              setDebugInfo(prev => `${prev}\nRPC profile creation failed: ${rpcError.message}`);
+            } else {
+              setDebugInfo(prev => `${prev}\nRPC profile creation succeeded`);
+            }
           } else {
             setDebugInfo(prev => `${prev}\nProfile created successfully`);
           }
@@ -131,7 +85,7 @@ const SpotifyCallback = () => {
         const code = params.get('code');
         const errorParam = params.get('error');
         
-        // Log basic diagnostics but don't expose in UI
+        // Log basic diagnostics
         setDebugInfo(prev => `${prev}\nCode present: ${!!code}`);
         setDebugInfo(prev => `${prev}\nError present: ${!!errorParam}`);
         
@@ -159,20 +113,40 @@ const SpotifyCallback = () => {
           return;
         }
 
+        setDebugInfo(prev => `${prev}\nCode value: ${code.substring(0, 10)}...`);
         setDebugInfo(prev => `${prev}\nExchanging code for tokens...`);
         
         // Make multiple attempts to exchange the code for tokens
         let attempts = 0;
         let result = null;
+        let tokenData = null;
         
         while (attempts < 3 && !result?.success) {
           setDebugInfo(prev => `${prev}\nToken exchange attempt ${attempts + 1}...`);
           
-          result = await handleSpotifyCallback(code);
-          console.log(`Attempt ${attempts + 1} result:`, result);
-          setDebugInfo(prev => `${prev}\nAttempt ${attempts + 1}: ${result.success ? 'Success' : 'Failed - ' + (result.error || 'Unknown error')}`);
+          try {
+            // We need to capture token data for potential manual update
+            result = await handleSpotifyCallback(code);
+            console.log(`Attempt ${attempts + 1} result:`, result);
+            
+            if (result.access_token) {
+              tokenData = {
+                access_token: result.access_token,
+                refresh_token: result.refresh_token || '',
+                expires_at: result.expires_at || new Date(Date.now() + 3600000).toISOString(),
+                display_name: result.display_name || 'Spotify User'
+              };
+            }
+            
+            setDebugInfo(prev => `${prev}\nAttempt ${attempts + 1}: ${
+              result.success ? 'Success' : 'Failed - ' + (result.error || 'Unknown error')
+            }`);
+          } catch (err: any) {
+            console.error(`Error in attempt ${attempts + 1}:`, err);
+            setDebugInfo(prev => `${prev}\nError in attempt ${attempts + 1}: ${err.message}`);
+          }
           
-          if (!result.success && attempts < 2) {
+          if (!result?.success && attempts < 2) {
             // Wait before retrying
             await new Promise(resolve => setTimeout(resolve, 1500));
           }
@@ -189,31 +163,23 @@ const SpotifyCallback = () => {
           setDebugInfo(prev => `${prev}\nConnection reported successful! Username: ${result.display_name || 'Unknown'}`);
           
           // Check if the profile was actually updated in the database
-          const verified = await verifyProfileUpdate(userId, result.display_name || 'Spotify User');
+          const verified = await verifySpotifyProfileUpdate(userId);
           setDebugInfo(prev => `${prev}\nProfile updated successfully: ${verified}`);
           
-          if (!verified) {
+          if (!verified && tokenData) {
             setDebugInfo(prev => `${prev}\nWarning: Profile verification failed despite success response`);
             
             // Try direct update as a last resort
-            setDebugInfo(prev => `${prev}\nAttempting direct profile update...`);
-            try {
-              const { error: upsertError } = await supabase
-                .from('profiles')
-                .upsert({
-                  id: userId,
-                  spotify_username: result.display_name,
-                  updated_at: new Date().toISOString()
-                }, { onConflict: 'id' });
-                
-              if (upsertError) {
-                setDebugInfo(prev => `${prev}\nManual upsert failed: ${upsertError.message}`);
-              } else {
-                setDebugInfo(prev => `${prev}\nManual upsert succeeded`);
-              }
-            } catch (err: any) {
-              setDebugInfo(prev => `${prev}\nManual update error: ${err.message}`);
-            }
+            setDebugInfo(prev => `${prev}\nAttempting manual profile update...`);
+            const manualSuccess = await manualProfileUpdate(
+              userId,
+              tokenData.access_token,
+              tokenData.refresh_token,
+              tokenData.expires_at,
+              tokenData.display_name
+            );
+            
+            setDebugInfo(prev => `${prev}\nManual profile update ${manualSuccess ? 'succeeded' : 'failed'}`);
           }
           
           // Wait a moment for the database to update

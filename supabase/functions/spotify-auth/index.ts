@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -63,7 +64,7 @@ serve(async (req) => {
       } catch (parseError) {
         console.error("Error parsing JSON body:", parseError);
         return new Response(
-          JSON.stringify({ error: "Invalid JSON body" }),
+          JSON.stringify({ error: "Invalid JSON body", details: parseError.message }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }
@@ -214,6 +215,7 @@ serve(async (req) => {
       
       try {
         // First, check if the profile exists
+        console.log(`Checking if profile exists for user ${userId}`);
         const { data: profileData, error: profileCheckError } = await supabase
           .from("profiles")
           .select("id")
@@ -222,25 +224,62 @@ serve(async (req) => {
           
         if (profileCheckError) {
           console.error("Error checking if profile exists:", profileCheckError);
+          return new Response(
+            JSON.stringify({ 
+              error: "Failed to check profile existence", 
+              details: profileCheckError.message 
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
         } else if (!profileData) {
           console.log(`Profile does not exist for user ${userId}, creating one`);
           
-          // Create a new profile with minimal data - we'll update it with Spotify data later
-          const { error: createProfileError } = await supabase
-            .from("profiles")
-            .insert([{ id: userId }]);
-            
-          if (createProfileError) {
-            console.error("Failed to create profile:", createProfileError);
+          try {
+            // Create a new profile with minimal data - we'll update it with Spotify data later
+            const { error: createProfileError } = await supabase
+              .from("profiles")
+              .insert([{ id: userId }]);
+              
+            if (createProfileError) {
+              console.error("Failed to create profile:", createProfileError);
+              
+              // Try to use the RPC function as fallback
+              console.log("Attempting to use RPC function as fallback for profile creation");
+              const { error: rpcError } = await supabase.rpc(
+                "update_profile_spotify_data",
+                {
+                  p_user_id: userId,
+                  p_access_token: '',
+                  p_refresh_token: '',
+                  p_expires_at: new Date().toISOString(),
+                  p_username: 'New User'
+                }
+              );
+              
+              if (rpcError) {
+                console.error("RPC creation fallback also failed:", rpcError);
+                return new Response(
+                  JSON.stringify({ 
+                    error: "Failed to create user profile", 
+                    details: `Original error: ${createProfileError.message}, RPC fallback error: ${rpcError.message}` 
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+                );
+              } else {
+                console.log("Successfully created profile using RPC function");
+              }
+            } else {
+              console.log("Successfully created profile for user");
+            }
+          } catch (profileCreationError) {
+            console.error("Exception during profile creation:", profileCreationError);
             return new Response(
               JSON.stringify({ 
-                error: "Failed to create user profile", 
-                details: createProfileError.message 
+                error: "Exception during profile creation", 
+                details: profileCreationError.message
               }),
               { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
             );
-          } else {
-            console.log("Successfully created profile for user");
           }
         } else {
           console.log(`Found existing profile for user ${userId}`);
@@ -248,214 +287,158 @@ serve(async (req) => {
       
         // Exchange the code for an access token
         console.log("Sending token exchange request to Spotify API...");
-        const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-          },
-          body: new URLSearchParams({
-            grant_type: "authorization_code",
-            code,
-            redirect_uri: redirectUri,
-          }),
-        });
-        
-        console.log("Token exchange response status:", tokenResponse.status);
-        
-        if (!tokenResponse.ok) {
-          console.error("Token exchange error status:", tokenResponse.status);
-          const errorText = await tokenResponse.text();
-          console.error("Token exchange error body:", errorText);
-          
-          try {
-            // Try to parse as JSON if possible
-            const errorJson = JSON.parse(errorText);
-            return new Response(
-              JSON.stringify({ 
-                error: errorJson.error || "Token exchange failed", 
-                error_description: errorJson.error_description,
-                details: `Redirect URI: ${redirectUri}, Code length: ${code.length}, Status: ${tokenResponse.status}`
-              }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-            );
-          } catch {
-            // If not JSON, return the text
-            return new Response(
-              JSON.stringify({ 
-                error: "Token exchange failed", 
-                details: `Status: ${tokenResponse.status}, Response: ${errorText.substring(0, 100)}...`
-              }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-            );
-          }
-        }
-        
-        const tokenData = await tokenResponse.json();
-        
-        if (tokenData.error) {
-          console.error("Token exchange error:", tokenData);
-          return new Response(
-            JSON.stringify({ 
-              error: tokenData.error, 
-              error_description: tokenData.error_description,
-              details: `Redirect URI: ${redirectUri}, Code length: ${code.length}`
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-          );
-        }
-        
-        console.log("Token exchange successful. Got tokens:", {
-          access_token_present: !!tokenData.access_token,
-          refresh_token_present: !!tokenData.refresh_token,
-          expires_in: tokenData.expires_in
-        });
-        
         try {
-          // Get the user's Spotify profile
-          console.log("Fetching Spotify user profile...");
-          const profileResponse = await fetch("https://api.spotify.com/v1/me", {
+          const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
+            method: "POST",
             headers: {
-              "Authorization": `Bearer ${tokenData.access_token}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Authorization": `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
             },
+            body: new URLSearchParams({
+              grant_type: "authorization_code",
+              code,
+              redirect_uri: redirectUri,
+            }),
           });
           
-          if (!profileResponse.ok) {
-            console.error("Profile fetch error status:", profileResponse.status);
-            const profileErrorText = await profileResponse.text();
-            console.error("Profile fetch error text:", profileErrorText);
-            throw new Error(`Failed to fetch profile: ${profileResponse.status}`);
-          }
+          console.log("Token exchange response status:", tokenResponse.status);
           
-          const profileData = await profileResponse.json();
-          
-          console.log("Got Spotify profile:", {
-            id: profileData.id,
-            display_name: profileData.display_name,
-            email: profileData.email
-          });
-          
-          // Calculate token expiration
-          const expiresAt = new Date();
-          expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
-          
-          // Save the tokens in the user's profile
-          console.log("Updating profile record in database for user:", userId);
-          console.log("With data:", {
-            spotify_access_token: "PRESENT",
-            spotify_refresh_token: "PRESENT",
-            spotify_token_expires_at: expiresAt.toISOString(),
-            spotify_username: profileData.display_name || profileData.id
-          });
-          
-          // First, try using the function we created for reliability
-          try {
-            console.log("Attempting to update profile data using RPC function...");
-            const { data: rpcResult, error: rpcError } = await supabase.rpc(
-              "update_profile_spotify_data",
-              {
-                p_user_id: userId,
-                p_access_token: tokenData.access_token,
-                p_refresh_token: tokenData.refresh_token || "",
-                p_expires_at: expiresAt.toISOString(),
-                p_username: profileData.display_name || profileData.id
-              }
-            );
-            
-            if (rpcError) {
-              console.error("RPC function error:", rpcError);
-              // Continue to fallback methods
-            } else {
-              console.log("RPC function update result:", rpcResult);
-              if (rpcResult === true) {
-                console.log("Profile updated successfully via RPC function!");
-                
-                // Verify the update succeeded
-                const { data: verifyData, error: verifyError } = await supabase
-                  .from("profiles")
-                  .select("spotify_username, spotify_access_token")
-                  .eq("id", userId)
-                  .single();
-                  
-                if (verifyError) {
-                  console.error("Error verifying profile update:", verifyError);
-                } else {
-                  console.log("Profile verification after RPC update:", {
-                    hasUsername: !!verifyData?.spotify_username,
-                    hasToken: !!verifyData?.spotify_access_token,
-                    username: verifyData?.spotify_username
-                  });
-                  
-                  // If update is confirmed, we can return success
-                  if (verifyData?.spotify_access_token && verifyData?.spotify_username) {
-                    return new Response(
-                      JSON.stringify({ 
-                        success: true,
-                        display_name: profileData.display_name,
-                        expires_at: expiresAt.toISOString() 
-                      }),
-                      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-                    );
-                  }
-                  // Otherwise continue to fallback methods
-                }
-              }
-            }
-          } catch (rpcCallError) {
-            console.error("Error calling RPC function:", rpcCallError);
-            // Continue to fallback methods
-          }
-          
-          // Try direct update as fallback 1
-          console.log("Attempting direct update as fallback...");
-          try {
-            const { data: updateData, error: updateError } = await supabase
-              .from("profiles")
-              .update({
-                spotify_access_token: tokenData.access_token,
-                spotify_refresh_token: tokenData.refresh_token,
-                spotify_token_expires_at: expiresAt.toISOString(),
-                spotify_username: profileData.display_name || profileData.id,
-              })
-              .eq("id", userId);
-            
-            if (updateError) {
-              console.error("Error updating profile with direct update:", updateError);
-              throw new Error(`Failed to update profile: ${updateError.message}`);
-            }
-            
-            console.log("Direct update completed successfully");
-          } catch (directUpdateError) {
-            console.error("Direct update failed:", directUpdateError);
-            
-            // Try upsert as fallback 2
-            console.log("Attempting upsert as second fallback...");
+          if (!tokenResponse.ok) {
+            console.error("Token exchange error status:", tokenResponse.status);
+            let errorBody = "";
             try {
-              const { error: upsertError } = await supabase
-                .from("profiles")
-                .upsert({
-                  id: userId,
-                  spotify_access_token: tokenData.access_token,
-                  spotify_refresh_token: tokenData.refresh_token,
-                  spotify_token_expires_at: expiresAt.toISOString(),
-                  spotify_username: profileData.display_name || profileData.id,
-                  updated_at: new Date().toISOString()
-                }, {
-                  onConflict: 'id'
-                });
-                
-              if (upsertError) {
-                console.error("Upsert fallback failed:", upsertError);
-                throw new Error(`Failed to upsert profile: ${upsertError.message}`);
+              errorBody = await tokenResponse.text();
+              console.error("Token exchange error body:", errorBody);
+              
+              // Try to parse as JSON if possible
+              try {
+                const errorJson = JSON.parse(errorBody);
+                return new Response(
+                  JSON.stringify({ 
+                    error: errorJson.error || "Token exchange failed", 
+                    error_description: errorJson.error_description,
+                    details: `Redirect URI: ${redirectUri}, Code length: ${code.length}, Status: ${tokenResponse.status}`
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+                );
+              } catch {
+                // If not JSON, return the text
+                return new Response(
+                  JSON.stringify({ 
+                    error: "Token exchange failed", 
+                    details: `Status: ${tokenResponse.status}, Response: ${errorBody.substring(0, 100)}...`
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+                );
               }
-              
-              console.log("Upsert completed successfully");
-            } catch (upsertCatchError) {
-              console.error("Upsert try-catch failed:", upsertCatchError);
-              
-              // Last resort - try raw SQL via RPC
-              console.log("Last resort: Attempting direct SQL via function call...");
-              const { error: rawSqlError } = await supabase.rpc(
+            } catch (responseReadError) {
+              console.error("Error reading token exchange response:", responseReadError);
+              return new Response(
+                JSON.stringify({ 
+                  error: "Error reading token exchange response", 
+                  details: responseReadError.message
+                }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+              );
+            }
+          }
+          
+          let tokenData;
+          try {
+            tokenData = await tokenResponse.json();
+          } catch (tokenJsonError) {
+            console.error("Error parsing token response JSON:", tokenJsonError);
+            return new Response(
+              JSON.stringify({ 
+                error: "Error parsing token response", 
+                details: tokenJsonError.message 
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+            );
+          }
+          
+          if (tokenData.error) {
+            console.error("Token exchange error:", tokenData);
+            return new Response(
+              JSON.stringify({ 
+                error: tokenData.error, 
+                error_description: tokenData.error_description,
+                details: `Redirect URI: ${redirectUri}, Code length: ${code.length}`
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+            );
+          }
+          
+          console.log("Token exchange successful. Got tokens:", {
+            access_token_present: !!tokenData.access_token,
+            refresh_token_present: !!tokenData.refresh_token,
+            expires_in: tokenData.expires_in
+          });
+          
+          try {
+            // Get the user's Spotify profile
+            console.log("Fetching Spotify user profile...");
+            const profileResponse = await fetch("https://api.spotify.com/v1/me", {
+              headers: {
+                "Authorization": `Bearer ${tokenData.access_token}`,
+              },
+            });
+            
+            if (!profileResponse.ok) {
+              console.error("Profile fetch error status:", profileResponse.status);
+              let profileErrorText = "";
+              try {
+                profileErrorText = await profileResponse.text();
+              } catch (e) {
+                profileErrorText = "Could not read error response";
+              }
+              console.error("Profile fetch error text:", profileErrorText);
+              return new Response(
+                JSON.stringify({ 
+                  error: "Failed to fetch profile", 
+                  details: `Status: ${profileResponse.status}, Response: ${profileErrorText}`
+                }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: profileResponse.status }
+              );
+            }
+            
+            let profileData;
+            try {
+              profileData = await profileResponse.json();
+            } catch (profileJsonError) {
+              console.error("Error parsing profile response JSON:", profileJsonError);
+              return new Response(
+                JSON.stringify({ 
+                  error: "Error parsing profile response", 
+                  details: profileJsonError.message 
+                }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+              );
+            }
+            
+            console.log("Got Spotify profile:", {
+              id: profileData.id,
+              display_name: profileData.display_name,
+              email: profileData.email
+            });
+            
+            // Calculate token expiration
+            const expiresAt = new Date();
+            expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+            
+            // Save the tokens in the user's profile
+            console.log("Updating profile record in database for user:", userId);
+            console.log("With data:", {
+              spotify_username: profileData.display_name || profileData.id,
+              expires_at: expiresAt.toISOString()
+            });
+            
+            // First, try using the function we created for reliability
+            let profileUpdateSuccess = false;
+            
+            try {
+              console.log("Attempting to update profile data using RPC function...");
+              const { data: rpcResult, error: rpcError } = await supabase.rpc(
                 "update_profile_spotify_data",
                 {
                   p_user_id: userId,
@@ -466,50 +449,136 @@ serve(async (req) => {
                 }
               );
               
-              if (rawSqlError) {
-                console.error("Final SQL attempt failed:", rawSqlError);
-                throw new Error(`Failed to update profile: ${rawSqlError.message}`);
+              if (rpcError) {
+                console.error("RPC function error:", rpcError);
+                // Continue to fallback methods
+              } else {
+                console.log("RPC function update result:", rpcResult);
+                if (rpcResult === true) {
+                  console.log("Profile updated successfully via RPC function!");
+                  profileUpdateSuccess = true;
+                }
               }
-              
-              console.log("Final SQL attempt succeeded");
+            } catch (rpcCallError) {
+              console.error("Error calling RPC function:", rpcCallError);
+              // Continue to fallback methods
             }
-          }
-          
-          // Final verification to make sure the data was actually saved
-          const { data: finalVerifyData, error: finalVerifyError } = await supabase
-            .from("profiles")
-            .select("spotify_username, spotify_access_token")
-            .eq("id", userId)
-            .single();
             
-          if (finalVerifyError) {
-            console.error("Error in final verification:", finalVerifyError);
-          } else {
-            console.log("Final verification result:", {
-              hasUsername: !!finalVerifyData?.spotify_username,
-              hasToken: !!finalVerifyData?.spotify_access_token,
-              username: finalVerifyData?.spotify_username
-            });
-            
-            if (!finalVerifyData?.spotify_access_token || !finalVerifyData?.spotify_username) {
-              console.error("Critical error: Data still not saved after all attempts!");
+            // Try direct update as fallback 1 if RPC failed
+            if (!profileUpdateSuccess) {
+              console.log("Attempting direct update as fallback...");
+              try {
+                const { error: updateError } = await supabase
+                  .from("profiles")
+                  .update({
+                    spotify_access_token: tokenData.access_token,
+                    spotify_refresh_token: tokenData.refresh_token,
+                    spotify_token_expires_at: expiresAt.toISOString(),
+                    spotify_username: profileData.display_name || profileData.id,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq("id", userId);
+                
+                if (updateError) {
+                  console.error("Error updating profile with direct update:", updateError);
+                } else {
+                  console.log("Direct update completed successfully");
+                  profileUpdateSuccess = true;
+                }
+              } catch (directUpdateError) {
+                console.error("Direct update failed:", directUpdateError);
+              }
             }
+            
+            // Try upsert as fallback 2 if both RPC and direct update failed
+            if (!profileUpdateSuccess) {
+              console.log("Attempting upsert as second fallback...");
+              try {
+                const { error: upsertError } = await supabase
+                  .from("profiles")
+                  .upsert({
+                    id: userId,
+                    spotify_access_token: tokenData.access_token,
+                    spotify_refresh_token: tokenData.refresh_token,
+                    spotify_token_expires_at: expiresAt.toISOString(),
+                    spotify_username: profileData.display_name || profileData.id,
+                    updated_at: new Date().toISOString()
+                  }, {
+                    onConflict: 'id'
+                  });
+                  
+                if (upsertError) {
+                  console.error("Upsert fallback failed:", upsertError);
+                } else {
+                  console.log("Upsert completed successfully");
+                  profileUpdateSuccess = true;
+                }
+              } catch (upsertCatchError) {
+                console.error("Upsert try-catch failed:", upsertCatchError);
+              }
+            }
+            
+            // Final verification to make sure the data was actually saved
+            try {
+              const { data: finalVerifyData, error: finalVerifyError } = await supabase
+                .from("profiles")
+                .select("spotify_username, spotify_access_token")
+                .eq("id", userId)
+                .single();
+                
+              if (finalVerifyError) {
+                console.error("Error in final verification:", finalVerifyError);
+              } else {
+                console.log("Final verification result:", {
+                  hasUsername: !!finalVerifyData?.spotify_username,
+                  hasToken: !!finalVerifyData?.spotify_access_token,
+                  username: finalVerifyData?.spotify_username
+                });
+                
+                if (!finalVerifyData?.spotify_access_token || !finalVerifyData?.spotify_username) {
+                  console.error("Critical error: Data still not saved after all attempts!");
+                } else {
+                  profileUpdateSuccess = true;
+                }
+              }
+            } catch (verifyError) {
+              console.error("Error during verification:", verifyError);
+            }
+            
+            if (!profileUpdateSuccess) {
+              return new Response(
+                JSON.stringify({ 
+                  error: "Failed to save Spotify data to database after multiple attempts",
+                  success: false 
+                }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+              );
+            }
+            
+            return new Response(
+              JSON.stringify({ 
+                success: true,
+                display_name: profileData.display_name,
+                expires_at: expiresAt.toISOString()
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+            );
+          } catch (profileError) {
+            console.error("Error fetching or saving profile data:", profileError);
+            return new Response(
+              JSON.stringify({ 
+                error: "Failed to process profile data", 
+                details: profileError.message
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+            );
           }
-          
+        } catch (tokenFetchError) {
+          console.error("Error fetching token from Spotify:", tokenFetchError);
           return new Response(
             JSON.stringify({ 
-              success: true,
-              display_name: profileData.display_name,
-              expires_at: expiresAt.toISOString()
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-          );
-        } catch (profileError) {
-          console.error("Error fetching or saving profile data:", profileError);
-          return new Response(
-            JSON.stringify({ 
-              error: "Failed to process profile data", 
-              details: profileError.message
+              error: "Error fetching token from Spotify", 
+              details: tokenFetchError.message
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
           );
@@ -552,15 +621,38 @@ serve(async (req) => {
         if (!profile) {
           console.log("No profile found for user:", userIdToCheck);
           
-          // Try to create a profile for the user
-          const { error: createError } = await supabase
-            .from("profiles")
-            .insert({ id: userIdToCheck });
-            
-          if (createError) {
-            console.error("Error creating profile:", createError);
-          } else {
-            console.log("Created new profile for user");
+          try {
+            // Try to create a profile for the user
+            const { error: createError } = await supabase
+              .from("profiles")
+              .insert({ id: userIdToCheck });
+              
+            if (createError) {
+              console.error("Error creating profile:", createError);
+              
+              // Try to use the RPC function as fallback
+              console.log("Attempting to use RPC function as fallback for profile creation");
+              const { error: rpcError } = await supabase.rpc(
+                "update_profile_spotify_data",
+                {
+                  p_user_id: userIdToCheck,
+                  p_access_token: '',
+                  p_refresh_token: '',
+                  p_expires_at: new Date().toISOString(),
+                  p_username: ''
+                }
+              );
+              
+              if (rpcError) {
+                console.error("RPC creation fallback also failed:", rpcError);
+              } else {
+                console.log("Successfully created profile using RPC function");
+              }
+            } else {
+              console.log("Created new profile for user");
+            }
+          } catch (createError) {
+            console.error("Exception during profile creation:", createError);
           }
           
           return new Response(
@@ -581,7 +673,7 @@ serve(async (req) => {
         });
         
         const isConnected = !!profile?.spotify_username && !!profile?.spotify_access_token;
-        const isExpired = !profile?.spotify_token_expires_at || new Date(profile.spotify_token_expires_at) < new Date();
+        const isExpired = profile?.spotify_token_expires_at ? new Date(profile.spotify_token_expires_at) < new Date() : true;
         
         return new Response(
           JSON.stringify({
@@ -920,7 +1012,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Unhandled error in edge function:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error", details: error.message }),
+      JSON.stringify({ error: "Internal server error", details: error.message, stack: error.stack }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
