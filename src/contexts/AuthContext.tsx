@@ -104,20 +104,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    // Check if we have a session first
     try {
+      // Check if there's a valid session
+      const { data } = await supabase.auth.getSession();
+      
+      if (!data.session) {
+        // If no session, just update the local state
+        setAuthState({
+          session: null,
+          user: null,
+          loading: false,
+        });
+        toast({
+          title: "Signed out",
+          description: "You've been signed out successfully.",
+        });
+        return;
+      }
+      
+      // Proceed with signout if we have a session
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
       toast({
         title: "Signed out",
         description: "You've been signed out successfully.",
       });
     } catch (error: any) {
+      console.error('Sign out error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to sign out",
         variant: "destructive",
       });
-      throw error;
+      
+      // Even if there's an error, we should still reset the local auth state
+      // This ensures the UI reflects a signed-out state even if the backend call failed
+      setAuthState({
+        session: null,
+        user: null,
+        loading: false,
+      });
     }
   };
 

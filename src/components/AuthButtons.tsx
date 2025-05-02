@@ -10,7 +10,12 @@ export const AuthButtons: React.FC = () => {
   const isAuthenticated = !!authState.user;
 
   const handleSignOut = async () => {
-    await signOut();
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+      // The error is already handled in the AuthContext
+    }
   };
 
   if (isAuthenticated) {
