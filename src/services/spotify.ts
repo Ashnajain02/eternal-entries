@@ -11,7 +11,9 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     }
 
     // Define the required parameters
-    const redirectUri = `${window.location.origin}/spotify-callback`;
+    // Use HTTPS for the redirect URI if we're on a secure connection or deployed site
+    const isHttps = window.location.protocol === 'https:' || !window.location.hostname.includes('localhost');
+    const redirectUri = `${window.location.protocol}//${window.location.host}/spotify-callback`;
     const scope = 'user-read-private user-read-email user-top-read';
     const showDialog = true;
 

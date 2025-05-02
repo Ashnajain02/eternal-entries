@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotify';
@@ -14,11 +15,13 @@ const SpotifyCallback = () => {
   useEffect(() => {
     const processCallback = async () => {
       try {
+        // Get the full URL, decode any percent-encoded characters
         const url = new URL(window.location.href);
-        const code = url.searchParams.get('code');
-        const error = url.searchParams.get('error');
+        const params = new URLSearchParams(url.search);
+        const code = params.get('code');
+        const errorParam = params.get('error');
 
-        if (error) {
+        if (errorParam) {
           setError('Authorization was denied or an error occurred.');
           toast({
             title: 'Spotify Connection Failed',
@@ -65,7 +68,7 @@ const SpotifyCallback = () => {
           });
           setTimeout(() => navigate('/settings'), 3000);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error processing Spotify callback:', err);
         setError('An unexpected error occurred.');
         toast({
