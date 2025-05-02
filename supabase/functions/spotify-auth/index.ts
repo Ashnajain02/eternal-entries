@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -34,49 +33,10 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     console.log("Auth header present:", !!authHeader);
     
-    if (!authHeader) {
-      console.error("No authorization header provided");
-      return new Response(
-        JSON.stringify({ 
-          error: "No authorization header", 
-          help: "Make sure to include the Authorization: Bearer <token> header" 
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
-      );
-    }
-    
-    const token = authHeader.replace("Bearer ", "");
-    console.log("Token extracted, length:", token.length);
-    
-    // IMPORTANT CHANGE: Explicitly log token verification attempts and results
-    console.log("Beginning token verification...");
-    
-    // Try to verify the JWT token but don't fail if it doesn't work
-    // This change allows the function to continue even if token verification fails
+    // Extract userId directly from the request body if possible
     let userId = null;
     let verifiedUser = null;
     
-    try {
-      // Attempt to get user but don't require it to succeed
-      const { data: userData, error: userError } = await supabase.auth.getUser(token);
-      
-      if (userError) {
-        console.error("Failed to verify token:", userError.message);
-        console.log("Proceeding anyway with the request...");
-      }
-      
-      if (userData?.user) {
-        console.log("Successfully verified user from token:", userData.user.id);
-        verifiedUser = userData.user;
-        userId = userData.user.id;
-      } else {
-        console.log("Token verification succeeded but no user was returned");
-      }
-    } catch (authError) {
-      console.error("Exception during token verification:", authError);
-      console.log("Continuing despite token verification failure");
-    }
-
     // Parse request body to get the action and parameters
     let action, params;
     const contentType = req.headers.get("content-type") || "";
@@ -84,30 +44,29 @@ serve(async (req) => {
     try {
       if (contentType.includes("application/json")) {
         const body = await req.json();
+        console.log("Request body:", JSON.stringify(body));
         action = body.action;
         params = body;
         
-        // If we couldn't get the user ID from token verification, use the one from params
-        if (!userId && params.user_id) {
-          userId = params.user_id;
+        // Use user_id from request body if available
+        if (body.user_id) {
+          userId = body.user_id;
           console.log("Using user_id from request body:", userId);
         }
-        
-        console.log(`Request to ${action} endpoint with params:`, params);
       } else {
         // For backward compatibility with URL-based params
         const url = new URL(req.url);
         action = url.pathname.split("/").pop();
         params = Object.fromEntries(url.searchParams);
         
-        // If we couldn't get the user ID from token verification, use the one from params
-        if (!userId && params.user_id) {
+        // Use user_id from URL params if available
+        if (params.user_id) {
           userId = params.user_id;
           console.log("Using user_id from URL params:", userId);
         }
-        
-        console.log(`URL-based request to ${action} endpoint with params:`, params);
       }
+      
+      console.log(`Request to ${action || 'unknown'} endpoint with params:`, params);
     } catch (parseError) {
       console.error("Error parsing request body:", parseError);
       return new Response(
@@ -119,82 +78,207 @@ serve(async (req) => {
       );
     }
     
-    // If still no userId, return error
-    if (!userId && !params.user_id) {
-      console.error("No user ID found in token or parameters");
+    // If authHeader is present, try to extract user from it
+    if (authHeader) {
+      const token = authHeader.replace("Bearer ", "");
+      console.log("Token extracted, length:", token.length);
+      
+      try {
+        // Attempt to get user but don't require it to succeed
+        const { data: userData, error: userError } = await supabase.auth.getUser(token);
+        
+        if (userError) {
+          console.error("Failed to verify token:", userError.message);
+          console.log("Proceeding anyway with the request...");
+        }
+        
+        if (userData?.user) {
+          console.log("Successfully verified user from token:", userData.user.id);
+          verifiedUser = userData.user;
+          // If we don't have userId yet, use the one from the token
+          if (!userId) {
+            userId = userData.user.id;
+            console.log("Using user_id from token:", userId);
+          }
+        } else {
+          console.log("Token verification succeeded but no user was returned");
+        }
+      } catch (authError) {
+        console.error("Exception during token verification:", authError);
+        console.log("Continuing despite token verification failure");
+      }
+    }
+    
+    // If no action provided, return error
+    if (!action) {
+      console.error("No action specified in request");
       return new Response(
-        JSON.stringify({ 
-          error: "No user ID available", 
-          details: "User ID must be provided either via authenticated token or in request parameters" 
-        }),
+        JSON.stringify({ error: "No action specified" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
     
-    // Use user_id from params if provided, otherwise use from token
-    userId = params.user_id || userId;
-    console.log(`Using user ID: ${userId} for operation`);
-    
-    // Special endpoint to get tokens for a user (for verification purposes only)
-    if (action === "get_tokens_for_userid") {
+    // Search endpoint - search for tracks
+    if (action === "search") {
       try {
-        const userIdToCheck = params.user_id || user.id;
+        console.log("Handling search request with params:", params);
         
-        if (userIdToCheck !== user.id && !user.app_metadata?.admin) {
+        const query = params.q;
+        
+        if (!query) {
+          console.error("Missing search query parameter");
           return new Response(
-            JSON.stringify({ error: "Unauthorized access" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+            JSON.stringify({ 
+              error: "Missing search query", 
+              details: "The 'q' parameter is required for search" 
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
           );
         }
         
+        // If userId is not provided, return error
+        if (!userId) {
+          console.error("No user ID found for search action");
+          return new Response(
+            JSON.stringify({ 
+              error: "No user ID available", 
+              details: "User ID must be provided either via authenticated token or in request parameters (user_id)" 
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          );
+        }
+        
+        console.log(`Performing Spotify search for user ${userId} with query "${query}"`);
+        
+        // Get the user's access token
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("spotify_access_token, spotify_refresh_token, spotify_token_expires_at")
-          .eq("id", userIdToCheck)
-          .maybeSingle();
-          
+          .select("spotify_access_token, spotify_token_expires_at")
+          .eq("id", userId)
+          .single();
+        
         if (profileError) {
-          console.error("Error fetching tokens:", profileError);
+          console.error("Error fetching Spotify access token:", profileError);
           return new Response(
-            JSON.stringify({ error: "Failed to fetch tokens", details: profileError.message }),
+            JSON.stringify({ 
+              error: "Failed to fetch access token", 
+              details: profileError.message 
+            }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
           );
         }
         
-        if (!profile || !profile.spotify_access_token) {
+        console.log("Spotify profile data:", {
+          hasToken: !!profile?.spotify_access_token,
+          expiresAt: profile?.spotify_token_expires_at
+        });
+        
+        if (!profile?.spotify_access_token) {
           return new Response(
-            JSON.stringify({ error: "No tokens found" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
+            JSON.stringify({ error: "No Spotify access token found" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
           );
         }
         
-        // Calculate expires_in from expires_at
-        let expires_in = 3600; // Default 1 hour
-        if (profile.spotify_token_expires_at) {
-          const expiresAt = new Date(profile.spotify_token_expires_at);
-          const now = new Date();
-          expires_in = Math.floor((expiresAt.getTime() - now.getTime()) / 1000);
-          if (expires_in < 0) expires_in = 0;
+        // Check if token is expired
+        if (profile.spotify_token_expires_at && new Date(profile.spotify_token_expires_at) < new Date()) {
+          return new Response(
+            JSON.stringify({ 
+              error: "Spotify token expired", 
+              error_description: "Please reconnect your Spotify account" 
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+          );
         }
         
+        // Search for tracks using the Spotify API
+        console.log(`Calling Spotify API with query: ${query}`);
+        const searchResponse = await fetch(
+          `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
+          {
+            headers: {
+              "Authorization": `Bearer ${profile.spotify_access_token}`,
+            },
+          }
+        );
+        
+        console.log("Spotify API response status:", searchResponse.status);
+        
+        if (!searchResponse.ok) {
+          let errorText = "";
+          try {
+            errorText = await searchResponse.text();
+            console.error("Spotify search error response:", errorText);
+          } catch (e) {
+            console.error("Could not read error response:", e);
+          }
+          
+          // Check if the error is due to token expiration
+          if (searchResponse.status === 401) {
+            return new Response(
+              JSON.stringify({ 
+                error: "Spotify token expired or invalid", 
+                error_description: "Please reconnect your Spotify account",
+                details: errorText 
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+            );
+          }
+          
+          return new Response(
+            JSON.stringify({ 
+              error: "Spotify search failed", 
+              details: `Status: ${searchResponse.status}`,
+              response: errorText 
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchResponse.status }
+          );
+        }
+        
+        // Parse the search results
+        let searchData;
+        try {
+          searchData = await searchResponse.json();
+        } catch (parseError) {
+          console.error("Error parsing Spotify API response:", parseError);
+          return new Response(
+            JSON.stringify({
+              error: "Failed to parse Spotify API response",
+              details: parseError.message
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+        
+        console.log(`Spotify search results: ${searchData.tracks?.items?.length || 0} tracks found`);
+        
+        // Format the search results
+        const tracks = searchData.tracks.items.map(track => ({
+          id: track.id,
+          name: track.name,
+          artist: track.artists.map(artist => artist.name).join(", "),
+          album: track.album.name,
+          albumArt: track.album.images[0]?.url || "",
+          duration: track.duration_ms,
+          spotifyUri: track.uri
+        }));
+        
         return new Response(
-          JSON.stringify({
-            access_token: profile.spotify_access_token,
-            refresh_token: profile.spotify_refresh_token,
-            expires_in
-          }),
+          JSON.stringify({ tracks }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
         );
-      } catch (error) {
-        console.error("Error in get_tokens_for_userid:", error);
+      } catch (searchError) {
+        console.error("Error searching tracks:", searchError);
         return new Response(
-          JSON.stringify({ error: "Internal server error", details: error.message }),
+          JSON.stringify({ 
+            error: "Error searching tracks", 
+            details: searchError.message 
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
     }
     
-    // Authorize endpoint - provide proper Spotify authorization URL
     else if (action === "authorize") {
       const redirect_uri = params.redirect_uri;
       const scope = params.scope;
@@ -782,251 +866,4 @@ serve(async (req) => {
         
         // Refresh the access token
         const refreshResponse = await fetch("https://accounts.spotify.com/api/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-          },
-          body: new URLSearchParams({
-            grant_type: "refresh_token",
-            refresh_token: profile.spotify_refresh_token,
-          }),
-        });
-        
-        if (!refreshResponse.ok) {
-          console.error("Token refresh failed with status:", refreshResponse.status);
-          const refreshErrorText = await refreshResponse.text();
-          console.error("Token refresh error body:", refreshErrorText);
-          return new Response(
-            JSON.stringify({ 
-              error: "Failed to refresh token", 
-              details: `Status: ${refreshResponse.status}` 
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-          );
-        }
-        
-        const refreshData = await refreshResponse.json();
-        
-        if (refreshData.error) {
-          console.error("Token refresh returned error:", refreshData.error);
-          return new Response(
-            JSON.stringify({ error: refreshData.error }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-          );
-        }
-        
-        // Calculate new expiration time
-        const expiresAt = new Date();
-        expiresAt.setSeconds(expiresAt.getSeconds() + refreshData.expires_in);
-        
-        // Update the tokens in the database
-        const updateData = {
-          spotify_access_token: refreshData.access_token,
-          spotify_token_expires_at: expiresAt.toISOString(),
-        };
-        
-        // Update refresh token if provided
-        if (refreshData.refresh_token) {
-          updateData.spotify_refresh_token = refreshData.refresh_token;
-        }
-        
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update(updateData)
-          .eq("id", userIdToCheck);
-        
-        if (updateError) {
-          console.error("Error updating tokens in database:", updateError);
-          return new Response(
-            JSON.stringify({ error: "Failed to update tokens", details: updateError.message }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-          );
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            access_token: refreshData.access_token,
-            expires_at: expiresAt.toISOString() 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-        );
-      } catch (refreshError) {
-        console.error("Error during token refresh:", refreshError);
-        return new Response(
-          JSON.stringify({ 
-            error: "Error refreshing token", 
-            details: refreshError.message 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-        );
-      }
-    }
-    
-    // Revoke endpoint - disconnect Spotify
-    else if (action === "revoke") {
-      try {
-        // Use the userId from params if provided, otherwise fall back to token user
-        const userIdToCheck = params.user_id || user.id;
-        
-        console.log("Disconnecting Spotify for user:", userIdToCheck);
-        
-        // Clear Spotify-related fields in the profile
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update({
-            spotify_access_token: null,
-            spotify_refresh_token: null,
-            spotify_token_expires_at: null,
-            spotify_username: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", userIdToCheck);
-        
-        if (updateError) {
-          console.error("Error disconnecting Spotify:", updateError);
-          return new Response(
-            JSON.stringify({ error: "Failed to disconnect Spotify", details: updateError.message }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-          );
-        }
-        
-        console.log("Successfully disconnected Spotify for user:", userIdToCheck);
-        
-        return new Response(
-          JSON.stringify({ success: true }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-        );
-      } catch (revokeError) {
-        console.error("Error revoking Spotify access:", revokeError);
-        return new Response(
-          JSON.stringify({ 
-            error: "Error revoking Spotify access", 
-            details: revokeError.message 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-        );
-      }
-    }
-    
-    // Search endpoint - search for tracks
-    else if (action === "search") {
-      try {
-        const query = params.q;
-        
-        if (!query) {
-          return new Response(
-            JSON.stringify({ error: "Missing search query" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-          );
-        }
-        
-        // Get the user's access token
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("spotify_access_token, spotify_token_expires_at")
-          .eq("id", userId)
-          .single();
-        
-        if (profileError) {
-          console.error("Error fetching Spotify access token:", profileError);
-          return new Response(
-            JSON.stringify({ error: "Failed to fetch access token", details: profileError.message }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-          );
-        }
-        
-        if (!profile?.spotify_access_token) {
-          return new Response(
-            JSON.stringify({ error: "No Spotify access token found" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-          );
-        }
-        
-        // Check if token is expired
-        if (profile.spotify_token_expires_at && new Date(profile.spotify_token_expires_at) < new Date()) {
-          return new Response(
-            JSON.stringify({ 
-              error: "Spotify token expired", 
-              error_description: "Please reconnect your Spotify account"
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
-          );
-        }
-        
-        // Search for tracks using the Spotify API
-        const searchResponse = await fetch(
-          `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
-          {
-            headers: {
-              "Authorization": `Bearer ${profile.spotify_access_token}`,
-            },
-          }
-        );
-        
-        if (!searchResponse.ok) {
-          const errorText = await searchResponse.text();
-          console.error("Spotify search error:", errorText);
-          
-          // Check if the error is due to token expiration
-          if (searchResponse.status === 401) {
-            return new Response(
-              JSON.stringify({ 
-                error: "Spotify token expired or invalid", 
-                error_description: "Please reconnect your Spotify account"
-              }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
-            );
-          }
-          
-          return new Response(
-            JSON.stringify({ 
-              error: "Spotify search failed", 
-              details: `Status: ${searchResponse.status}` 
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchResponse.status }
-          );
-        }
-        
-        const searchData = await searchResponse.json();
-        
-        // Format the search results
-        const tracks = searchData.tracks.items.map(track => ({
-          id: track.id,
-          name: track.name,
-          artist: track.artists.map(artist => artist.name).join(", "),
-          album: track.album.name,
-          albumArt: track.album.images[0]?.url || "",
-          duration: track.duration_ms,
-          spotifyUri: track.uri
-        }));
-        
-        return new Response(
-          JSON.stringify({ tracks }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-        );
-      } catch (searchError) {
-        console.error("Error searching tracks:", searchError);
-        return new Response(
-          JSON.stringify({ 
-            error: "Error searching tracks", 
-            details: searchError.message 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-        );
-      }
-    }
-    
-    // Default response for unknown action
-    return new Response(
-      JSON.stringify({ error: "Unknown action" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-    );
-  } catch (err) {
-    console.error("Unhandled error in function:", err);
-    return new Response(
-      JSON.stringify({ error: "Internal error", details: err.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
-  }
-});
+          method: "

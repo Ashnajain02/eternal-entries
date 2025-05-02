@@ -31,7 +31,6 @@ site_url = "http://localhost:3000"
 [auth.email]
 enabled = true
 
-[functions]
 [functions.spotify-auth]
 verify_jwt = false
 

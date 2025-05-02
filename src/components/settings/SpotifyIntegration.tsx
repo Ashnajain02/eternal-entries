@@ -1,11 +1,11 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { openSpotifyAuthWindow, disconnectSpotify } from '@/services/spotifyAuth';
-import { Loader2, Music, Check, X, RefreshCw } from 'lucide-react';
+import { Loader2, Music, Check, X, RefreshCw, Search } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import AuthTest from './AuthTest';
+import { searchSpotifyTracks } from '@/services/spotify';
 
 interface SpotifyStatusProps {
   isLoading: boolean;
@@ -32,6 +32,9 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [showAuthTest, setShowAuthTest] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResult, setSearchResult] = useState<any>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const handleConnectSpotify = async () => {
     try {
@@ -103,6 +106,55 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
     }
   };
 
+  // Add a test search function to help debug
+  const testSearch = async () => {
+    if (!spotifyStatus.connected) {
+      toast({
+        title: "Not connected",
+        description: "Please connect to Spotify first",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSearching(true);
+    setSearchResult(null);
+    setSearchError(null);
+    
+    try {
+      // Use a simple test query
+      const tracks = await searchSpotifyTracks("test");
+      setSearchResult({
+        success: true,
+        trackCount: tracks.length,
+        sampleTracks: tracks.slice(0, 2)
+      });
+      
+      if (tracks.length > 0) {
+        toast({
+          title: "Search successful",
+          description: `Found ${tracks.length} tracks`,
+        });
+      } else {
+        toast({
+          title: "No results",
+          description: "The search was successful but no tracks were found",
+        });
+      }
+    } catch (error: any) {
+      console.error("Search test error:", error);
+      setSearchError(error.message || "Unknown error");
+      
+      toast({
+        title: "Search failed",
+        description: error.message || "Failed to search tracks",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4 p-4 border rounded-lg">
       <div className="flex items-center justify-between">
@@ -168,7 +220,22 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
               <div>{spotifyStatus.username || 'Unknown user'}</div>
             </div>
             
-            <div className="flex justify-end">
+            {/* Add search test button */}
+            <div className="flex justify-between">
+              <Button 
+                variant="outline" 
+                onClick={testSearch}
+                disabled={isSearching}
+                className="gap-2"
+              >
+                {isSearching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                Test Search
+              </Button>
+              
               <Button 
                 variant="outline" 
                 onClick={handleDisconnectSpotify}
@@ -180,6 +247,23 @@ export const SpotifyIntegration: React.FC<SpotifyIntegrationProps> = ({
                 Disconnect
               </Button>
             </div>
+            
+            {/* Show search test results */}
+            {searchError && (
+              <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
+                <p className="font-medium">Search Error:</p>
+                <p>{searchError}</p>
+              </div>
+            )}
+            
+            {searchResult && (
+              <div className="p-3 bg-muted rounded-md">
+                <p className="font-medium mb-2">Search Result:</p>
+                <pre className="text-xs whitespace-pre-wrap overflow-auto max-h-60">
+                  {JSON.stringify(searchResult, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-4">

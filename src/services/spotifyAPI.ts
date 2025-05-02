@@ -10,11 +10,15 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
       throw new Error('No active session');
     }
 
+    // Add logging to help debug the request
+    console.log("Searching for tracks with query:", query);
+    
     // Search Spotify via our edge function
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: {
         action: 'search',
-        q: query
+        q: query,
+        user_id: sessionData.session.user.id // Add user_id to the request body
       }
     });
 

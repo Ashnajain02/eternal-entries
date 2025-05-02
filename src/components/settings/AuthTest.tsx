@@ -10,12 +10,14 @@ const AuthTest: React.FC = () => {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [tokenInfo, setTokenInfo] = useState<any>(null);
+  const [requestInfo, setRequestInfo] = useState<any>(null);
 
   const testAuth = async () => {
     setIsLoading(true);
     setError(null);
     setResult(null);
     setTokenInfo(null);
+    setRequestInfo(null);
     
     try {
       // First, get the current session
@@ -27,11 +29,13 @@ const AuthTest: React.FC = () => {
       }
       
       const accessToken = sessionData.session.access_token;
+      const userId = sessionData.session.user.id;
       
       // Log details about the token
       console.log('Access token available:', !!accessToken);
       console.log('Access token length:', accessToken.length);
       console.log('First 20 chars of token:', accessToken.substring(0, 20) + '...');
+      console.log('User ID:', userId);
       
       // Display token info in the UI for diagnostics
       setTokenInfo({
@@ -40,6 +44,16 @@ const AuthTest: React.FC = () => {
         tokenSuffix: '...' + accessToken.substring(accessToken.length - 20),
         userId: sessionData.session.user.id,
         email: sessionData.session.user.email
+      });
+
+      // Store request information
+      setRequestInfo({
+        endpoint: 'auth-test',
+        userId: userId,
+        tokenLength: accessToken.length,
+        headers: {
+          Authorization: `Bearer ${accessToken.substring(0, 10)}...`
+        }
       });
 
       // Call the auth-test function
@@ -76,6 +90,14 @@ const AuthTest: React.FC = () => {
         {error && (
           <div className="p-3 bg-destructive/10 text-destructive rounded-md mb-4 text-sm">
             {error}
+          </div>
+        )}
+        {requestInfo && (
+          <div className="p-3 bg-muted rounded-md mb-4 text-xs">
+            <h4 className="font-medium mb-2">Request Information:</h4>
+            <pre className="whitespace-pre-wrap">
+              {JSON.stringify(requestInfo, null, 2)}
+            </pre>
           </div>
         )}
         {tokenInfo && (
