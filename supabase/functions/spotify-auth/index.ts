@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -214,9 +215,9 @@ serve(async (req) => {
             .from("profiles")
             .select("id")
             .eq("id", user.id)
-            .single();
+            .maybeSingle();
             
-          if (profileCheckError && profileCheckError.code !== "PGRST116") { // PGRST116 means no rows returned
+          if (profileCheckError) {
             console.error("Error checking profile:", profileCheckError);
             throw profileCheckError;
           }
@@ -225,27 +226,54 @@ serve(async (req) => {
           if (!existingProfile) {
             console.log("Profile doesn't exist, creating new profile for:", user.id);
             
-            // First get user data from auth.users
-            const { data: userData, error: userDataError } = await supabase.auth.admin.getUserById(user.id);
+            // First get user data from auth table
+            const { data: userData, error: userDataError } = await supabase
+              .from("users")
+              .select("email, first_name, last_name")
+              .eq("id", user.id)
+              .maybeSingle();
+            
             if (userDataError) {
               console.error("Error getting user data:", userDataError);
-              throw userDataError;
-            }
-            
-            const { error: createError } = await supabase
-              .from("profiles")
-              .insert({
-                id: user.id,
-                username: userData.user.email,
-                spotify_access_token: tokenData.access_token,
-                spotify_refresh_token: tokenData.refresh_token,
-                spotify_token_expires_at: expiresAt.toISOString(),
-                spotify_username: profileData.display_name || profileData.id,
-              });
+              // Fall back to auth metadata
+              const metadata = user.user_metadata || {};
               
-            if (createError) {
-              console.error("Error creating profile:", createError);
-              throw createError;
+              const { error: createError } = await supabase
+                .from("profiles")
+                .insert({
+                  id: user.id,
+                  username: user.email || metadata.email,
+                  first_name: metadata.first_name || null,
+                  last_name: metadata.last_name || null,
+                  spotify_access_token: tokenData.access_token,
+                  spotify_refresh_token: tokenData.refresh_token,
+                  spotify_token_expires_at: expiresAt.toISOString(),
+                  spotify_username: profileData.display_name || profileData.id,
+                });
+                
+              if (createError) {
+                console.error("Error creating profile:", createError);
+                throw createError;
+              }
+            } else {
+              // Use user data from the users table
+              const { error: createError } = await supabase
+                .from("profiles")
+                .insert({
+                  id: user.id,
+                  username: userData.email,
+                  first_name: userData.first_name,
+                  last_name: userData.last_name,
+                  spotify_access_token: tokenData.access_token,
+                  spotify_refresh_token: tokenData.refresh_token,
+                  spotify_token_expires_at: expiresAt.toISOString(),
+                  spotify_username: profileData.display_name || profileData.id,
+                });
+                
+              if (createError) {
+                console.error("Error creating profile:", createError);
+                throw createError;
+              }
             }
           } else {
             // Save the tokens in the user's profile
@@ -295,9 +323,9 @@ serve(async (req) => {
         .from("profiles")
         .select("spotify_refresh_token")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
       
-      if (profileError || !profiles.spotify_refresh_token) {
+      if (profileError || !profiles?.spotify_refresh_token) {
         console.error("No refresh token found:", profileError);
         return new Response(
           JSON.stringify({ error: "No refresh token found" }),
@@ -414,9 +442,9 @@ serve(async (req) => {
         .from("profiles")
         .select("spotify_access_token, spotify_token_expires_at")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
       
-      if (profileError || !profile.spotify_access_token) {
+      if (profileError || !profile?.spotify_access_token) {
         console.error("Spotify token not found:", profileError);
         return new Response(
           JSON.stringify({ error: "Not connected to Spotify" }),
@@ -505,26 +533,25 @@ serve(async (req) => {
           .from("profiles")
           .select("spotify_username, spotify_token_expires_at, spotify_access_token")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
         
-        if (profileError) {
+        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows returned
           console.error("Error getting profile:", profileError);
-          
-          // If profile doesn't exist, return not connected
-          if (profileError.code === "PGRST116") { // No rows returned
-            return new Response(
-              JSON.stringify({
-                connected: false,
-                expired: false,
-                username: null,
-              }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-          
           return new Response(
             JSON.stringify({ error: "Failed to get profile", details: profileError.message }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+        
+        // If no profile exists, report as not connected
+        if (!profile) {
+          return new Response(
+            JSON.stringify({
+              connected: false,
+              expired: false,
+              username: null,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         

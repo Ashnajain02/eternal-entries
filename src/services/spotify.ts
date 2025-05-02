@@ -101,10 +101,6 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
           method: 'GET',
           // Add cache control to prevent caching
           cache: 'no-store',
-          // Ensure cookies are sent
-          credentials: 'include',
-          // Enable CORS mode
-          mode: 'cors',
         }
       );
 
@@ -133,7 +129,7 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
         success: result.success, 
         display_name: result.display_name
       };
-    } catch (fetchError) {
+    } catch (fetchError: any) {
       clearTimeout(timeoutId);
       
       if (fetchError.name === 'AbortError') {
@@ -141,9 +137,16 @@ export async function handleSpotifyCallback(code: string): Promise<{success: boo
       }
       
       console.error('Fetch error in handleSpotifyCallback:', fetchError);
+      
+      // Try to fetch the session again to see if it's still valid
+      const { data: refreshSessionData, error: refreshSessionError } = await supabase.auth.getSession();
+      if (refreshSessionError || !refreshSessionData.session) {
+        throw new Error('Your session has expired. Please log in again.');
+      }
+      
       throw new Error(fetchError.message || 'Network error while connecting to Spotify');
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling Spotify callback:', error);
     throw error;
   }
@@ -162,6 +165,7 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -216,6 +220,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -247,6 +252,8 @@ export async function refreshSpotifyToken(): Promise<boolean> {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
+      // Add cache control to prevent caching
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -278,6 +285,8 @@ export async function disconnectSpotify(): Promise<boolean> {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
+      // Add cache control to prevent caching
+      cache: 'no-store',
     });
 
     if (!response.ok) {
