@@ -80,12 +80,12 @@ URL protocol: ${url.protocol}
             description: `Successfully connected as ${result.display_name || 'User'}.`,
           });
           
-          // Wait a moment for the database to update
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          // Wait a moment for the database to update (longer wait)
+          await new Promise(resolve => setTimeout(resolve, 2500));
           
-          // Force a hard refresh to ensure all state is updated properly
-          // This is more reliable than navigation with parameters
-          window.location.href = '/settings?spotify_connected=true&t=' + new Date().getTime();
+          // Use hard navigation with cache-busting timestamp to ensure full page reload
+          const timestamp = new Date().getTime();
+          window.location.replace(`/settings?spotify_connected=true&t=${timestamp}`);
         } else {
           // Enhanced error handling
           const errorMessage = result.error || 'Failed to connect to Spotify.';
@@ -119,7 +119,8 @@ URL protocol: ${url.protocol}
 
   const handleGoToSettings = () => {
     // Force a hard refresh to ensure all state is updated properly
-    window.location.href = '/settings?spotify_connected=true&t=' + new Date().getTime();
+    const timestamp = new Date().getTime();
+    window.location.replace(`/settings?spotify_connected=true&t=${timestamp}`);
   };
 
   return (

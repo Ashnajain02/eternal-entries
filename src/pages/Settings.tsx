@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +28,7 @@ const Settings = () => {
     lastRefreshed: Date.now()
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const fetchSpotifyStatus = useCallback(async (showToast = false) => {
     try {
@@ -39,7 +41,7 @@ const Settings = () => {
       if (justConnected) {
         console.log("Detected successful Spotify connection from URL param, refreshing status...");
         // Add a small delay to allow the database to update
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
       
       console.log("Fetching Spotify connection status...");
@@ -58,7 +60,7 @@ const Settings = () => {
         
         // Otherwise wait a bit and try again
         if (attempts < 2) {
-          await new Promise(resolve => setTimeout(resolve, 800));
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
         attempts++;
@@ -95,6 +97,8 @@ const Settings = () => {
           });
         }
       }
+      
+      return status.connected;
     } catch (error) {
       console.error('Error fetching Spotify status:', error);
       setSpotifyStatus(prev => ({
@@ -110,20 +114,21 @@ const Settings = () => {
           variant: 'destructive',
         });
       }
+      
+      return false;
     } finally {
       setIsRefreshing(false);
     }
   }, [authState.user, searchParams, toast]);
 
   const handleRefreshStatus = () => {
+    setRetryCount(0);
     fetchSpotifyStatus(true);
   };
 
+  // Main effect for status checking
   useEffect(() => {
     fetchSpotifyStatus();
-    
-    // Force a status refresh when the component mounts and whenever the URL parameters change
-    // This helps ensure we catch the connection state after a redirect back from Spotify
   }, [fetchSpotifyStatus, location.search]);
   
   // Additional effect to detect when spotify_connected=true is in URL and force a refresh
@@ -131,22 +136,30 @@ const Settings = () => {
     const justConnected = searchParams.get('spotify_connected') === 'true';
     if (justConnected) {
       console.log("Spotify connection detected in URL, forcing status refresh");
-      fetchSpotifyStatus(true);
       
-      // Set up an interval to check a few times
-      const checkInterval = setInterval(() => {
-        if (!spotifyStatus.connected) {
-          console.log("Retrying Spotify status check...");
-          fetchSpotifyStatus(false);
-        } else {
-          clearInterval(checkInterval);
+      // Initial attempt
+      fetchSpotifyStatus(true).then(connected => {
+        // If not connected on first try, set up retry mechanism
+        if (!connected && retryCount < 5) {
+          console.log(`Spotify status not connected, setting up retry #${retryCount + 1}`);
+          
+          // Retry with increasing delay
+          const retryTimer = setTimeout(() => {
+            console.log(`Executing retry #${retryCount + 1} for Spotify status`);
+            setRetryCount(prev => prev + 1);
+            fetchSpotifyStatus(true);
+          }, 2000 + (retryCount * 1000)); // Increasing delay for each retry
+          
+          return () => clearTimeout(retryTimer);
         }
-      }, 1500);
-      
-      // Clean up
-      return () => clearInterval(checkInterval);
+      });
     }
-  }, [searchParams, fetchSpotifyStatus, spotifyStatus.connected]);
+  }, [searchParams, fetchSpotifyStatus, retryCount]);
+  
+  // Reset retry count when leaving the page
+  useEffect(() => {
+    return () => setRetryCount(0);
+  }, []);
 
   if (!authState.user) {
     return (

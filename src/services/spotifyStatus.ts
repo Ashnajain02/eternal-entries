@@ -16,21 +16,23 @@ export async function getSpotifyConnectionStatus(): Promise<{
       return { connected: false, expired: false, username: null };
     }
 
-    // First try a direct database query for better reliability
-    // Important: We use nocache:true to ensure we're getting the latest data
+    // First try a direct database query with nocache enabled for better reliability
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('spotify_username, spotify_token_expires_at, spotify_access_token')
       .eq('id', sessionData.session.user.id)
-      .single();
+      .single()
+      .abortSignal(AbortSignal.timeout(3000)) // Add timeout to prevent hanging
+      .options({ cache: 'no-store' }); // Force no caching
     
-    // Cache bypass approach - also try an RPC call which has less caching
+    // If direct query fails, try the RPC call which has less caching
     if (profileError || !profile || !profile.spotify_username) {
       console.log('No profile data from direct query, trying status endpoint');
       
       // Get status from our edge function as a backup approach
       const timestamp = new Date().getTime(); // Add timestamp to prevent caching
       const response = await fetch(`https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/status?t=${timestamp}`, {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
