@@ -77,6 +77,18 @@ export async function handleSpotifyCallback(code: string): Promise<{
 
     const userId = sessionData.session.user.id;
     console.log('Active session found for user:', userId);
+    
+    // Check if the profile exists and create if needed (fallback)
+    console.log('Ensuring profile exists before continuing...');
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({ id: userId, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+      
+    if (profileError) {
+      console.error('Error ensuring profile exists:', profileError);
+      // Continue anyway, the edge function will also try to create it
+    }
+    
     console.log('Exchanging code for tokens with code length:', code.length);
     
     // Ensure we're using the exact same redirect URI as in the authorization request
@@ -85,31 +97,6 @@ export async function handleSpotifyCallback(code: string): Promise<{
     
     // Add timestamp to prevent caching
     const timestamp = new Date().getTime();
-    
-    // Check if the profile exists before trying to update it
-    const { data: profileExists, error: profileCheckError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', userId)
-      .maybeSingle();
-      
-    if (profileCheckError) {
-      console.error('Error checking if profile exists:', profileCheckError);
-    } else if (!profileExists) {
-      console.log('Profile does not exist for user, creating one');
-      const { error: createProfileError } = await supabase
-        .from('profiles')
-        .insert({ id: userId });
-        
-      if (createProfileError) {
-        console.error('Failed to create profile:', createProfileError);
-        return {
-          success: false,
-          error: 'Failed to create user profile',
-          error_description: createProfileError.message
-        };
-      }
-    }
     
     // Use the supabase.functions.invoke method with proper error handling
     try {
@@ -140,38 +127,15 @@ export async function handleSpotifyCallback(code: string): Promise<{
       
       console.log('Successfully exchanged code for tokens, display name:', data.display_name);
       
-      // Verify the profile was updated correctly using RPC
-      try {
-        console.log('Verifying profile update using RPC...');
-        const { data: rpcResult, error: rpcError } = await supabase.rpc(
-          'update_profile_spotify_data',
-          {
-            p_user_id: userId,
-            p_access_token: data.access_token || '',
-            p_refresh_token: data.refresh_token || '',
-            p_expires_at: data.expires_at || new Date(Date.now() + 3600000).toISOString(),
-            p_username: data.display_name || 'Spotify User'
-          }
-        );
-        
-        if (rpcError) {
-          console.error('RPC update error:', rpcError);
-        } else {
-          console.log('RPC update succeeded:', rpcResult);
-        }
-      } catch (rpcError) {
-        console.error('Error calling RPC function:', rpcError);
-      }
-      
       // Double-check if the profile was updated correctly
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData, error: profileCheckError } = await supabase
         .from('profiles')
         .select('spotify_username, spotify_access_token')
         .eq('id', userId)
         .single();
         
-      if (profileError) {
-        console.error('Error verifying profile update:', profileError);
+      if (profileCheckError) {
+        console.error('Error verifying profile update:', profileCheckError);
       } else {
         console.log('Profile verification:', {
           hasUsername: !!profileData?.spotify_username,
@@ -179,22 +143,26 @@ export async function handleSpotifyCallback(code: string): Promise<{
           username: profileData?.spotify_username
         });
         
-        // If the profile verification shows the data wasn't saved, try a direct update
+        // If the profile verification shows the data wasn't saved properly, try a direct update
         if (!profileData?.spotify_access_token || !profileData?.spotify_username) {
-          console.log('Profile update verification failed, attempting direct update');
+          console.log('Profile data appears incomplete, attempting RPC update...');
           
-          const { error: manualUpdateError } = await supabase
-            .from('profiles')
-            .update({
-              spotify_username: data.display_name,
-              spotify_token_expires_at: data.expires_at
-            })
-            .eq('id', userId);
-            
-          if (manualUpdateError) {
-            console.error('Manual profile update failed:', manualUpdateError);
+          // Try the database function for more reliability
+          const { error: rpcError } = await supabase.rpc(
+            'update_profile_spotify_data',
+            {
+              p_user_id: userId,
+              p_access_token: data.access_token || '',
+              p_refresh_token: data.refresh_token || '',
+              p_expires_at: data.expires_at || new Date(Date.now() + 3600000).toISOString(),
+              p_username: data.display_name || 'Spotify User'
+            }
+          );
+          
+          if (rpcError) {
+            console.error('RPC update failed:', rpcError);
           } else {
-            console.log('Manual profile update succeeded');
+            console.log('RPC update successful');
           }
         }
       }

@@ -100,6 +100,31 @@ const SpotifyCallback = () => {
         const userId = sessionData.session.user.id;
         setDebugInfo(`Active session for user: ${userId}`);
         
+        // Explicitly check if profile exists and create if needed
+        setDebugInfo(prev => `${prev}\nChecking if profile exists...`);
+        const { data: profileExists, error: profileCheckError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', userId)
+          .maybeSingle();
+          
+        if (profileCheckError) {
+          setDebugInfo(prev => `${prev}\nError checking profile: ${profileCheckError.message}`);
+        } else if (!profileExists) {
+          setDebugInfo(prev => `${prev}\nProfile doesn't exist, creating...`);
+          const { error: createError } = await supabase
+            .from('profiles')
+            .insert([{ id: userId }]);
+            
+          if (createError) {
+            setDebugInfo(prev => `${prev}\nError creating profile: ${createError.message}`);
+          } else {
+            setDebugInfo(prev => `${prev}\nProfile created successfully`);
+          }
+        } else {
+          setDebugInfo(prev => `${prev}\nProfile exists: ${profileExists.id}`);
+        }
+        
         // Get the full URL, decode any percent-encoded characters
         const url = new URL(window.location.href);
         const params = new URLSearchParams(url.search);
@@ -173,17 +198,18 @@ const SpotifyCallback = () => {
             // Try direct update as a last resort
             setDebugInfo(prev => `${prev}\nAttempting direct profile update...`);
             try {
-              const { error: updateError } = await supabase
+              const { error: upsertError } = await supabase
                 .from('profiles')
-                .update({
-                  spotify_username: result.display_name
-                })
-                .eq('id', userId);
+                .upsert({
+                  id: userId,
+                  spotify_username: result.display_name,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'id' });
                 
-              if (updateError) {
-                setDebugInfo(prev => `${prev}\nManual update failed: ${updateError.message}`);
+              if (upsertError) {
+                setDebugInfo(prev => `${prev}\nManual upsert failed: ${upsertError.message}`);
               } else {
-                setDebugInfo(prev => `${prev}\nManual username update succeeded`);
+                setDebugInfo(prev => `${prev}\nManual upsert succeeded`);
               }
             } catch (err: any) {
               setDebugInfo(prev => `${prev}\nManual update error: ${err.message}`);

@@ -23,7 +23,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
     const timestamp = new Date().getTime();
     
     try {
-      // First try a direct database query with cache prevention
+      // Direct database query with cache prevention
       console.log(`Attempting direct database query for Spotify profile data for userId: ${userId}...`);
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -34,7 +34,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
       if (profileError) {
         console.error('Error fetching Spotify profile data:', profileError);
         
-        // Try to diagnose if the profile exists at all
+        // Check if the profile exists at all
         const { count, error: countError } = await supabase
           .from('profiles')
           .select('id', { count: 'exact', head: true })
@@ -46,18 +46,45 @@ export async function getSpotifyConnectionStatus(): Promise<{
           console.log(`Profile existence check for user ${userId}: ${count === 1 ? 'EXISTS' : 'DOES NOT EXIST'}`);
           
           if (count === 0) {
-            // Profile doesn't exist, need to create it
+            // Profile doesn't exist, create it
             console.log('Profile does not exist, creating it now');
             
-            // Create a new profile
             const { error: insertError } = await supabase
               .from('profiles')
-              .insert({ id: userId });
+              .insert([{ id: userId }]);
               
             if (insertError) {
               console.error('Failed to create missing profile:', insertError);
             } else {
               console.log('Created new profile for user');
+              
+              // Retry fetching the profile after creating it
+              const { data: retryProfile, error: retryError } = await supabase
+                .from('profiles')
+                .select('spotify_username, spotify_token_expires_at, spotify_access_token')
+                .eq('id', userId)
+                .single();
+                
+              if (retryError) {
+                console.error('Error fetching profile after creation:', retryError);
+              } else if (retryProfile) {
+                console.log('Got profile data after creation:', {
+                  username: retryProfile.spotify_username,
+                  hasToken: !!retryProfile.spotify_access_token,
+                  expiresAt: retryProfile.spotify_token_expires_at
+                });
+                
+                const isConnected = !!retryProfile.spotify_username && !!retryProfile.spotify_access_token;
+                const isExpired = retryProfile.spotify_token_expires_at ? 
+                  new Date(retryProfile.spotify_token_expires_at) < new Date() : 
+                  false;
+                  
+                return {
+                  connected: isConnected,
+                  expired: isConnected && isExpired,
+                  username: retryProfile.spotify_username || null,
+                };
+              }
             }
           }
         }
@@ -74,6 +101,12 @@ export async function getSpotifyConnectionStatus(): Promise<{
           new Date(profile.spotify_token_expires_at) < new Date() : 
           false;
           
+        console.log('Spotify connection status result:', {
+          connected: isConnected,
+          expired: isExpired,
+          username: profile.spotify_username
+        });
+        
         return {
           connected: isConnected,
           expired: isConnected && isExpired,
@@ -82,39 +115,11 @@ export async function getSpotifyConnectionStatus(): Promise<{
       } else {
         console.log('No profile data returned despite successful query');
       }
-      
-      // Try direct RPC function call to update_profile_spotify_data
-      console.log('Attempting to verify profile using RPC...');
-      
-      const { data: rpcVerifyData, error: rpcVerifyError } = await supabase
-        .from('profiles')
-        .select('spotify_username, spotify_access_token')
-        .eq('id', userId)
-        .maybeSingle();
-        
-      if (rpcVerifyError) {
-        console.error('RPC verification check failed:', rpcVerifyError);
-      } else if (rpcVerifyData) {
-        console.log('RPC profile check result:', {
-          hasUsername: !!rpcVerifyData.spotify_username,
-          hasToken: !!rpcVerifyData.spotify_access_token
-        });
-        
-        const isConnected = !!rpcVerifyData.spotify_username && !!rpcVerifyData.spotify_access_token;
-        if (isConnected) {
-          return {
-            connected: true,
-            expired: false, // We don't have expiry info here, assume not expired
-            username: rpcVerifyData.spotify_username
-          };
-        }
-      }
     } catch (dbError) {
       console.warn('Error fetching Spotify info from database:', dbError);
-      // Continue to fallback
     }
     
-    // Fallback to edge function
+    // Fallback to edge function if direct database query fails
     try {
       console.log(`Calling edge function for Spotify status with timestamp: ${timestamp}`);
       
@@ -122,7 +127,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
         body: {
           action: 'status',
           t: timestamp,
-          user_id: userId // Explicitly pass the user ID to the edge function
+          user_id: sessionData.session.user.id
         }
       });
       
@@ -132,6 +137,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
       }
       
       console.log('Received Spotify status from edge function:', data);
+      
       return {
         connected: !!data?.connected,
         expired: !!data?.expired,
@@ -139,7 +145,6 @@ export async function getSpotifyConnectionStatus(): Promise<{
       };
     } catch (functionError) {
       console.error('Edge function fallback failed:', functionError);
-      // All methods failed, return disconnected state
     }
 
     // If all methods fail, assume not connected
