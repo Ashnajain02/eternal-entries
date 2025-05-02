@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -848,4 +849,184 @@ serve(async (req) => {
             access_token: refreshData.access_token,
             expires_at: expiresAt.toISOString() 
           }),
-          { headers: { ...corsHeaders
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      } catch (refreshError) {
+        console.error("Error during token refresh:", refreshError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Error refreshing token", 
+            details: refreshError.message 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+    }
+    
+    // Revoke endpoint - disconnect Spotify
+    else if (action === "revoke") {
+      try {
+        // Use the userId from params if provided, otherwise fall back to token user
+        const userIdToCheck = params.user_id || user.id;
+        
+        console.log("Disconnecting Spotify for user:", userIdToCheck);
+        
+        // Clear Spotify-related fields in the profile
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            spotify_access_token: null,
+            spotify_refresh_token: null,
+            spotify_token_expires_at: null,
+            spotify_username: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", userIdToCheck);
+        
+        if (updateError) {
+          console.error("Error disconnecting Spotify:", updateError);
+          return new Response(
+            JSON.stringify({ error: "Failed to disconnect Spotify", details: updateError.message }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+        
+        console.log("Successfully disconnected Spotify for user:", userIdToCheck);
+        
+        return new Response(
+          JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      } catch (revokeError) {
+        console.error("Error revoking Spotify access:", revokeError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Error revoking Spotify access", 
+            details: revokeError.message 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+    }
+    
+    // Search endpoint - search for tracks
+    else if (action === "search") {
+      try {
+        const query = params.q;
+        
+        if (!query) {
+          return new Response(
+            JSON.stringify({ error: "Missing search query" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          );
+        }
+        
+        // Get the user's access token
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("spotify_access_token, spotify_token_expires_at")
+          .eq("id", userId)
+          .single();
+        
+        if (profileError) {
+          console.error("Error fetching Spotify access token:", profileError);
+          return new Response(
+            JSON.stringify({ error: "Failed to fetch access token", details: profileError.message }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+        
+        if (!profile?.spotify_access_token) {
+          return new Response(
+            JSON.stringify({ error: "No Spotify access token found" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          );
+        }
+        
+        // Check if token is expired
+        if (profile.spotify_token_expires_at && new Date(profile.spotify_token_expires_at) < new Date()) {
+          return new Response(
+            JSON.stringify({ 
+              error: "Spotify token expired", 
+              error_description: "Please reconnect your Spotify account"
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+          );
+        }
+        
+        // Search for tracks using the Spotify API
+        const searchResponse = await fetch(
+          `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
+          {
+            headers: {
+              "Authorization": `Bearer ${profile.spotify_access_token}`,
+            },
+          }
+        );
+        
+        if (!searchResponse.ok) {
+          const errorText = await searchResponse.text();
+          console.error("Spotify search error:", errorText);
+          
+          // Check if the error is due to token expiration
+          if (searchResponse.status === 401) {
+            return new Response(
+              JSON.stringify({ 
+                error: "Spotify token expired or invalid", 
+                error_description: "Please reconnect your Spotify account"
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+            );
+          }
+          
+          return new Response(
+            JSON.stringify({ 
+              error: "Spotify search failed", 
+              details: `Status: ${searchResponse.status}` 
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchResponse.status }
+          );
+        }
+        
+        const searchData = await searchResponse.json();
+        
+        // Format the search results
+        const tracks = searchData.tracks.items.map(track => ({
+          id: track.id,
+          name: track.name,
+          artist: track.artists.map(artist => artist.name).join(", "),
+          album: track.album.name,
+          albumArt: track.album.images[0]?.url || "",
+          duration: track.duration_ms,
+          spotifyUri: track.uri
+        }));
+        
+        return new Response(
+          JSON.stringify({ tracks }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      } catch (searchError) {
+        console.error("Error searching tracks:", searchError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Error searching tracks", 
+            details: searchError.message 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+    }
+    
+    // Default response for unknown action
+    return new Response(
+      JSON.stringify({ error: "Unknown action" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+    );
+  } catch (err) {
+    console.error("Unhandled error in function:", err);
+    return new Response(
+      JSON.stringify({ error: "Internal error", details: err.message }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+    );
+  }
+});
