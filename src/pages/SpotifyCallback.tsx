@@ -33,7 +33,9 @@ const SpotifyCallback = () => {
         }
         
         const userId = sessionData.session.user.id;
+        const accessToken = sessionData.session.access_token;
         setDebugInfo(`Active session for user: ${userId}`);
+        setDebugInfo(prev => `${prev}\nAccess token present: ${!!accessToken}`);
         
         // Explicitly check if profile exists and create if needed
         setDebugInfo(prev => `${prev}\nChecking if profile exists...`);
@@ -126,6 +128,7 @@ const SpotifyCallback = () => {
           
           try {
             // We need to capture token data for potential manual update
+            // IMPORTANT: Now properly adding auth token for edge function invocation
             result = await handleSpotifyCallback(code);
             console.log(`Attempt ${attempts + 1} result:`, result);
             

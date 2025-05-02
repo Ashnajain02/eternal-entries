@@ -25,28 +25,64 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 serve(async (req) => {
   // Handle CORS preflight request
   if (req.method === "OPTIONS") {
+    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders, status: 204 });
   }
   
   try {
-    // Get the token from the request
+    // IMPROVED: Better authentication checking and logging
     const authHeader = req.headers.get("Authorization");
+    console.log("Auth header present:", !!authHeader);
+    
     if (!authHeader) {
       console.error("No authorization header provided");
       return new Response(
-        JSON.stringify({ error: "No authorization header" }),
+        JSON.stringify({ 
+          error: "No authorization header", 
+          help: "Make sure to include the Authorization: Bearer <token> header" 
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
     
     const token = authHeader.replace("Bearer ", "");
+    console.log("Token extracted, length:", token.length);
     
     // Verify the JWT token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      console.error("Unauthorized request:", userError?.message);
+    let user;
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      
+      if (userError) {
+        console.error("Failed to verify token:", userError.message);
+        return new Response(
+          JSON.stringify({ 
+            error: "Invalid authentication token", 
+            details: userError.message 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+        );
+      }
+      
+      if (!userData.user) {
+        console.error("Token verification succeeded but no user was returned");
+        return new Response(
+          JSON.stringify({ 
+            error: "No user found for provided token" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+        );
+      }
+      
+      user = userData.user;
+      console.log("Successfully authenticated user:", user.id);
+    } catch (authError) {
+      console.error("Exception during token verification:", authError);
       return new Response(
-        JSON.stringify({ error: "Unauthorized", details: userError?.message }),
+        JSON.stringify({ 
+          error: "Error verifying authentication token", 
+          details: authError.message 
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
@@ -55,33 +91,39 @@ serve(async (req) => {
     let action, params;
     const contentType = req.headers.get("content-type") || "";
     
-    if (contentType.includes("application/json")) {
-      try {
+    try {
+      if (contentType.includes("application/json")) {
         const body = await req.json();
         action = body.action;
         params = body;
         console.log(`Request to ${action} endpoint with params:`, params);
-      } catch (parseError) {
-        console.error("Error parsing JSON body:", parseError);
-        return new Response(
-          JSON.stringify({ error: "Invalid JSON body", details: parseError.message }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-        );
+      } else {
+        // For backward compatibility with URL-based params
+        const url = new URL(req.url);
+        action = url.pathname.split("/").pop();
+        params = Object.fromEntries(url.searchParams);
+        console.log(`URL-based request to ${action} endpoint with params:`, params);
       }
-    } else {
-      // For backward compatibility with URL-based params
-      const url = new URL(req.url);
-      action = url.pathname.split("/").pop();
-      params = Object.fromEntries(url.searchParams);
-      console.log(`URL-based request to ${action} endpoint with params:`, params);
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid request format", 
+          details: parseError.message 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
     }
     
     // If user_id is provided in params, use it for verification
     const userId = params.user_id || user.id;
+    console.log(`Using user ID: ${userId} for operation`);
+    
     if (params.user_id && params.user_id !== user.id) {
       console.warn(`User ID mismatch: ${params.user_id} (param) vs ${user.id} (token)`);
+      // Allow the mismatch but log it as a warning
     }
-    
+
     // Special endpoint to get tokens for a user (for verification purposes only)
     if (action === "get_tokens_for_userid") {
       try {
@@ -559,6 +601,8 @@ serve(async (req) => {
               JSON.stringify({ 
                 success: true,
                 display_name: profileData.display_name,
+                access_token: tokenData.access_token,
+                refresh_token: tokenData.refresh_token,
                 expires_at: expiresAt.toISOString()
               }),
               { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
