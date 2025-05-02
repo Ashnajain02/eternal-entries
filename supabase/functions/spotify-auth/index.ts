@@ -172,12 +172,16 @@ serve(async (req) => {
         console.log("Spotify profile data:", {
           hasToken: !!profile?.spotify_access_token,
           expiresAt: profile?.spotify_token_expires_at,
-          tokenPrefix: profile?.spotify_access_token ? profile.spotify_access_token.substring(0, 10) + '...' : 'null'
+          tokenPrefix: profile?.spotify_access_token ? profile.spotify_access_token.substring(0, 10) + '...' : 'null',
+          tokenLength: profile?.spotify_access_token ? profile.spotify_access_token.length : 0
         });
         
         if (!profile || !profile.spotify_access_token) {
           return new Response(
-            JSON.stringify({ error: "No Spotify access token found" }),
+            JSON.stringify({ 
+              error: "No Spotify access token found",
+              details: "Please connect your Spotify account in the settings" 
+            }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
           );
         }
@@ -196,11 +200,27 @@ serve(async (req) => {
         // Search for tracks using the Spotify API
         console.log(`Calling Spotify API with query: ${query}`);
         try {
+          const spotifyToken = profile.spotify_access_token;
+          
+          // Log the token format to check if it has Bearer prefix already
+          console.log("Token format check:", {
+            startsWithBearer: spotifyToken.startsWith("Bearer "),
+            firstFewChars: spotifyToken.substring(0, 10) + "...",
+            length: spotifyToken.length
+          });
+          
+          // Ensure proper authorization header format
+          const authorizationHeader = spotifyToken.startsWith("Bearer ") 
+            ? spotifyToken 
+            : `Bearer ${spotifyToken}`;
+            
+          console.log("Using authorization header:", authorizationHeader.substring(0, 20) + "...");
+          
           const searchResponse = await fetch(
             `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
             {
               headers: {
-                "Authorization": `Bearer ${profile.spotify_access_token}`,
+                "Authorization": authorizationHeader,
               },
             }
           );

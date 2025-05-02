@@ -26,6 +26,10 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
         action: 'search', // This matches what the edge function expects
         q: query, // Using the parameter name 'q' to match what the function expects
         user_id: sessionData.session.user.id
+      },
+      // Explicitly add the authorization header to ensure it's being sent correctly
+      headers: {
+        Authorization: `Bearer ${sessionData.session.access_token}`
       }
     });
 
