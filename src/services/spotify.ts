@@ -157,12 +157,36 @@ export async function getSpotifyConnectionStatus(): Promise<{
   try {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
+      console.error('No active session when checking Spotify status');
       return { connected: false, expired: false, username: null };
     }
 
-    console.log('Checking Spotify connection status...');
+    console.log('Checking Spotify connection status with session token...');
     
-    // Get status from our edge function
+    // First try a direct database query for better reliability
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('spotify_username, spotify_token_expires_at')
+      .eq('id', sessionData.session.user.id)
+      .single();
+    
+    if (!profileError && profile) {
+      console.log('Got Spotify profile data directly from database:', profile);
+      const isConnected = !!profile.spotify_username;
+      const isExpired = profile.spotify_token_expires_at ? 
+        new Date(profile.spotify_token_expires_at) < new Date() : 
+        false;
+        
+      return {
+        connected: isConnected,
+        expired: isConnected && isExpired,
+        username: profile.spotify_username || null,
+      };
+    } else {
+      console.log('Falling back to edge function for Spotify status');
+    }
+    
+    // Get status from our edge function as a backup approach
     const response = await fetch('https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/status', {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
@@ -184,7 +208,9 @@ export async function getSpotifyConnectionStatus(): Promise<{
       }
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log('Received Spotify status from edge function:', result);
+    return result;
   } catch (error) {
     console.error('Error checking Spotify status:', error);
     return { connected: false, expired: false, username: null };

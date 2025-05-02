@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotify';
@@ -74,13 +73,21 @@ URL protocol: ${url.protocol}
             description: `Successfully connected as ${result.display_name || 'User'}.`,
           });
           
-          // Close this window if it's a popup
+          // Force reload of settings page after successful connection
           if (window.opener && !window.opener.closed) {
-            window.opener.focus();
-            window.close();
+            try {
+              // Try to reload the opener window to refresh status
+              window.opener.location.reload();
+              window.opener.focus();
+              window.close();
+            } catch (e) {
+              console.error("Error interacting with opener:", e);
+              // If we can't access the opener, just navigate
+              setTimeout(() => navigate('/settings'), 1500);
+            }
           } else {
-            // Otherwise navigate back to settings
-            navigate('/settings');
+            // Otherwise navigate back to settings with reload flag
+            navigate('/settings?spotify_connected=true');
           }
         } else {
           // Enhanced error handling

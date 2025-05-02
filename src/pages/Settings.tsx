@@ -8,10 +8,12 @@ import Layout from '@/components/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { getSpotifyConnectionStatus, openSpotifyAuthWindow, disconnectSpotify } from '@/services/spotify';
 import { Loader2, Music, Check, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 const Settings = () => {
   const { authState } = useAuth();
   const { toast } = useToast();
+  const location = useLocation();
   const [spotifyStatus, setSpotifyStatus] = useState<{
     isLoading: boolean;
     connected: boolean;
@@ -29,13 +31,31 @@ const Settings = () => {
       try {
         if (!authState.user) return;
         
+        // Check if we just came from a successful connection
+        const justConnected = location.search.includes('spotify_connected=true');
+        if (justConnected) {
+          console.log("Detected successful Spotify connection, refreshing status...");
+          // Add a small delay to allow the database to update
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        console.log("Fetching Spotify connection status...");
         const status = await getSpotifyConnectionStatus();
+        console.log("Received Spotify status:", status);
+        
         setSpotifyStatus({
           isLoading: false,
           connected: status.connected,
           expired: status.expired,
           username: status.username,
         });
+        
+        if (justConnected && status.connected) {
+          toast({
+            title: 'Spotify Connection Verified',
+            description: `You're successfully connected as ${status.username || 'a Spotify user'}.`,
+          });
+        }
       } catch (error) {
         console.error('Error fetching Spotify status:', error);
         setSpotifyStatus({
@@ -48,7 +68,9 @@ const Settings = () => {
     };
 
     fetchSpotifyStatus();
-  }, [authState.user]);
+    
+    // Also refetch when location changes (to catch redirects from spotify-callback)
+  }, [authState.user, location.search, toast]);
 
   const handleConnectSpotify = async () => {
     try {
@@ -60,7 +82,7 @@ const Settings = () => {
         title: 'Spotify Authorization',
         description: 'Please complete the authentication in the new tab. If no tab opened, check your popup blocker.',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error opening Spotify auth window:', error);
       
       // Check if the error is related to popup blocking
@@ -100,7 +122,7 @@ const Settings = () => {
       } else {
         throw new Error('Failed to disconnect');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error disconnecting from Spotify:', error);
       toast({
         title: 'Error',
