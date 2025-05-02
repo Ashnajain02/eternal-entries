@@ -70,7 +70,7 @@ const SpotifyCallback = () => {
         }
       } catch (err: any) {
         console.error('Error processing Spotify callback:', err);
-        setError('An unexpected error occurred.');
+        setError(err.message || 'An unexpected error occurred.');
         toast({
           title: 'Spotify Connection Error',
           description: err.message || 'An unexpected error occurred.',

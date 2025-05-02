@@ -33,7 +33,7 @@ serve(async (req) => {
     const url = new URL(req.url);
     const path = url.pathname.split("/").pop();
     
-    console.log(`Request to ${path} endpoint`); // Debug log
+    console.log(`Request to ${path} endpoint`);
     
     // New authorize endpoint that will provide the proper authorization URL
     if (path === "authorize") {
@@ -51,8 +51,7 @@ serve(async (req) => {
       const scope = url.searchParams.get("scope");
       const show_dialog = url.searchParams.get("show_dialog") === "true";
       
-      console.log("Auth request params:", { redirect_uri, scope, show_dialog }); // Debug log
-      console.log("Spotify Client ID available:", !!clientId); // Debug log for client ID
+      console.log("Auth request params:", { redirect_uri, scope, show_dialog });
       
       if (!redirect_uri || !scope) {
         return new Response(
@@ -73,7 +72,7 @@ serve(async (req) => {
         redirect_uri
       )}&scope=${encodeURIComponent(scope)}${show_dialog ? "&show_dialog=true" : ""}`;
       
-      console.log("Generated auth URL:", authUrl); // Debug log
+      console.log("Generated auth URL:", authUrl);
       
       return new Response(
         JSON.stringify({ url: authUrl }),
@@ -112,13 +111,13 @@ serve(async (req) => {
         );
       }
       
-      // Exchange the code for an access token
-      // Use the same redirect URI as in the authorization request
+      // Extract origin from the request headers or default to URL origin
       const originUrl = new URL(req.headers.get("Origin") || url.origin);
       const redirectUri = `${originUrl.origin}/spotify-callback`;
       
-      console.log("Using redirect URI for token exchange:", redirectUri); // Debug log
+      console.log("Using redirect URI for token exchange:", redirectUri);
       
+      // Exchange the code for an access token
       const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
         method: "POST",
         headers: {
@@ -135,7 +134,7 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json();
       
       if (tokenData.error) {
-        console.error("Token exchange error:", tokenData.error); // Debug log
+        console.error("Token exchange error:", tokenData.error);
         return new Response(
           JSON.stringify({ error: tokenData.error }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -184,13 +183,13 @@ serve(async (req) => {
       );
     } else if (path === "refresh") {
       // Get the user's refresh token
-      const { data: profiles, error: profileError } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("spotify_refresh_token")
         .eq("id", user.id)
         .single();
       
-      if (profileError || !profiles.spotify_refresh_token) {
+      if (profileError || !profile.spotify_refresh_token) {
         return new Response(
           JSON.stringify({ error: "No refresh token found" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -206,7 +205,7 @@ serve(async (req) => {
         },
         body: new URLSearchParams({
           grant_type: "refresh_token",
-          refresh_token: profiles.spotify_refresh_token,
+          refresh_token: profile.spotify_refresh_token,
         }),
       });
       
@@ -278,12 +277,13 @@ serve(async (req) => {
       );
     } else if (path === "search") {
       // Get user's Spotify token
-      const { data: { spotify_access_token, spotify_token_expires_at }, error: profileError } = await supabase
-        .rpc('get_user_spotify_token', { user_id: user.id })
-        .select()
+      const { data, error: profileError } = await supabase
+        .from("profiles")
+        .select("spotify_access_token, spotify_token_expires_at")
+        .eq("id", user.id)
         .single();
       
-      if (profileError || !spotify_access_token) {
+      if (profileError || !data.spotify_access_token) {
         return new Response(
           JSON.stringify({ error: "Not connected to Spotify" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -291,7 +291,7 @@ serve(async (req) => {
       }
       
       // Check if token is expired
-      const isExpired = await supabase.rpc('is_spotify_token_expired', { user_id: user.id });
+      const isExpired = new Date(data.spotify_token_expires_at) < new Date();
       
       if (isExpired) {
         return new Response(
@@ -315,7 +315,7 @@ serve(async (req) => {
         `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
         {
           headers: {
-            "Authorization": `Bearer ${spotify_access_token}`,
+            "Authorization": `Bearer ${data.spotify_access_token}`,
           },
         }
       );
@@ -323,9 +323,27 @@ serve(async (req) => {
       const searchData = await searchResponse.json();
       
       if (searchData.error) {
+        // If we get an auth error, the token might be invalid despite not being expired
+        if (searchData.error.status === 401) {
+          // Attempt to refresh the token
+          try {
+            // Try to refresh the token and perform the search again
+            const refreshResult = await refreshAndRetrySearch(user.id, query);
+            return new Response(
+              JSON.stringify({ tracks: refreshResult }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          } catch (refreshError) {
+            return new Response(
+              JSON.stringify({ error: "Authentication failed, please reconnect to Spotify" }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+            );
+          }
+        }
+        
         return new Response(
           JSON.stringify({ error: searchData.error.message }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchData.error.status }
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchData.error.status || 400 }
         );
       }
       
@@ -335,7 +353,7 @@ serve(async (req) => {
         name: track.name,
         artist: track.artists.map((a: any) => a.name).join(", "),
         album: track.album.name,
-        albumArt: track.album.images[0]?.url,
+        albumArt: track.album.images[0]?.url || "",
         uri: track.uri,
       }));
       
@@ -383,3 +401,85 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to refresh token and retry search
+async function refreshAndRetrySearch(userId: string, query: string): Promise<any[]> {
+  // Get refresh token
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("spotify_refresh_token")
+    .eq("id", userId)
+    .single();
+  
+  if (profileError || !profile.spotify_refresh_token) {
+    throw new Error("No refresh token available");
+  }
+  
+  // Refresh the access token
+  const refreshResponse = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Authorization": `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: profile.spotify_refresh_token,
+    }),
+  });
+  
+  const refreshData = await refreshResponse.json();
+  
+  if (refreshData.error) {
+    throw new Error(refreshData.error);
+  }
+  
+  // Calculate new expiration time
+  const expiresAt = new Date();
+  expiresAt.setSeconds(expiresAt.getSeconds() + refreshData.expires_in);
+  
+  // Update tokens in database
+  const updateData: any = {
+    spotify_access_token: refreshData.access_token,
+    spotify_token_expires_at: expiresAt.toISOString(),
+  };
+  
+  if (refreshData.refresh_token) {
+    updateData.spotify_refresh_token = refreshData.refresh_token;
+  }
+  
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update(updateData)
+    .eq("id", userId);
+  
+  if (updateError) {
+    throw new Error("Failed to update tokens");
+  }
+  
+  // Try the search again with the new token
+  const searchResponse = await fetch(
+    `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
+    {
+      headers: {
+        "Authorization": `Bearer ${refreshData.access_token}`,
+      },
+    }
+  );
+  
+  const searchData = await searchResponse.json();
+  
+  if (searchData.error) {
+    throw new Error(searchData.error.message);
+  }
+  
+  // Transform the response
+  return searchData.tracks.items.map((track: any) => ({
+    id: track.id,
+    name: track.name,
+    artist: track.artists.map((a: any) => a.name).join(", "),
+    album: track.album.name,
+    albumArt: track.album.images[0]?.url || "",
+    uri: track.uri,
+  }));
+}

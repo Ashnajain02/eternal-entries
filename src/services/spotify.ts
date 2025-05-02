@@ -10,21 +10,22 @@ export async function openSpotifyAuthWindow(): Promise<void> {
       throw new Error('No active session');
     }
 
-    // Define the required parameters
-    // Use HTTPS for the redirect URI if we're on a secure connection or deployed site
-    const isHttps = window.location.protocol === 'https:' || !window.location.hostname.includes('localhost');
-    const redirectUri = `${window.location.protocol}//${window.location.host}/spotify-callback`;
-    const scope = 'user-read-private user-read-email user-top-read';
-    const showDialog = true;
-
-    console.log("Requesting Spotify auth with params:", { redirectUri, scope, showDialog });
-
-    // Get the authorization URL from our edge function with required parameters
+    // Required scopes for Spotify API
+    const scopes = [
+      'user-read-private',
+      'user-read-email',
+      'user-top-read'
+    ];
+    
+    // Determine redirect URI based on environment
+    const redirectUri = `${window.location.origin}/spotify-callback`;
+    
+    // Call our edge function to get the auth URL with required parameters
     const response = await fetch(
       `https://veorhexddrwlwxtkuycb.functions.supabase.co/spotify-auth/authorize?` + 
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `scope=${encodeURIComponent(scope)}&` +
-      `show_dialog=${showDialog}`, 
+      `scope=${encodeURIComponent(scopes.join(' '))}&` +
+      `show_dialog=true`, 
       {
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
@@ -33,28 +34,20 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     );
 
     if (!response.ok) {
-      // Parse the response to get the error message
       const errorData = await response.text();
       console.error('Error response from authorize endpoint:', errorData);
       try {
         const parsedError = JSON.parse(errorData);
         throw new Error(parsedError.error || 'Failed to get authorization URL');
       } catch (parseError) {
-        // If we can't parse JSON, just throw the raw error
         throw new Error(`Failed to get authorization URL: ${errorData}`);
       }
     }
 
     const { url } = await response.json();
-    console.log("Opening Spotify auth URL:", url); // Add debug log
     
     // Open in a new tab with appropriate attributes
-    const newWindow = window.open(url, '_blank');
-    
-    // Check if popup was blocked
-    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-      throw new Error('Popup was blocked. Please allow popups for this website.');
-    }
+    window.open(url, '_blank', 'noopener,noreferrer');
   } catch (error) {
     console.error('Error opening Spotify auth window:', error);
     throw error;
@@ -110,7 +103,7 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     if (!response.ok) {
       const error = await response.json();
       // Special handling for token expired errors
-      if (error.error && error.error.includes("expired")) {
+      if (error.error && (error.error.includes("expired") || error.error.includes("token"))) {
         throw new Error("Spotify session expired, please reconnect your account");
       }
       throw new Error(error.error || 'Failed to search Spotify');

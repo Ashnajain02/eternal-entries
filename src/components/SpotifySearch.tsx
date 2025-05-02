@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Link } from 'react-router-dom';
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface SpotifySearchProps {
   onSelect: (track: SpotifyTrack) => void;
@@ -22,14 +22,24 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
   const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(null);
   const [spotifyUsername, setSpotifyUsername] = useState<string | null>(null);
   const [connectionChecked, setConnectionChecked] = useState(false);
+  const { toast } = useToast();
 
-  // Check Spotify connection status
+  // Check Spotify connection status whenever the popover opens
   useEffect(() => {
     const checkSpotifyConnection = async () => {
       try {
         const status = await getSpotifyConnectionStatus();
         setSpotifyConnected(status.connected && !status.expired);
         setSpotifyUsername(status.username);
+        
+        // If token is expired, show a message
+        if (status.connected && status.expired) {
+          toast({
+            title: "Spotify Connection Expired",
+            description: "Please reconnect your Spotify account in Settings.",
+            variant: "warning"
+          });
+        }
       } catch (error) {
         console.error('Error checking Spotify connection:', error);
         setSpotifyConnected(false);
@@ -41,7 +51,14 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
     if (isOpen && !connectionChecked) {
       checkSpotifyConnection();
     }
-  }, [isOpen, connectionChecked]);
+  }, [isOpen, connectionChecked, toast]);
+
+  // Reset connection check when popover closes
+  useEffect(() => {
+    if (!isOpen) {
+      setConnectionChecked(false);
+    }
+  }, [isOpen]);
 
   // Search for tracks when query changes
   useEffect(() => {
@@ -55,31 +72,40 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
       try {
         const tracks = await searchSpotifyTracks(query);
         setResults(tracks);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error searching tracks:', error);
         
         // Show toast for specific errors
-        if (error.message.includes("reconnect")) {
+        if (error.message && error.message.includes("reconnect")) {
           toast({
-            title: "Spotify session expired",
+            title: "Spotify Session Expired",
             description: "Please reconnect to Spotify in Settings.",
             variant: "destructive"
           });
           setSpotifyConnected(false);
+        } else {
+          toast({
+            title: "Search Error",
+            description: error.message || "Failed to search tracks",
+            variant: "destructive"
+          });
         }
+        
+        setResults([]);
       } finally {
         setIsSearching(false);
       }
     };
 
+    // Add debounce to avoid too many requests
     const debounce = setTimeout(() => {
-      if (spotifyConnected) {
+      if (spotifyConnected && query.trim()) {
         fetchResults();
       }
     }, 300);
     
     return () => clearTimeout(debounce);
-  }, [query, spotifyConnected]);
+  }, [query, spotifyConnected, toast]);
 
   const handleSelect = (track: SpotifyTrack) => {
     onSelect(track);
@@ -116,7 +142,16 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
           )}
         </PopoverTrigger>
         <PopoverContent className="w-80 p-2" align="start">
-          {connectionChecked && !spotifyConnected ? (
+          {!connectionChecked ? (
+            <div className="p-4 text-center">
+              <div className="flex justify-center mb-2">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+              <p className="text-sm">
+                Checking Spotify connection...
+              </p>
+            </div>
+          ) : !spotifyConnected ? (
             <div className="p-4 text-center space-y-4">
               <div className="flex justify-center">
                 <AlertCircle className="h-8 w-8 text-muted-foreground" />
@@ -147,6 +182,7 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
                   placeholder="Search songs..."
                   className="border-none focus-visible:ring-0 shadow-none"
                   autoComplete="off"
+                  autoFocus
                 />
               </div>
               
@@ -172,6 +208,9 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
                         src={track.albumArt} 
                         alt={`${track.album} cover`} 
                         className="h-10 w-10 rounded"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://placehold.co/40x40/gray/white?text=♫';
+                        }}
                       />
                       <div className="text-left flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{track.name}</p>
@@ -210,5 +249,25 @@ const SpotifySearch: React.FC<SpotifySearchProps> = ({ onSelect, selectedTrack }
     </div>
   );
 };
+
+// Loader component
+function Loader2({ className }: { className?: string }) {
+  return (
+    <svg 
+      className={className || "h-4 w-4 animate-spin"}
+      xmlns="http://www.w3.org/2000/svg" 
+      width="24" 
+      height="24" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
 
 export default SpotifySearch;

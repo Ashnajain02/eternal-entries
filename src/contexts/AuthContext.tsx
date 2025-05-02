@@ -104,7 +104,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    // Check if we have a session first
     try {
       // Check if there's a valid session
       const { data } = await supabase.auth.getSession();
