@@ -22,10 +22,18 @@ const SpotifyCallback = () => {
         const code = params.get('code');
         const errorParam = params.get('error');
 
-        // Save debug info
-        setDebugInfo(`Callback URL: ${url.toString()}\nCode present: ${!!code}\nError present: ${!!errorParam}`);
-        console.log("Spotify callback URL:", url.toString());
-        console.log("Authorization code present:", !!code);
+        // Enhanced debug info
+        const debugDetails = `
+Callback URL: ${url.toString()}
+Code present: ${!!code}
+Error present: ${!!errorParam}
+Error value: ${errorParam || 'none'}
+Origin: ${window.location.origin}
+Timestamp: ${new Date().toISOString()}
+        `;
+        
+        setDebugInfo(debugDetails);
+        console.log("Spotify callback data:", debugDetails);
         
         if (errorParam) {
           console.error("Spotify auth error parameter:", errorParam);
@@ -70,10 +78,12 @@ const SpotifyCallback = () => {
             navigate('/settings');
           }
         } else {
-          setError(result.error || 'Failed to connect to Spotify.');
+          // Enhanced error handling
+          const errorMessage = result.error || 'Failed to connect to Spotify.';
+          setError(`${errorMessage} - This may be due to invalid client credentials or a misconfigured redirect URI.`);
           toast({
             title: 'Spotify Connection Failed',
-            description: result.error || 'There was a problem connecting your Spotify account.',
+            description: errorMessage,
             variant: 'destructive',
           });
           setTimeout(() => navigate('/settings'), 5000);

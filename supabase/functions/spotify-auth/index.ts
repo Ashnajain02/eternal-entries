@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -68,6 +67,11 @@ serve(async (req) => {
       }
       
       // Generate the authorization URL with the proper client ID
+      // Important: Ensure clientId is not a timestamp or other unexpected value
+      console.log("Client ID type:", typeof clientId);
+      console.log("Client ID length:", clientId.length);
+      console.log("First 5 chars of Client ID:", clientId.substring(0, 5));
+      
       const authUrl = `https://accounts.spotify.com/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(
         redirect_uri
       )}&scope=${encodeURIComponent(scope)}${show_dialog ? "&show_dialog=true" : ""}`;
@@ -116,6 +120,10 @@ serve(async (req) => {
       const redirectUri = `${originUrl.origin}/spotify-callback`;
       
       console.log("Using redirect URI for token exchange:", redirectUri);
+      console.log("Client credentials:", { 
+        clientIdLength: clientId.length,
+        clientSecretLength: clientSecret ? clientSecret.length : 0
+      });
       
       // Exchange the code for an access token
       const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
@@ -135,8 +143,9 @@ serve(async (req) => {
       
       if (tokenData.error) {
         console.error("Token exchange error:", tokenData.error);
+        console.error("Token exchange error description:", tokenData.error_description);
         return new Response(
-          JSON.stringify({ error: tokenData.error }),
+          JSON.stringify({ error: tokenData.error, error_description: tokenData.error_description }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }
