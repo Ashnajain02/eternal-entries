@@ -5,12 +5,12 @@ import { handleSpotifyCallback } from '@/services/spotifyAuth';
 import { Card } from '@/components/ui/card';
 import { Loader2, Check, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
 
 const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processingStarted, setProcessingStarted] = useState<boolean>(false);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -30,30 +30,34 @@ const SpotifyCallback = () => {
         // Log basic diagnostics but don't expose in UI
         console.log("Processing Spotify callback with code present:", !!code);
         console.log("Error present:", !!errorParam);
+        console.log("Code (first 10 chars):", code ? code.substring(0, 10) + "..." : "null");
         
         if (errorParam) {
           console.error("Spotify auth error parameter:", errorParam);
+          setDebugInfo(`Auth error: ${errorParam}`);
           toast({
             title: 'Spotify Connection Failed',
             description: `Authorization error: ${errorParam}`,
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 1500);
+          setTimeout(() => navigate('/settings'), 3000);
           return;
         }
 
         if (!code) {
           console.error("No authorization code provided");
+          setDebugInfo("Missing auth code in URL");
           toast({
             title: 'Spotify Connection Failed',
             description: 'No authorization code was provided.',
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 1500);
+          setTimeout(() => navigate('/settings'), 3000);
           return;
         }
 
         console.log("Attempting to exchange code for tokens...");
+        setDebugInfo("Exchanging code for tokens...");
         
         // Make multiple attempts to exchange the code for tokens
         let attempts = 0;
@@ -64,10 +68,11 @@ const SpotifyCallback = () => {
           
           result = await handleSpotifyCallback(code);
           console.log(`Attempt ${attempts + 1} result:`, result);
+          setDebugInfo(prev => `${prev}\nAttempt ${attempts + 1}: ${result.success ? 'Success' : 'Failed - ' + (result.error || 'Unknown error')}`);
           
           if (!result.success && attempts < 2) {
             // Wait before retrying
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
           
           attempts++;
@@ -79,8 +84,10 @@ const SpotifyCallback = () => {
             description: `Successfully connected as ${result.display_name || 'User'}.`,
           });
           
+          setDebugInfo(prev => `${prev}\nConnection successful! Username: ${result.display_name || 'Unknown'}`);
+          
           // Wait a moment for the database to update
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
           // Use hard navigation with cache-busting timestamp to ensure full page reload
           const timestamp = new Date().getTime();
@@ -90,21 +97,27 @@ const SpotifyCallback = () => {
           const errorMessage = result?.error || 'Failed to connect to Spotify.';
           const errorDesc = result?.error_description || '';
           
+          setError(`${errorMessage}${errorDesc ? `: ${errorDesc}` : ''}`);
+          setDebugInfo(prev => `${prev}\nFinal error: ${errorMessage}${errorDesc ? ` - ${errorDesc}` : ''}`);
+          
           toast({
             title: 'Spotify Connection Failed',
             description: errorMessage,
             variant: 'destructive',
           });
-          setTimeout(() => navigate('/settings'), 1500);
+          setTimeout(() => navigate('/settings'), 3000);
         }
       } catch (err: any) {
         console.error('Error processing Spotify callback:', err);
+        setError(err.message || 'An unexpected error occurred.');
+        setDebugInfo(`Exception: ${err.message || 'Unknown error'}`);
+        
         toast({
           title: 'Spotify Connection Error',
           description: err.message || 'An unexpected error occurred.',
           variant: 'destructive',
         });
-        setTimeout(() => navigate('/settings'), 1500);
+        setTimeout(() => navigate('/settings'), 3000);
       } finally {
         setIsLoading(false);
       }
@@ -140,6 +153,12 @@ const SpotifyCallback = () => {
             <p className="text-sm text-muted-foreground mt-2">
               Redirecting to settings page...
             </p>
+          </div>
+        )}
+        
+        {debugInfo && (
+          <div className="mt-6 p-3 bg-muted rounded-md">
+            <p className="text-xs text-left font-mono whitespace-pre-line">{debugInfo}</p>
           </div>
         )}
       </Card>

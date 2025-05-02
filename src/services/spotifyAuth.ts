@@ -66,12 +66,15 @@ export async function handleSpotifyCallback(code: string): Promise<{
   error_description?: string;
 }> {
   try {
+    console.log('Starting Spotify callback handler with code length:', code.length);
+    
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
       console.error('No active session when handling Spotify callback:', sessionError);
       return { success: false, error: 'No active session' };
     }
 
+    console.log('Active session found for user:', sessionData.session.user.id);
     console.log('Exchanging code for tokens with code length:', code.length);
     
     // Ensure we're using the exact same redirect URI as in the authorization request
@@ -83,6 +86,8 @@ export async function handleSpotifyCallback(code: string): Promise<{
     
     // Use the supabase.functions.invoke method with proper error handling
     try {
+      console.log('Invoking spotify-auth edge function with action: callback');
+      
       const { data, error } = await supabase.functions.invoke('spotify-auth', {
         body: {
           action: 'callback',
@@ -101,10 +106,28 @@ export async function handleSpotifyCallback(code: string): Promise<{
       }
 
       if (!data) {
+        console.error('No data returned from callback function');
         return { success: false, error: 'No data returned from callback function' };
       }
       
       console.log('Successfully exchanged code for tokens, display name:', data.display_name);
+      
+      // Double-check if the profile was updated correctly
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('spotify_username, spotify_access_token')
+        .eq('id', sessionData.session.user.id)
+        .single();
+        
+      if (profileError) {
+        console.error('Error verifying profile update:', profileError);
+      } else {
+        console.log('Profile verification:', {
+          hasUsername: !!profileData?.spotify_username,
+          hasToken: !!profileData?.spotify_access_token,
+          username: profileData?.spotify_username
+        });
+      }
       
       return { 
         success: data.success, 

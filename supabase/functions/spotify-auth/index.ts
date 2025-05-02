@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -150,6 +149,7 @@ serve(async (req) => {
       
       try {
         // Exchange the code for an access token
+        console.log("Sending token exchange request to Spotify API...");
         const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
           method: "POST",
           headers: {
@@ -162,6 +162,8 @@ serve(async (req) => {
             redirect_uri: redirectUri,
           }),
         });
+        
+        console.log("Token exchange response status:", tokenResponse.status);
         
         if (!tokenResponse.ok) {
           console.error("Token exchange error status:", tokenResponse.status);
@@ -213,6 +215,7 @@ serve(async (req) => {
         
         try {
           // Get the user's Spotify profile
+          console.log("Fetching Spotify user profile...");
           const profileResponse = await fetch("https://api.spotify.com/v1/me", {
             headers: {
               "Authorization": `Bearer ${tokenData.access_token}`,
@@ -239,7 +242,15 @@ serve(async (req) => {
           expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
           
           // Save the tokens in the user's profile
-          const { error: updateError } = await supabase
+          console.log("Updating profile record in database for user:", user.id);
+          console.log("With data:", {
+            spotify_access_token: "PRESENT",
+            spotify_refresh_token: "PRESENT",
+            spotify_token_expires_at: expiresAt.toISOString(),
+            spotify_username: profileData.display_name || profileData.id
+          });
+          
+          const { data: updateData, error: updateError } = await supabase
             .from("profiles")
             .update({
               spotify_access_token: tokenData.access_token,
@@ -251,16 +262,70 @@ serve(async (req) => {
           
           if (updateError) {
             console.error("Error updating profile:", updateError);
-            return new Response(
-              JSON.stringify({ 
-                error: "Failed to save Spotify credentials", 
-                details: updateError.message
-              }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-            );
+            
+            // Check if row exists by doing a select
+            const { data: existingProfile, error: selectError } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("id", user.id)
+              .maybeSingle();
+              
+            if (selectError) {
+              console.error("Error checking profile existence:", selectError);
+            } else {
+              console.log("Profile exists for user:", !!existingProfile);
+              
+              if (!existingProfile) {
+                // Try to insert a new profile if it doesn't exist
+                console.log("Attempting to insert new profile for user:", user.id);
+                const { error: insertError } = await supabase
+                  .from("profiles")
+                  .insert({
+                    id: user.id,
+                    spotify_access_token: tokenData.access_token,
+                    spotify_refresh_token: tokenData.refresh_token,
+                    spotify_token_expires_at: expiresAt.toISOString(),
+                    spotify_username: profileData.display_name || profileData.id,
+                  });
+                  
+                if (insertError) {
+                  console.error("Error inserting new profile:", insertError);
+                  return new Response(
+                    JSON.stringify({ 
+                      error: "Failed to create profile", 
+                      details: insertError.message
+                    }),
+                    { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+                  );
+                } else {
+                  console.log("Successfully created new profile");
+                }
+              } else {
+                return new Response(
+                  JSON.stringify({ 
+                    error: "Failed to update profile", 
+                    details: updateError.message
+                  }),
+                  { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+                );
+              }
+            }
+          } else {
+            console.log("Successfully updated user profile with Spotify credentials");
           }
           
-          console.log("Successfully updated user profile with Spotify credentials");
+          // Do a double check to verify the profile was updated
+          const { data: verifyProfile } = await supabase
+            .from("profiles")
+            .select("spotify_username, spotify_access_token")
+            .eq("id", user.id)
+            .single();
+            
+          console.log("Verification of profile update:", {
+            hasUsername: !!verifyProfile?.spotify_username,
+            hasToken: !!verifyProfile?.spotify_access_token,
+            username: verifyProfile?.spotify_username
+          });
           
           return new Response(
             JSON.stringify({ 
@@ -286,6 +351,55 @@ serve(async (req) => {
           JSON.stringify({ 
             error: "Error during token exchange", 
             details: tokenError.message
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+    }
+    
+    // Status endpoint - check Spotify connection status
+    else if (action === "status") {
+      try {
+        console.log("Checking Spotify status for user:", user.id);
+        
+        // Get the user's Spotify connection status
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("spotify_username, spotify_token_expires_at, spotify_access_token")
+          .eq("id", user.id)
+          .maybeSingle();
+        
+        if (profileError) {
+          console.error("Error getting profile for status check:", profileError);
+          return new Response(
+            JSON.stringify({ error: "Failed to get profile", details: profileError.message }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+        
+        console.log("Retrieved profile data:", {
+          has_username: !!profile?.spotify_username,
+          has_token: !!profile?.spotify_access_token,
+          expires_at: profile?.spotify_token_expires_at
+        });
+        
+        const isConnected = !!profile?.spotify_username && !!profile?.spotify_access_token;
+        const isExpired = !profile?.spotify_token_expires_at || new Date(profile.spotify_token_expires_at) < new Date();
+        
+        return new Response(
+          JSON.stringify({
+            connected: isConnected,
+            expired: isConnected && isExpired,
+            username: profile?.spotify_username || null,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      } catch (statusError) {
+        console.error("General error checking status:", statusError);
+        return new Response(
+          JSON.stringify({ 
+            error: "Error checking status", 
+            details: statusError.message 
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
@@ -567,55 +681,6 @@ serve(async (req) => {
           JSON.stringify({ 
             error: "Search error", 
             details: searchError.message 
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-        );
-      }
-    }
-    
-    // Status endpoint - check Spotify connection status
-    else if (action === "status") {
-      try {
-        console.log("Checking Spotify status for user:", user.id);
-        
-        // Get the user's Spotify connection status
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("spotify_username, spotify_token_expires_at, spotify_access_token")
-          .eq("id", user.id)
-          .single();
-        
-        if (profileError) {
-          console.error("Error getting profile for status check:", profileError);
-          return new Response(
-            JSON.stringify({ error: "Failed to get profile", details: profileError.message }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-          );
-        }
-        
-        console.log("Retrieved profile data:", {
-          has_username: !!profile.spotify_username,
-          has_token: !!profile.spotify_access_token,
-          expires_at: profile.spotify_token_expires_at
-        });
-        
-        const isConnected = !!profile.spotify_username && !!profile.spotify_access_token;
-        const isExpired = !profile.spotify_token_expires_at || new Date(profile.spotify_token_expires_at) < new Date();
-        
-        return new Response(
-          JSON.stringify({
-            connected: isConnected,
-            expired: isConnected && isExpired,
-            username: profile.spotify_username || null,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-        );
-      } catch (statusError) {
-        console.error("General error checking status:", statusError);
-        return new Response(
-          JSON.stringify({ 
-            error: "Error checking status", 
-            details: statusError.message 
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );

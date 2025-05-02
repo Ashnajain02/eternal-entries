@@ -1,5 +1,36 @@
 
+# A string used to distinguish different Supabase projects on the same host. Defaults to the project ID.
 project_id = "veorhexddrwlwxtkuycb"
 
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+# Email testing server. Emails sent with the local dev setup are not actually delivered,
+# instead they are monitored, and you can view the emails that would have been delivered
+# from the `/functions/emails` path in the frontend.
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[auth.email]
+enabled = true
+
+[functions]
 [functions.spotify-auth]
 verify_jwt = true

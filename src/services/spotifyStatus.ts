@@ -16,11 +16,14 @@ export async function getSpotifyConnectionStatus(): Promise<{
       return { connected: false, expired: false, username: null };
     }
 
+    console.log('Found active session for user:', sessionData.session.user.id);
+
     // Add a cache-busting timestamp to ensure we get fresh data
     const timestamp = new Date().getTime();
     
     try {
       // First try a direct database query with cache prevention
+      console.log('Attempting direct database query for Spotify profile data...');
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('spotify_username, spotify_token_expires_at, spotify_access_token')
@@ -45,7 +48,8 @@ export async function getSpotifyConnectionStatus(): Promise<{
           username: profile.spotify_username || null,
         };
       } else {
-        console.log('No profile data from direct query, trying fallback');
+        console.log('No profile data from direct query or error:', profileError?.message);
+        console.log('Trying fallback to edge function');
       }
     } catch (dbError) {
       console.warn('Error fetching Spotify info from database:', dbError);
