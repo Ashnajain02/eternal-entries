@@ -24,7 +24,7 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: {
         action: 'search', // This matches what the edge function expects
-        q: query, // Using the parameter name 'q' to match what the function expects
+        q: 'coldplay', // Using the parameter name 'q' to match what the function expects
         user_id: sessionData.session.user.id
       },
       // Explicitly add the authorization header to ensure it's being sent correctly
