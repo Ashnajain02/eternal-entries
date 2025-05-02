@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -97,7 +96,7 @@ const Auth = () => {
   return (
     <Layout>
       <div className="container mx-auto flex flex-col items-center justify-center max-w-md py-8">
-        <h1 className="text-3xl font-bold mb-8">Welcome to Song Weather Journal</h1>
+        <h1 className="text-3xl font-bold mb-8">Welcome to Eternal Entries</h1>
         
         <Card className="w-full">
           <CardHeader>

@@ -24,7 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="fixed inset-x-0 top-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
         <div className="container flex items-center justify-between h-16">
           <Link to="/" className="flex items-center font-semibold">
-            Song Weather Journal
+            Eternal Entries
           </Link>
           <div className="flex items-center space-x-4">
             {/* Only show navigation when NOT on auth page */}

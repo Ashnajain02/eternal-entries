@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useJournal } from '@/contexts/JournalContext';
@@ -66,7 +67,7 @@ const Index = () => {
     return (
       <Layout>
         <div className="max-w-3xl mx-auto text-center py-16">
-          <h1 className="text-3xl font-bold mb-4">Welcome to Journal App</h1>
+          <h1 className="text-3xl font-bold mb-4">Welcome to Eternal Entries</h1>
           <p className="mb-6">Please sign in to start journaling</p>
         </div>
       </Layout>
