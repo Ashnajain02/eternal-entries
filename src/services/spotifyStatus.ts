@@ -44,27 +44,10 @@ export async function getSpotifyConnectionStatus(): Promise<{
       // Continue to fallback
     }
 
-    // Fallback to RPC if edge function is unavailable
-    try {
-      const { data: rpcData, error: rpcError } = await supabase.rpc(
-        'get_spotify_status', 
-        { user_id: sessionData.session.user.id }
-      );
-
-      if (!rpcError && rpcData) {
-        console.log('Got Spotify status from RPC:', rpcData);
-        return {
-          connected: rpcData.connected || false,
-          expired: rpcData.expired || false,
-          username: rpcData.username || null,
-        };
-      }
-    } catch (rpcError) {
-      console.warn('RPC fallback failed:', rpcError);
-      // Final fallback
-    }
-
-    // Last resort - try edge function with timeout and failure handling
+    // Instead of using RPC, we'll make a direct database query or use the edge function
+    // Remove the problematic RPC call that was causing TypeScript errors
+    
+    // Skip directly to edge function fallback with timeout and failure handling
     try {
       const timestamp = new Date().getTime(); // Add timestamp to prevent caching
       const controller = new AbortController();
