@@ -32,6 +32,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
         headers: {
           Authorization: `Bearer ${sessionData.session.access_token}`,
         },
+        cache: 'no-store', // Prevent caching
       }
     );
 
@@ -77,6 +78,7 @@ export async function handleSpotifyCallback(code: string): Promise<{
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
+      cache: 'no-store', // Prevent caching
     });
 
     if (!response.ok) {
@@ -119,6 +121,7 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
+      cache: 'no-store', // Prevent caching
     });
 
     if (!response.ok) {
@@ -148,31 +151,31 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
   }
 }
 
-// Check connection status with Spotify
+// Check connection status with Spotify - improved with direct database query and no-cache options
 export async function getSpotifyConnectionStatus(): Promise<{
   connected: boolean;
   expired: boolean;
   username: string | null;
 }> {
   try {
+    console.log('Checking Spotify connection status...');
+    
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
       console.error('No active session when checking Spotify status');
       return { connected: false, expired: false, username: null };
     }
 
-    console.log('Checking Spotify connection status with session token...');
-    
     // First try a direct database query for better reliability
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('spotify_username, spotify_token_expires_at')
+      .select('spotify_username, spotify_token_expires_at, spotify_access_token')
       .eq('id', sessionData.session.user.id)
       .single();
     
     if (!profileError && profile) {
       console.log('Got Spotify profile data directly from database:', profile);
-      const isConnected = !!profile.spotify_username;
+      const isConnected = !!profile.spotify_username && !!profile.spotify_access_token;
       const isExpired = profile.spotify_token_expires_at ? 
         new Date(profile.spotify_token_expires_at) < new Date() : 
         false;
@@ -183,6 +186,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
         username: profile.spotify_username || null,
       };
     } else {
+      console.log('Profile data fetch error or no profile data:', profileError);
       console.log('Falling back to edge function for Spotify status');
     }
     
@@ -191,6 +195,7 @@ export async function getSpotifyConnectionStatus(): Promise<{
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
+      cache: 'no-store',  // Prevent caching
     });
 
     if (!response.ok) {
@@ -231,6 +236,7 @@ export async function disconnectSpotify(): Promise<boolean> {
       headers: {
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
+      cache: 'no-store', // Prevent caching
     });
 
     if (!response.ok) {

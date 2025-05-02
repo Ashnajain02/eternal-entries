@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,70 +7,103 @@ import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
 import { useToast } from '@/hooks/use-toast';
 import { getSpotifyConnectionStatus, openSpotifyAuthWindow, disconnectSpotify } from '@/services/spotify';
-import { Loader2, Music, Check, X } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { Loader2, Music, Check, X, RefreshCw } from 'lucide-react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 const Settings = () => {
   const { authState } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [spotifyStatus, setSpotifyStatus] = useState<{
     isLoading: boolean;
     connected: boolean;
     expired: boolean;
     username: string | null;
+    lastRefreshed: number;
   }>({
     isLoading: true,
     connected: false,
     expired: false,
     username: null,
+    lastRefreshed: Date.now()
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchSpotifyStatus = async () => {
-      try {
-        if (!authState.user) return;
-        
-        // Check if we just came from a successful connection
-        const justConnected = location.search.includes('spotify_connected=true');
-        if (justConnected) {
-          console.log("Detected successful Spotify connection, refreshing status...");
-          // Add a small delay to allow the database to update
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        
-        console.log("Fetching Spotify connection status...");
-        const status = await getSpotifyConnectionStatus();
-        console.log("Received Spotify status:", status);
-        
-        setSpotifyStatus({
-          isLoading: false,
-          connected: status.connected,
-          expired: status.expired,
-          username: status.username,
-        });
-        
-        if (justConnected && status.connected) {
-          toast({
-            title: 'Spotify Connection Verified',
-            description: `You're successfully connected as ${status.username || 'a Spotify user'}.`,
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching Spotify status:', error);
-        setSpotifyStatus({
-          isLoading: false,
-          connected: false,
-          expired: false,
-          username: null,
+  const fetchSpotifyStatus = useCallback(async (showToast = false) => {
+    try {
+      if (!authState.user) return;
+      
+      setIsRefreshing(true);
+      
+      // Check if we just came from a successful connection
+      const justConnected = searchParams.get('spotify_connected') === 'true';
+      if (justConnected) {
+        console.log("Detected successful Spotify connection from URL param, refreshing status...");
+        // Add a small delay to allow the database to update
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+      
+      console.log("Fetching Spotify connection status...");
+      const status = await getSpotifyConnectionStatus();
+      console.log("Received Spotify status:", status);
+      
+      setSpotifyStatus({
+        isLoading: false,
+        connected: status.connected,
+        expired: status.expired,
+        username: status.username,
+        lastRefreshed: Date.now()
+      });
+      
+      if (justConnected && status.connected && showToast) {
+        toast({
+          title: 'Spotify Connection Verified',
+          description: `You're successfully connected as ${status.username || 'a Spotify user'}.`,
         });
       }
-    };
 
+      if (showToast && !justConnected) {
+        if (status.connected) {
+          toast({
+            title: 'Connection Status Updated',
+            description: `You're connected to Spotify as ${status.username || 'a user'}.`,
+          });
+        } else {
+          toast({
+            description: 'Not connected to Spotify.',
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Spotify status:', error);
+      setSpotifyStatus(prev => ({
+        ...prev,
+        isLoading: false,
+        lastRefreshed: Date.now()
+      }));
+      
+      if (showToast) {
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch Spotify connection status.',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [authState.user, searchParams, toast]);
+
+  const handleRefreshStatus = () => {
+    fetchSpotifyStatus(true);
+  };
+
+  useEffect(() => {
     fetchSpotifyStatus();
     
     // Also refetch when location changes (to catch redirects from spotify-callback)
-  }, [authState.user, location.search, toast]);
+  }, [fetchSpotifyStatus, location.search]);
 
   const handleConnectSpotify = async () => {
     try {
@@ -113,6 +146,7 @@ const Settings = () => {
           connected: false,
           expired: false,
           username: null,
+          lastRefreshed: Date.now()
         });
         
         toast({
@@ -180,9 +214,22 @@ const Settings = () => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center">
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={handleRefreshStatus}
+                          disabled={isRefreshing}
+                          title="Refresh connection status"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        </Button>
+                        
                         {spotifyStatus.isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Checking...</span>
+                          </div>
                         ) : spotifyStatus.connected ? (
                           <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                             <Check className="h-4 w-4" />

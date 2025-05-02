@@ -1,14 +1,18 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotify';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 const SpotifyCallback = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -68,27 +72,19 @@ URL protocol: ${url.protocol}
         console.log("Spotify callback result:", result);
         
         if (result.success) {
+          setSuccess(true);
+          setUsername(result.display_name || null);
+          
           toast({
             title: 'Spotify Connected!',
             description: `Successfully connected as ${result.display_name || 'User'}.`,
           });
           
-          // Force reload of settings page after successful connection
-          if (window.opener && !window.opener.closed) {
-            try {
-              // Try to reload the opener window to refresh status
-              window.opener.location.reload();
-              window.opener.focus();
-              window.close();
-            } catch (e) {
-              console.error("Error interacting with opener:", e);
-              // If we can't access the opener, just navigate
-              setTimeout(() => navigate('/settings'), 1500);
-            }
-          } else {
-            // Otherwise navigate back to settings with reload flag
-            navigate('/settings?spotify_connected=true');
-          }
+          // Wait a moment for the database to update
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Always navigate back to settings with a refresh flag to ensure the status is refreshed
+          navigate('/settings?spotify_connected=true');
         } else {
           // Enhanced error handling
           const errorMessage = result.error || 'Failed to connect to Spotify.';
@@ -120,6 +116,10 @@ URL protocol: ${url.protocol}
     processCallback();
   }, [navigate, toast]);
 
+  const handleGoToSettings = () => {
+    navigate('/settings?spotify_connected=true');
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <Card className="p-8 w-full max-w-md text-center">
@@ -144,13 +144,38 @@ URL protocol: ${url.protocol}
             <p className="text-sm text-muted-foreground mt-4">
               Redirecting back to settings in a few seconds...
             </p>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={handleGoToSettings}
+            >
+              Go to Settings
+            </Button>
+          </div>
+        ) : success ? (
+          <div className="text-green-500">
+            <p>Successfully connected to Spotify{username ? ` as ${username}` : ''}!</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Redirecting to settings page...
+            </p>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={handleGoToSettings}
+            >
+              Go to Settings
+            </Button>
           </div>
         ) : (
-          <div className="text-green-500">
-            <p>Successfully connected to Spotify!</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              You can close this window or wait to be redirected...
-            </p>
+          <div className="text-amber-500">
+            <p>Processing complete but no status available.</p>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={handleGoToSettings}
+            >
+              Go to Settings
+            </Button>
           </div>
         )}
       </Card>
