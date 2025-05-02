@@ -121,6 +121,16 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      update_profile_spotify_data: {
+        Args: {
+          p_user_id: string
+          p_access_token: string
+          p_refresh_token: string
+          p_expires_at: string
+          p_username: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

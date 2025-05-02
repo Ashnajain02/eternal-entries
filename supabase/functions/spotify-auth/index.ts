@@ -1,4 +1,3 @@
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -82,8 +81,67 @@ serve(async (req) => {
       console.warn(`User ID mismatch: ${params.user_id} (param) vs ${user.id} (token)`);
     }
     
+    // Special endpoint to get tokens for a user (for verification purposes only)
+    if (action === "get_tokens_for_userid") {
+      try {
+        const userIdToCheck = params.user_id || user.id;
+        
+        if (userIdToCheck !== user.id && !user.app_metadata?.admin) {
+          return new Response(
+            JSON.stringify({ error: "Unauthorized access" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+          );
+        }
+        
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("spotify_access_token, spotify_refresh_token, spotify_token_expires_at")
+          .eq("id", userIdToCheck)
+          .maybeSingle();
+          
+        if (profileError) {
+          console.error("Error fetching tokens:", profileError);
+          return new Response(
+            JSON.stringify({ error: "Failed to fetch tokens", details: profileError.message }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+        
+        if (!profile || !profile.spotify_access_token) {
+          return new Response(
+            JSON.stringify({ error: "No tokens found" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
+          );
+        }
+        
+        // Calculate expires_in from expires_at
+        let expires_in = 3600; // Default 1 hour
+        if (profile.spotify_token_expires_at) {
+          const expiresAt = new Date(profile.spotify_token_expires_at);
+          const now = new Date();
+          expires_in = Math.floor((expiresAt.getTime() - now.getTime()) / 1000);
+          if (expires_in < 0) expires_in = 0;
+        }
+        
+        return new Response(
+          JSON.stringify({
+            access_token: profile.spotify_access_token,
+            refresh_token: profile.spotify_refresh_token,
+            expires_in
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      } catch (error) {
+        console.error("Error in get_tokens_for_userid:", error);
+        return new Response(
+          JSON.stringify({ error: "Internal server error", details: error.message }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+    }
+    
     // Authorize endpoint - provide proper Spotify authorization URL
-    if (action === "authorize") {
+    else if (action === "authorize") {
       const redirect_uri = params.redirect_uri;
       const scope = params.scope;
       const show_dialog = params.show_dialog === "true";
@@ -286,7 +344,38 @@ serve(async (req) => {
             spotify_username: profileData.display_name || profileData.id
           });
           
-          // Choose between update or insert based on our previous check
+          // Try using the dedicated RPC function first - more reliable
+          try {
+            console.log("Attempting to update via RPC function...");
+            const { data: rpcResult, error: rpcError } = await supabase.rpc(
+              "update_profile_spotify_data",
+              {
+                p_user_id: userId,
+                p_access_token: tokenData.access_token,
+                p_refresh_token: tokenData.refresh_token,
+                p_expires_at: expiresAt.toISOString(),
+                p_username: profileData.display_name || profileData.id
+              }
+            );
+            
+            if (rpcError) {
+              console.error("RPC function error:", rpcError);
+              // Continue to regular update as fallback
+            } else {
+              console.log("RPC function result:", rpcResult);
+              if (rpcResult) {
+                // RPC update successful, proceed to verification and return
+                // ... continue with verification and response
+              } else {
+                console.error("RPC update returned false, falling back to standard update");
+              }
+            }
+          } catch (rpcCallError) {
+            console.error("Error calling RPC function:", rpcCallError);
+            // Continue to regular update
+          }
+          
+          // Traditional update as fallback
           const { data: updateData, error: updateError } = await supabase
             .from("profiles")
             .update({
@@ -296,7 +385,7 @@ serve(async (req) => {
               spotify_username: profileData.display_name || profileData.id,
             })
             .eq("id", userId);
-          
+        
           if (updateError) {
             console.error("Error updating profile:", updateError);
             

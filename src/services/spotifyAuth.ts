@@ -140,6 +140,29 @@ export async function handleSpotifyCallback(code: string): Promise<{
       
       console.log('Successfully exchanged code for tokens, display name:', data.display_name);
       
+      // Verify the profile was updated correctly using RPC
+      try {
+        console.log('Verifying profile update using RPC...');
+        const { data: rpcResult, error: rpcError } = await supabase.rpc(
+          'update_profile_spotify_data',
+          {
+            p_user_id: userId,
+            p_access_token: data.access_token || '',
+            p_refresh_token: data.refresh_token || '',
+            p_expires_at: data.expires_at || new Date(Date.now() + 3600000).toISOString(),
+            p_username: data.display_name || 'Spotify User'
+          }
+        );
+        
+        if (rpcError) {
+          console.error('RPC update error:', rpcError);
+        } else {
+          console.log('RPC update succeeded:', rpcResult);
+        }
+      } catch (rpcError) {
+        console.error('Error calling RPC function:', rpcError);
+      }
+      
       // Double-check if the profile was updated correctly
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -188,7 +211,7 @@ export async function handleSpotifyCallback(code: string): Promise<{
         error_description: functionError.message 
       };
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling Spotify callback:', error);
     return { success: false, error: error.message || 'Unknown error occurred' };
   }

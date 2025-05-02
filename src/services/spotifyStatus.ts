@@ -47,9 +47,9 @@ export async function getSpotifyConnectionStatus(): Promise<{
           
           if (count === 0) {
             // Profile doesn't exist, need to create it
-            console.log('Profile does not exist, this could be why Spotify data is not being saved');
+            console.log('Profile does not exist, creating it now');
             
-            // Attempt to create a profile
+            // Create a new profile
             const { error: insertError } = await supabase
               .from('profiles')
               .insert({ id: userId });
@@ -81,6 +81,33 @@ export async function getSpotifyConnectionStatus(): Promise<{
         };
       } else {
         console.log('No profile data returned despite successful query');
+      }
+      
+      // Try direct RPC function call to update_profile_spotify_data
+      console.log('Attempting to verify profile using RPC...');
+      
+      const { data: rpcVerifyData, error: rpcVerifyError } = await supabase
+        .from('profiles')
+        .select('spotify_username, spotify_access_token')
+        .eq('id', userId)
+        .maybeSingle();
+        
+      if (rpcVerifyError) {
+        console.error('RPC verification check failed:', rpcVerifyError);
+      } else if (rpcVerifyData) {
+        console.log('RPC profile check result:', {
+          hasUsername: !!rpcVerifyData.spotify_username,
+          hasToken: !!rpcVerifyData.spotify_access_token
+        });
+        
+        const isConnected = !!rpcVerifyData.spotify_username && !!rpcVerifyData.spotify_access_token;
+        if (isConnected) {
+          return {
+            connected: true,
+            expired: false, // We don't have expiry info here, assume not expired
+            username: rpcVerifyData.spotify_username
+          };
+        }
       }
     } catch (dbError) {
       console.warn('Error fetching Spotify info from database:', dbError);
