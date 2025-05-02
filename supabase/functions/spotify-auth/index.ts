@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -99,7 +100,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized", details: userError?.message }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
@@ -113,7 +114,8 @@ serve(async (req) => {
       console.log("Callback request params:", { 
         codePresent: !!code, 
         codeLength: code ? code.length : 0,
-        redirect_uri 
+        redirect_uri,
+        userId: user.id
       });
       
       if (!code) {
@@ -160,6 +162,12 @@ serve(async (req) => {
         );
       }
       
+      console.log("Token exchange successful. Got tokens:", {
+        access_token_present: !!tokenData.access_token,
+        refresh_token_present: !!tokenData.refresh_token,
+        expires_in: tokenData.expires_in
+      });
+      
       // Get the user's Spotify profile
       const profileResponse = await fetch("https://api.spotify.com/v1/me", {
         headers: {
@@ -168,6 +176,23 @@ serve(async (req) => {
       });
       
       const profileData = await profileResponse.json();
+      
+      if (profileData.error) {
+        console.error("Error fetching Spotify profile:", profileData.error);
+        return new Response(
+          JSON.stringify({ 
+            error: "Failed to fetch Spotify profile",
+            details: profileData.error
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        );
+      }
+      
+      console.log("Got Spotify profile:", {
+        id: profileData.id,
+        display_name: profileData.display_name,
+        email: profileData.email
+      });
       
       // Calculate token expiration
       const expiresAt = new Date();
@@ -187,10 +212,15 @@ serve(async (req) => {
       if (updateError) {
         console.error("Error updating profile:", updateError);
         return new Response(
-          JSON.stringify({ error: "Failed to save Spotify credentials" }),
+          JSON.stringify({ 
+            error: "Failed to save Spotify credentials", 
+            details: updateError.message
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
+      
+      console.log("Successfully updated user profile with Spotify credentials");
       
       return new Response(
         JSON.stringify({ 
@@ -210,7 +240,7 @@ serve(async (req) => {
       
       if (profileError || !profile.spotify_refresh_token) {
         return new Response(
-          JSON.stringify({ error: "No refresh token found" }),
+          JSON.stringify({ error: "No refresh token found", details: profileError?.message }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }
@@ -381,21 +411,30 @@ serve(async (req) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     } else if (path === "status") {
+      console.log("Checking Spotify status for user:", user.id);
+      
       // Get the user's Spotify connection status
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("spotify_username, spotify_token_expires_at")
+        .select("spotify_username, spotify_token_expires_at, spotify_access_token")
         .eq("id", user.id)
         .single();
       
       if (profileError) {
+        console.error("Error getting profile:", profileError);
         return new Response(
-          JSON.stringify({ error: "Failed to get profile" }),
+          JSON.stringify({ error: "Failed to get profile", details: profileError.message }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
         );
       }
       
-      const isConnected = !!profile.spotify_username;
+      console.log("Retrieved profile data:", {
+        has_username: !!profile.spotify_username,
+        has_token: !!profile.spotify_access_token,
+        expires_at: profile.spotify_token_expires_at
+      });
+      
+      const isConnected = !!profile.spotify_username && !!profile.spotify_access_token;
       const isExpired = !profile.spotify_token_expires_at || new Date(profile.spotify_token_expires_at) < new Date();
       
       return new Response(

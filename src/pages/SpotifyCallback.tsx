@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleSpotifyCallback } from '@/services/spotifyAuth';
 import { Card } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Check, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 
@@ -13,10 +13,15 @@ const SpotifyCallback = () => {
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [processingStarted, setProcessingStarted] = useState<boolean>(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
+    // Only run once - important to prevent multiple token exchanges
+    if (processingStarted) return;
+    setProcessingStarted(true);
+
     const processCallback = async () => {
       try {
         // Get the full URL, decode any percent-encoded characters
@@ -71,8 +76,23 @@ Code length: ${code ? code.length : 0}
         console.log("Attempting to exchange code for tokens...");
         console.log("Code starts with:", code.substring(0, 10) + "...");
         
-        const result = await handleSpotifyCallback(code);
-        console.log("Spotify callback result:", result);
+        // Make multiple attempts to exchange the code for tokens
+        let attempts = 0;
+        let result = null;
+        
+        while (attempts < 3 && !result?.success) {
+          console.log(`Token exchange attempt ${attempts + 1}...`);
+          
+          result = await handleSpotifyCallback(code);
+          console.log(`Attempt ${attempts + 1} result:`, result);
+          
+          if (!result.success && attempts < 2) {
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          attempts++;
+        }
         
         if (result.success) {
           setSuccess(true);
@@ -84,7 +104,7 @@ Code length: ${code ? code.length : 0}
           });
           
           // Wait a moment for the database to update (longer wait)
-          await new Promise(resolve => setTimeout(resolve, 2500));
+          await new Promise(resolve => setTimeout(resolve, 3000));
           
           // Use hard navigation with cache-busting timestamp to ensure full page reload
           const timestamp = new Date().getTime();
@@ -118,7 +138,7 @@ Code length: ${code ? code.length : 0}
     };
 
     processCallback();
-  }, [navigate, toast]);
+  }, [navigate, toast, processingStarted]);
 
   const handleGoToSettings = () => {
     // Force a hard refresh to ensure all state is updated properly
@@ -137,7 +157,11 @@ Code length: ${code ? code.length : 0}
           </div>
         ) : error ? (
           <div>
-            <p className="text-destructive mb-4">{error}</p>
+            <div className="flex items-center justify-center mb-4 text-destructive">
+              <AlertTriangle className="h-8 w-8 mr-2" />
+              <p className="text-lg font-medium">{error}</p>
+            </div>
+            
             {debugInfo && (
               <div className="mt-4 p-3 bg-muted rounded-md text-left">
                 <p className="text-sm font-medium mb-1">Debug Information:</p>
@@ -158,8 +182,9 @@ Code length: ${code ? code.length : 0}
             </Button>
           </div>
         ) : success ? (
-          <div className="text-green-500">
-            <p>Successfully connected to Spotify{username ? ` as ${username}` : ''}!</p>
+          <div className="text-green-500 flex flex-col items-center">
+            <Check className="h-12 w-12 mb-2" />
+            <p className="text-lg">Successfully connected to Spotify{username ? ` as ${username}` : ''}!</p>
             <p className="text-sm text-muted-foreground mt-2">
               Redirecting to settings page...
             </p>
