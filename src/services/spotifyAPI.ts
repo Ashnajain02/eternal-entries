@@ -14,12 +14,12 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     console.log("Searching for tracks with query:", query);
     console.log("Using user ID:", sessionData.session.user.id);
     
-    // Search Spotify via our edge function
+    // Search Spotify via our edge function - FIXED PARAMETER NAME
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: {
         action: 'search',
-        q: query,
-        user_id: sessionData.session.user.id // Add user_id to the request body
+        q: query, // Using the parameter name 'q' to match what the function expects
+        user_id: sessionData.session.user.id
       }
     });
 

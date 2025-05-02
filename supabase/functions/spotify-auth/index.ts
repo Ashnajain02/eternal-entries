@@ -156,7 +156,7 @@ serve(async (req) => {
           .from("profiles")
           .select("spotify_access_token, spotify_token_expires_at")
           .eq("id", userId)
-          .single();
+          .maybeSingle(); // Using maybeSingle instead of single to avoid errors when no record is found
         
         if (profileError) {
           console.error("Error fetching Spotify access token:", profileError);
@@ -171,10 +171,11 @@ serve(async (req) => {
         
         console.log("Spotify profile data:", {
           hasToken: !!profile?.spotify_access_token,
-          expiresAt: profile?.spotify_token_expires_at
+          expiresAt: profile?.spotify_token_expires_at,
+          tokenPrefix: profile?.spotify_access_token ? profile.spotify_access_token.substring(0, 10) + '...' : 'null'
         });
         
-        if (!profile?.spotify_access_token) {
+        if (!profile || !profile.spotify_access_token) {
           return new Response(
             JSON.stringify({ error: "No Spotify access token found" }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
@@ -194,80 +195,92 @@ serve(async (req) => {
         
         // Search for tracks using the Spotify API
         console.log(`Calling Spotify API with query: ${query}`);
-        const searchResponse = await fetch(
-          `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
-          {
-            headers: {
-              "Authorization": `Bearer ${profile.spotify_access_token}`,
-            },
-          }
-        );
-        
-        console.log("Spotify API response status:", searchResponse.status);
-        
-        if (!searchResponse.ok) {
-          let errorText = "";
-          try {
-            errorText = await searchResponse.text();
-            console.error("Spotify search error response:", errorText);
-          } catch (e) {
-            console.error("Could not read error response:", e);
-          }
+        try {
+          const searchResponse = await fetch(
+            `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
+            {
+              headers: {
+                "Authorization": `Bearer ${profile.spotify_access_token}`,
+              },
+            }
+          );
           
-          // Check if the error is due to token expiration
-          if (searchResponse.status === 401) {
+          console.log("Spotify API response status:", searchResponse.status);
+          
+          if (!searchResponse.ok) {
+            let errorText = "";
+            try {
+              errorText = await searchResponse.text();
+              console.error("Spotify search error response:", errorText);
+            } catch (e) {
+              console.error("Could not read error response:", e);
+            }
+            
+            // Check if the error is due to token expiration
+            if (searchResponse.status === 401) {
+              return new Response(
+                JSON.stringify({ 
+                  error: "Spotify token expired or invalid", 
+                  error_description: "Please reconnect your Spotify account",
+                  details: errorText 
+                }),
+                { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+              );
+            }
+            
             return new Response(
               JSON.stringify({ 
-                error: "Spotify token expired or invalid", 
-                error_description: "Please reconnect your Spotify account",
-                details: errorText 
+                error: "Spotify search failed", 
+                details: `Status: ${searchResponse.status}`,
+                response: errorText 
               }),
-              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchResponse.status }
             );
           }
           
+          // Parse the search results
+          let searchData;
+          try {
+            searchData = await searchResponse.json();
+            console.log("Spotify search response parsed successfully");
+          } catch (parseError) {
+            console.error("Error parsing Spotify API response:", parseError);
+            return new Response(
+              JSON.stringify({
+                error: "Failed to parse Spotify API response",
+                details: parseError.message
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+            );
+          }
+          
+          console.log(`Spotify search results: ${searchData.tracks?.items?.length || 0} tracks found`);
+          
+          // Format the search results
+          const tracks = searchData.tracks.items.map(track => ({
+            id: track.id,
+            name: track.name,
+            artist: track.artists.map(artist => artist.name).join(", "),
+            album: track.album.name,
+            albumArt: track.album.images[0]?.url || "",
+            duration: track.duration_ms,
+            spotifyUri: track.uri
+          }));
+          
           return new Response(
-            JSON.stringify({ 
-              error: "Spotify search failed", 
-              details: `Status: ${searchResponse.status}`,
-              response: errorText 
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: searchResponse.status }
+            JSON.stringify({ tracks }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
           );
-        }
-        
-        // Parse the search results
-        let searchData;
-        try {
-          searchData = await searchResponse.json();
-        } catch (parseError) {
-          console.error("Error parsing Spotify API response:", parseError);
+        } catch (spotifyApiError) {
+          console.error("Error calling Spotify API:", spotifyApiError);
           return new Response(
             JSON.stringify({
-              error: "Failed to parse Spotify API response",
-              details: parseError.message
+              error: "Error calling Spotify API",
+              details: spotifyApiError.message
             }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
           );
         }
-        
-        console.log(`Spotify search results: ${searchData.tracks?.items?.length || 0} tracks found`);
-        
-        // Format the search results
-        const tracks = searchData.tracks.items.map(track => ({
-          id: track.id,
-          name: track.name,
-          artist: track.artists.map(artist => artist.name).join(", "),
-          album: track.album.name,
-          albumArt: track.album.images[0]?.url || "",
-          duration: track.duration_ms,
-          spotifyUri: track.uri
-        }));
-        
-        return new Response(
-          JSON.stringify({ tracks }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-        );
       } catch (searchError) {
         console.error("Error searching tracks:", searchError);
         return new Response(
