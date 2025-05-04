@@ -9,12 +9,8 @@ export async function handleSearch(supabase, params, userId) {
     
     // Handle both query parameters and JSON body formats
     // Extract parameters from either the params object itself or from params.body
-    const body = params?.body || params;
-    
-    // Extract query and userId from body
-    const query = body.q;
-    // Use userId passed from index.ts if available, otherwise use from body
-    const userIdFromBody = body.user_id;
+    const query = params.q;
+    const userIdFromBody = params.user_id;
     const effectiveUserId = userId || userIdFromBody;
     
     console.log("Extracted params:", {
