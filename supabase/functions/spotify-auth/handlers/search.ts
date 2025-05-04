@@ -7,7 +7,22 @@ export async function handleSearch(supabase, params, userId) {
   try {
     console.log("Handling search request with params:", params);
     
-    const query = params.q;
+    // Handle both query parameters and JSON body formats
+    // Extract parameters from either the params object itself or from params.body
+    const body = params?.body || params;
+    
+    // Extract query and userId from body
+    const query = body.q;
+    // Use userId passed from index.ts if available, otherwise use from body
+    const userIdFromBody = body.user_id;
+    const effectiveUserId = userId || userIdFromBody;
+    
+    console.log("Extracted params:", {
+      query,
+      userIdFromParams: userId,
+      userIdFromBody,
+      effectiveUserId
+    });
     
     if (!query) {
       console.error("Missing search query parameter");
@@ -19,7 +34,7 @@ export async function handleSearch(supabase, params, userId) {
     }
     
     // If userId is not provided, return error
-    if (!userId) {
+    if (!effectiveUserId) {
       console.error("No user ID found for search action");
       return createErrorResponse(
         400, 
@@ -28,13 +43,13 @@ export async function handleSearch(supabase, params, userId) {
       );
     }
     
-    console.log(`Performing Spotify search for user ${userId} with query "${query}"`);
+    console.log(`Performing Spotify search for user ${effectiveUserId} with query "${query}"`);
     
     // Get the user's access token
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("spotify_access_token, spotify_token_expires_at")
-      .eq("id", userId)
+      .eq("id", effectiveUserId)
       .maybeSingle();
     
     if (profileError) {
