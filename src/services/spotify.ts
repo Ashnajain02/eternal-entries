@@ -1,5 +1,5 @@
 
-// Re-export all Spotify-related services from this central file
-export * from './spotifyAuth';
-export * from './spotifyAPI';
-export * from './spotifyStatus';
+// This file is kept as an empty export to avoid import errors in case there are any remaining references
+export const getSpotifyConnectionStatus = async () => {
+  return { connected: false, expired: false, username: null };
+};
