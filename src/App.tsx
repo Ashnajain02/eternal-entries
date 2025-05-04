@@ -11,7 +11,6 @@ import Archive from "./pages/Archive";
 import Stats from "./pages/Stats";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
-import SpotifyCallback from "./pages/SpotifyCallback";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -59,7 +58,6 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
-              <Route path="/spotify-callback" element={<SpotifyCallback />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

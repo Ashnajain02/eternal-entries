@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, SpotifyTrack, WeatherData, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -28,7 +27,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [content, setContent] = useState(initialEntry?.content || '');
   const [selectedMood, setSelectedMood] = useState<Mood>(initialEntry?.mood || 'neutral');
   const [weatherData, setWeatherData] = useState<WeatherData | null>(initialEntry?.weather || null);
-  const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | undefined>(initialEntry?.track);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -149,7 +147,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         content,
         mood: selectedMood,
         weather: weatherData || undefined,
-        track: selectedTrack,
+        track: undefined, // Remove Spotify track reference
       };
 
       if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
@@ -199,13 +197,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       
       <div className="mb-6">
         <MoodSelector selectedMood={selectedMood} onChange={setSelectedMood} />
-      </div>
-      
-      <div className="mb-6">
-        <SpotifySearch 
-          onSelect={setSelectedTrack} 
-          selectedTrack={selectedTrack} 
-        />
       </div>
       
       <div className="mb-6">
