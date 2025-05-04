@@ -11,6 +11,16 @@ import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
 import { Pencil, Trash, Play, Music } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -27,6 +37,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const { deleteEntry } = useJournal();
   const { toast } = useToast();
   const [isSpotifyExpanded, setIsSpotifyExpanded] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   const formattedDate = format(new Date(entry.date), 'EEEE, MMMM d, yyyy');
   const formattedTime = entry.timestamp 
@@ -34,12 +45,17 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     : '';
   
   const handleDelete = () => {
-    // In a real app, we would show a confirmation dialog
-    deleteEntry(entry.id);
+    // Now we just open the confirmation dialog
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    await deleteEntry(entry.id);
     toast({
       title: "Entry deleted",
       description: "Your journal entry has been permanently deleted."
     });
+    setIsDeleteDialogOpen(false);
   };
 
   const openSpotify = () => {
@@ -163,6 +179,23 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           </Button>
         </div>
       )}
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your journal entry.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
