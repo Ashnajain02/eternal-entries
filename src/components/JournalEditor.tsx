@@ -9,7 +9,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import MoodSelector from './MoodSelector';
 import WeatherDisplay from './WeatherDisplay';
-import SpotifySearch from './SpotifySearch';
 import { fetchWeatherData } from '@/services/api';
 import { format } from 'date-fns';
 
