@@ -120,7 +120,7 @@
   }
   
   .journal-input {
-    @apply min-h-[200px] w-full resize-none bg-transparent focus:outline-none focus:ring-0 border-0 p-4 text-lg;
+    @apply w-full resize-none bg-transparent focus:outline-none focus:ring-0 border-0 p-4 text-lg;
   }
   
   .mood-emoji {
@@ -145,5 +145,9 @@
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
+  }
+  
+  .transition-height {
+    transition: height 0.2s ease-out;
   }
 }
