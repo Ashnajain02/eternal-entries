@@ -1,7 +1,7 @@
 
 import { corsHeaders } from "../utils/corsHeaders.ts";
 import { createErrorResponse, createSuccessResponse } from "../utils/responseHelpers.ts";
-import { formatSpotifyTracks, formatAuthHeader } from "../utils/spotifyHelpers.ts";
+import { formatSpotifyTracks, formatAuthHeader, analyzeSpotifyError } from "../utils/spotifyHelpers.ts";
 
 export async function handleSearch(supabase, params, userId) {
   try {
@@ -71,37 +71,53 @@ export async function handleSearch(supabase, params, userId) {
     try {
       const spotifyToken = profile.spotify_access_token;
       
-      // Log the token format to check if it has Bearer prefix already
-      console.log("Token format check:", {
-        startsWithBearer: spotifyToken.startsWith("Bearer "),
-        firstFewChars: spotifyToken.substring(0, 10) + "...",
-        length: spotifyToken.length
-      });
-      
       // Ensure proper authorization header format
       const authorizationHeader = formatAuthHeader(spotifyToken);
         
       console.log("Using authorization header:", authorizationHeader.substring(0, 20) + "...");
+      
+      // Log the complete request details for debugging
+      console.log("Spotify API request:", {
+        url: `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
+        authHeaderLength: authorizationHeader.length,
+        authHeaderStart: authorizationHeader.substring(0, 15) + "..."
+      });
       
       const searchResponse = await fetch(
         `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10`,
         {
           headers: {
             "Authorization": authorizationHeader,
+            "Content-Type": "application/json"
           },
         }
       );
       
       console.log("Spotify API response status:", searchResponse.status);
       
+      // Get the response body as text first for complete logging
+      let responseText;
+      try {
+        responseText = await searchResponse.text();
+        console.log("Response body (first 300 chars):", responseText.substring(0, 300) + "...");
+      } catch (textError) {
+        console.error("Error reading response text:", textError);
+      }
+      
       if (!searchResponse.ok) {
-        let errorText = "";
+        // Try to parse the error response for better analysis
+        let errorData = null;
         try {
-          errorText = await searchResponse.text();
-          console.error("Spotify search error response:", errorText);
+          if (responseText) {
+            errorData = JSON.parse(responseText);
+          }
         } catch (e) {
-          console.error("Could not read error response:", e);
+          console.error("Failed to parse error response:", e);
         }
+        
+        // Use the enhanced error analyzer
+        const errorDetails = analyzeSpotifyError(searchResponse, errorData);
+        console.error("Spotify API error details:", errorDetails);
         
         // Check if the error is due to token expiration
         if (searchResponse.status === 401) {
@@ -115,23 +131,36 @@ export async function handleSearch(supabase, params, userId) {
         return createErrorResponse(
           searchResponse.status, 
           "Spotify search failed", 
-          `Status: ${searchResponse.status}, Response: ${errorText}`
+          errorDetails
         );
       }
       
       // Parse the search results
       let searchData;
       try {
-        searchData = await searchResponse.json();
+        searchData = responseText ? JSON.parse(responseText) : null;
         console.log("Spotify search response parsed successfully");
+        console.log(`Tracks data structure exists: ${!!searchData?.tracks}`);
+        console.log(`Items array exists: ${!!searchData?.tracks?.items}`);
+        console.log(`Items count: ${searchData?.tracks?.items?.length || 0}`);
       } catch (parseError) {
         console.error("Error parsing Spotify API response:", parseError);
         return createErrorResponse(500, "Failed to parse Spotify API response", parseError.message);
       }
       
+      // Check if we have a valid tracks structure
+      if (!searchData?.tracks?.items) {
+        console.error("Invalid or missing tracks data structure:", searchData);
+        return createErrorResponse(
+          500,
+          "Invalid Spotify API response format",
+          "The API response did not contain the expected data structure"
+        );
+      }
+      
       console.log(`Spotify search results: ${searchData.tracks?.items?.length || 0} tracks found`);
       
-      // Format the search results
+      // Format the search results with our enhanced formatter
       const tracks = formatSpotifyTracks(searchData.tracks.items);
       
       return createSuccessResponse({ tracks });

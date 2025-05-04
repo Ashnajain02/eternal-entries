@@ -36,6 +36,12 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
     // Detailed logging of the response
     if (data) {
       console.log("Spotify search successful, tracks returned:", data?.tracks?.length || 0);
+      if (data.tracks && data.tracks.length === 0) {
+        console.log("Empty search results returned. This could be due to:");
+        console.log("- Query too short or too generic");
+        console.log("- Token missing required scopes");
+        console.log("- No matching tracks found");
+      }
     }
     
     if (error) {
@@ -49,9 +55,13 @@ export async function searchSpotifyTracks(query: string): Promise<SpotifyTrack[]
         stack: error.stack
       });
       
-      // Special handling for token expired errors
+      // Special handling for specific error types
       if (error.message && (error.message.includes("expired") || error.message.includes("token"))) {
         throw new Error("Spotify session expired, please reconnect your account");
+      }
+      
+      if (error.message && error.message.includes("scope")) {
+        throw new Error("Insufficient scopes for Spotify search, please reconnect your account with the required permissions");
       }
       
       throw new Error(error.message || 'Failed to search Spotify');

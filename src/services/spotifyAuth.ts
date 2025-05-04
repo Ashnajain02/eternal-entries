@@ -8,11 +8,14 @@ export async function openSpotifyAuthWindow(): Promise<void> {
       throw new Error('No active session');
     }
 
-    // Required scopes for Spotify API
+    // Enhanced scopes for Spotify API - adding more permissions for better search functionality
     const scopes = [
       'user-read-private',
       'user-read-email',
-      'user-top-read'
+      'user-top-read',
+      'user-read-playback-state',
+      'user-library-read',
+      'streaming'
     ];
     
     // IMPORTANT: Use the EXACT format that was registered in the Spotify Developer Dashboard
@@ -20,6 +23,7 @@ export async function openSpotifyAuthWindow(): Promise<void> {
     
     console.log('Opening Spotify auth with redirect URI:', redirectUri);
     console.log('Using access token with length:', sessionData.session.access_token.length);
+    console.log('Requesting scopes:', scopes.join(', '));
     
     // Add timestamp to prevent caching
     const timestamp = new Date().getTime();
