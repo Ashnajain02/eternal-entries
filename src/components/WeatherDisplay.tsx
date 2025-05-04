@@ -34,18 +34,18 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
   const { authState } = useAuth();
 
   // Get user's temperature unit preference
-  const { data: userPreference } = useQuery({
+  const { data: userProfile } = useQuery({
     queryKey: ['temperature-settings', authState.user?.id],
     queryFn: async () => {
       if (!authState.user) return { temperature_unit: 'fahrenheit' };
       
       const { data, error } = await supabase
-        .from('user_preferences')
+        .from('profiles')
         .select('temperature_unit')
-        .eq('user_id', authState.user.id)
+        .eq('id', authState.user.id)
         .single();
       
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error fetching temperature preferences:', error);
       }
       
@@ -76,7 +76,7 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
 
   // Convert temperature based on user preference
   const formatTemperature = (celsius: number): string => {
-    if (userPreference?.temperature_unit === 'celsius') {
+    if (userProfile?.temperature_unit === 'celsius') {
       return `${celsius.toFixed(0)}°C`;
     } else {
       // Convert to Fahrenheit

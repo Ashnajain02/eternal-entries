@@ -77,6 +77,7 @@ export type Database = {
           spotify_refresh_token: string | null
           spotify_token_expires_at: string | null
           spotify_username: string | null
+          temperature_unit: string | null
           updated_at: string
           username: string | null
         }
@@ -90,6 +91,7 @@ export type Database = {
           spotify_refresh_token?: string | null
           spotify_token_expires_at?: string | null
           spotify_username?: string | null
+          temperature_unit?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -103,6 +105,7 @@ export type Database = {
           spotify_refresh_token?: string | null
           spotify_token_expires_at?: string | null
           spotify_username?: string | null
+          temperature_unit?: string | null
           updated_at?: string
           username?: string | null
         }

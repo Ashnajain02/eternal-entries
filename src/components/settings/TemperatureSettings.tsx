@@ -19,13 +19,14 @@ export const TemperatureSettings: React.FC = () => {
       if (!authState.user) return { temperature_unit: 'fahrenheit' as TemperatureUnit };
       
       const { data, error } = await supabase
-        .from('user_preferences')
+        .from('profiles')
         .select('temperature_unit')
-        .eq('user_id', authState.user.id)
+        .eq('id', authState.user.id)
         .single();
       
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-        throw error;
+      if (error) {
+        console.error('Error fetching temperature preferences:', error);
+        return { temperature_unit: 'fahrenheit' as TemperatureUnit };
       }
       
       return data || { temperature_unit: 'fahrenheit' as TemperatureUnit };
@@ -36,31 +37,12 @@ export const TemperatureSettings: React.FC = () => {
     mutationFn: async (newUnit: TemperatureUnit) => {
       if (!authState.user) throw new Error('Not authenticated');
       
-      const { data: existingPrefs } = await supabase
-        .from('user_preferences')
-        .select('id')
-        .eq('user_id', authState.user.id)
-        .single();
+      const { error } = await supabase
+        .from('profiles')
+        .update({ temperature_unit: newUnit })
+        .eq('id', authState.user.id);
       
-      if (existingPrefs) {
-        // Update existing preferences
-        const { error } = await supabase
-          .from('user_preferences')
-          .update({ temperature_unit: newUnit })
-          .eq('user_id', authState.user.id);
-        
-        if (error) throw error;
-      } else {
-        // Insert new preferences
-        const { error } = await supabase
-          .from('user_preferences')
-          .insert({
-            user_id: authState.user.id,
-            temperature_unit: newUnit
-          });
-        
-        if (error) throw error;
-      }
+      if (error) throw error;
     },
     onSuccess: () => {
       refetch();
