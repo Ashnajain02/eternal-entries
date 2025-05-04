@@ -59,13 +59,15 @@ const getLocationNameFromCoordinates = async (lat: number, lon: number): Promise
     // For demo purposes, we'll provide more realistic city names based on approximate coordinate ranges
     
     // These are very simplified and just for demonstration
+    // New York City approximate coordinates
+    if (lat > 40 && lat < 41 && lon > -74.5 && lon < -73.5) {
+      return "New York City, NY";
+    }
     // United States approximate regions
-    if (lat > 35 && lat < 42 && lon > -124 && lon < -115) {
+    else if (lat > 35 && lat < 42 && lon > -124 && lon < -115) {
       return "San Francisco, CA";
     } else if (lat > 33 && lat < 35 && lon > -119 && lon < -116) {
       return "Los Angeles, CA";
-    } else if (lat > 40 && lat < 42 && lon > -75 && lon < -72) {
-      return "New York, NY";
     } else if (lat > 36 && lat < 39 && lon > -123 && lon < -120) {
       return "San Jose, CA";
     } else if (lat > 29 && lat < 31 && lon > -98 && lon < -95) {

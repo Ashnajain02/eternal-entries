@@ -393,9 +393,10 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     );
   };
   
-  // Create a new empty entry
+  // Create a new empty entry using the user's local timezone
   const createNewEntry = (date?: string) => {
     const now = new Date();
+    // Use the ISO date string in local timezone, not UTC
     const formattedDate = date || now.toISOString().split('T')[0];
     
     const newEntry: JournalEntry = {

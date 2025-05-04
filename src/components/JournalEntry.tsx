@@ -39,7 +39,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [isSpotifyExpanded, setIsSpotifyExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  const formattedDate = format(new Date(entry.date), 'EEEE, MMMM d, yyyy');
+  // Ensure we use the local timezone for date display
+  const entryDate = new Date(entry.date);
+  const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
+  
   const formattedTime = entry.timestamp 
     ? format(new Date(entry.timestamp), 'h:mm a')
     : '';

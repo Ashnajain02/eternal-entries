@@ -20,6 +20,7 @@ const Index = () => {
   
   // Check for entries made today and on this day in previous years
   useEffect(() => {
+    // Get today's date in user's local timezone
     const today = new Date().toISOString().split('T')[0];
     
     // Find today's entries

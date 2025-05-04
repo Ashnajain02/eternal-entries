@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, SpotifyTrack, WeatherData, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -174,6 +175,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     }
   };
   
+  // Use the current date in the user's local timezone
   const formattedDate = format(new Date(entry.date), 'EEEE, MMMM d, yyyy');
 
   return (
