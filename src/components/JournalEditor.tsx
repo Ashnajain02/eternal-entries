@@ -34,6 +34,16 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [locationRequested, setLocationRequested] = useState(false);
   const [locationAttempts, setLocationAttempts] = useState(0);
 
+  // Default coordinates for different regions - used as fallbacks
+  const defaultCoordinates = {
+    // Manhattan, New York City
+    nyc: { lat: 40.7831, lon: -73.9712 },
+    // San Francisco
+    sf: { lat: 37.7749, lon: -122.4194 },
+    // Chicago
+    chicago: { lat: 41.8781, lon: -87.6298 }
+  };
+
   // Get current weather on first load if not already present
   useEffect(() => {
     if (!weatherData && !isLoadingWeather && !locationRequested) {
@@ -50,7 +60,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       // Check if we've tried multiple times and should fall back immediately
       if (locationAttempts >= 2) {
         console.log("Using fallback location after multiple failed attempts");
-        const data = await fetchWeatherData(37.7749, -122.4194); // San Francisco fallback
+        // Use NYC as primary fallback for better east coast coverage
+        const data = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
         setWeatherData(data);
         setIsLoadingWeather(false);
         return;
@@ -60,8 +71,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       if (!navigator.geolocation) {
         console.log("Geolocation not supported by browser");
         setLocationError("Geolocation is not supported by your browser");
-        // Fall back to default coordinates
-        const data = await fetchWeatherData(37.7749, -122.4194); // San Francisco coordinates as fallback
+        // Fall back to NYC coordinates as fallback
+        const data = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
         setWeatherData(data);
         return;
       }
@@ -116,16 +127,16 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         } catch (error) {
           console.error('Error fetching weather data:', error);
           setLocationError("Could not retrieve weather for your location");
-          // Fall back to default coordinates
-          const fallbackData = await fetchWeatherData(37.7749, -122.4194);
+          // Fall back to NYC coordinates
+          const fallbackData = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
           setWeatherData(fallbackData);
         }
       } catch (error: any) {
         console.error('Geolocation promise error:', error);
         setLocationError(error.message || "Could not access your location");
         
-        // Fall back to default coordinates
-        const data = await fetchWeatherData(37.7749, -122.4194);
+        // Fall back to NYC coordinates
+        const data = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
         setWeatherData(data);
         
         // Increment attempts counter
@@ -137,7 +148,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       
       // Final fallback
       try {
-        const data = await fetchWeatherData(37.7749, -122.4194);
+        const data = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
         setWeatherData(data);
       } catch (e) {
         console.error('Even fallback failed:', e);
