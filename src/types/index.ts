@@ -7,6 +7,8 @@ export interface MoodOption {
   emoji: string;
 }
 
+export type TemperatureUnit = 'celsius' | 'fahrenheit';
+
 export interface WeatherData {
   temperature: number;
   description: string;

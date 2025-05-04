@@ -14,6 +14,9 @@ import {
   MapPin
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WeatherDisplayProps {
   weatherData: WeatherData | null;
@@ -28,6 +31,30 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
   className, 
   onRefresh
 }) => {
+  const { authState } = useAuth();
+
+  // Get user's temperature unit preference
+  const { data: userPreference } = useQuery({
+    queryKey: ['temperature-settings', authState.user?.id],
+    queryFn: async () => {
+      if (!authState.user) return { temperature_unit: 'fahrenheit' };
+      
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('temperature_unit')
+        .eq('user_id', authState.user.id)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching temperature preferences:', error);
+      }
+      
+      return data || { temperature_unit: 'fahrenheit' };
+    },
+    // Default to fahrenheit if we can't fetch the preference
+    initialData: { temperature_unit: 'fahrenheit' }
+  });
+
   const getWeatherIcon = (iconName: string) => {
     switch (iconName) {
       case 'cloud-sun':
@@ -44,6 +71,17 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
         return <CloudMoonRain className="weather-icon" />;
       default:
         return <Cloud className="weather-icon" />;
+    }
+  };
+
+  // Convert temperature based on user preference
+  const formatTemperature = (celsius: number): string => {
+    if (userPreference?.temperature_unit === 'celsius') {
+      return `${celsius.toFixed(0)}°C`;
+    } else {
+      // Convert to Fahrenheit
+      const fahrenheit = (celsius * 9/5) + 32;
+      return `${fahrenheit.toFixed(0)}°F`;
     }
   };
 
@@ -81,7 +119,7 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
         {getWeatherIcon(weatherData.icon)}
         <div className="space-y-0">
           <p className="text-sm font-medium leading-none">
-            {weatherData.temperature}°C in {weatherData.location}
+            {formatTemperature(weatherData.temperature)} in {weatherData.location}
           </p>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
             <MapPin className="h-3 w-3" />

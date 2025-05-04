@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
 import { IntegrationsSettings } from '@/components/settings/IntegrationsSettings';
 import { AccountSettings } from '@/components/settings/AccountSettings';
+import { TemperatureSettings } from '@/components/settings/TemperatureSettings';
 
 const Settings = () => {
   const { authState } = useAuth();
@@ -29,6 +30,7 @@ const Settings = () => {
           <TabsList className="mb-6">
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
+            <TabsTrigger value="display">Display</TabsTrigger>
           </TabsList>
           
           <TabsContent value="integrations">
@@ -37,6 +39,12 @@ const Settings = () => {
           
           <TabsContent value="account">
             <AccountSettings user={authState.user} />
+          </TabsContent>
+          
+          <TabsContent value="display">
+            <div className="space-y-6">
+              <TemperatureSettings />
+            </div>
           </TabsContent>
         </Tabs>
       </div>
