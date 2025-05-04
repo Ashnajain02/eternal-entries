@@ -1,4 +1,3 @@
-
 import { SpotifyTrack, WeatherData } from "@/types";
 
 // Fetch weather data using actual coordinates
@@ -54,9 +53,6 @@ export const fetchWeatherData = async (lat: number, lon: number): Promise<Weathe
 const getLocationNameFromCoordinates = async (lat: number, lon: number): Promise<string> => {
   try {
     // In a production app, you would use a reverse geocoding API
-    // For example: const response = await fetch(`https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=YOUR_API_KEY`);
-    
-    // For demo purposes, we'll provide more realistic city names based on approximate coordinate ranges
     
     // These are very simplified and just for demonstration
     // New York City approximate coordinates

@@ -32,6 +32,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationRequested, setLocationRequested] = useState(false);
+  const [locationAttempts, setLocationAttempts] = useState(0);
 
   // Get current weather on first load if not already present
   useEffect(() => {
@@ -46,8 +47,18 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     setLocationRequested(true);
     
     try {
+      // Check if we've tried multiple times and should fall back immediately
+      if (locationAttempts >= 2) {
+        console.log("Using fallback location after multiple failed attempts");
+        const data = await fetchWeatherData(37.7749, -122.4194); // San Francisco fallback
+        setWeatherData(data);
+        setIsLoadingWeather(false);
+        return;
+      }
+      
       // Use the browser's geolocation API to get the user's coordinates
       if (!navigator.geolocation) {
+        console.log("Geolocation not supported by browser");
         setLocationError("Geolocation is not supported by your browser");
         // Fall back to default coordinates
         const data = await fetchWeatherData(37.7749, -122.4194); // San Francisco coordinates as fallback
@@ -57,6 +68,9 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       
       // Request location from user with a timeout
       const positionPromise = new Promise<GeolocationPosition>((resolve, reject) => {
+        // Set a shorter timeout to improve user experience
+        const timeoutDuration = 5000; // 5 seconds
+        
         navigator.geolocation.getCurrentPosition(
           // Success callback
           (position) => {
@@ -85,9 +99,9 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           },
           // Options
           {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0
+            enableHighAccuracy: false, // Set to false to prioritize speed over accuracy
+            timeout: timeoutDuration,
+            maximumAge: 60000 // Accept positions up to 1 minute old
           }
         );
       });
@@ -113,6 +127,9 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         // Fall back to default coordinates
         const data = await fetchWeatherData(37.7749, -122.4194);
         setWeatherData(data);
+        
+        // Increment attempts counter
+        setLocationAttempts(prev => prev + 1);
       }
     } catch (error) {
       console.error('Error getting weather:', error);
@@ -125,6 +142,9 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       } catch (e) {
         console.error('Even fallback failed:', e);
       }
+      
+      // Increment attempts counter
+      setLocationAttempts(prev => prev + 1);
     } finally {
       setIsLoadingWeather(false);
     }
