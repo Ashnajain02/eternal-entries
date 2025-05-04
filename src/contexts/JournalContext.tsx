@@ -1,9 +1,9 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { JournalEntry, Mood, SpotifyTrack, WeatherData } from '@/types';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { encryptJournalEntry, decryptJournalEntry, encryptText, decryptText } from '@/utils/encryption';
 
 interface JournalContextType {
   entries: JournalEntry[];
@@ -66,31 +66,40 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
 
         if (error) throw error;
 
-        // Transform the data to match our client-side model
-        const transformedEntries: JournalEntry[] = data.map(entry => ({
-          id: entry.id,
-          content: entry.entry_text,
-          date: new Date(entry.timestamp_started).toISOString().split('T')[0],
-          timestamp: entry.timestamp_started,
-          mood: entry.mood as Mood,
-          weather: entry.weather_temperature ? {
-            temperature: entry.weather_temperature,
-            description: entry.weather_description || '',
-            icon: entry.weather_icon || '',
-            location: entry.weather_location || ''
-          } : undefined,
-          track: entry.spotify_track_uri ? {
-            id: entry.spotify_track_uri,
-            name: entry.spotify_track_name || '',
-            artist: entry.spotify_track_artist || '',
-            album: entry.spotify_track_album || '',
-            albumArt: entry.spotify_track_image || '',
-            uri: entry.spotify_track_uri
-          } : undefined,
-          createdAt: new Date(entry.created_at).getTime(),
-          updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
-          user_id: entry.user_id
-        }));
+        // Transform and decrypt the data
+        const transformedEntries: JournalEntry[] = [];
+        
+        for (const entry of data) {
+          // Create the basic entry object
+          const journalEntry: JournalEntry = {
+            id: entry.id,
+            content: entry.entry_text,
+            date: new Date(entry.timestamp_started).toISOString().split('T')[0],
+            timestamp: entry.timestamp_started,
+            mood: entry.mood as Mood,
+            weather: entry.weather_temperature ? {
+              temperature: entry.weather_temperature,
+              description: entry.weather_description || '',
+              icon: entry.weather_icon || '',
+              location: entry.weather_location || ''
+            } : undefined,
+            track: entry.spotify_track_uri ? {
+              id: entry.spotify_track_uri,
+              name: entry.spotify_track_name || '',
+              artist: entry.spotify_track_artist || '',
+              album: entry.spotify_track_album || '',
+              albumArt: entry.spotify_track_image || '',
+              uri: entry.spotify_track_uri
+            } : undefined,
+            createdAt: new Date(entry.created_at).getTime(),
+            updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
+            user_id: entry.user_id
+          };
+          
+          // Decrypt the content
+          const decryptedEntry = await decryptJournalEntry(journalEntry, authState.user.id);
+          transformedEntries.push(decryptedEntry);
+        }
 
         setEntries(transformedEntries);
       } catch (error: any) {
@@ -215,11 +224,14 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     }
 
     try {
+      // Encrypt the entry content before saving to database
+      const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
+      
       const { data, error } = await supabase
         .from('journal_entries')
         .insert([{
           user_id: authState.user.id,
-          entry_text: entry.content,
+          entry_text: encryptedEntry.content, // Save encrypted content
           mood: entry.mood,
           spotify_track_uri: entry.track?.uri,
           spotify_track_name: entry.track?.name,
@@ -237,9 +249,9 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
 
       if (error) throw error;
 
-      // Add the entry to the local state with the server-generated ID
+      // Add the decrypted entry to the local state with the server-generated ID
       const newEntry: JournalEntry = {
-        ...entry,
+        ...entry, // Use the original unencrypted entry for local state
         id: data.id,
         createdAt: new Date(data.created_at).getTime(),
       };
@@ -248,7 +260,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
 
       toast({
         title: "Entry saved",
-        description: "Your journal entry has been saved successfully",
+        description: "Your journal entry has been securely saved",
       });
     } catch (error: any) {
       console.error('Error adding journal entry:', error);
@@ -275,10 +287,13 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       // Add the current timestamp as updated_at
       const now = new Date();
       
+      // Encrypt content before saving to database
+      const encryptedEntry = await encryptJournalEntry(updatedEntry, authState.user.id);
+      
       const { error } = await supabase
         .from('journal_entries')
         .update({
-          entry_text: updatedEntry.content,
+          entry_text: encryptedEntry.content, // Save encrypted content
           mood: updatedEntry.mood,
           spotify_track_uri: updatedEntry.track?.uri,
           spotify_track_name: updatedEntry.track?.name,
@@ -296,6 +311,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       if (error) throw error;
 
       // Update the entry with the new updated_at timestamp
+      // Use the unencrypted entry for local state
       const updatedEntryWithTimestamp = {
         ...updatedEntry,
         updatedAt: now.getTime()
@@ -307,7 +323,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
 
       toast({
         title: "Entry updated",
-        description: "Your journal entry has been updated successfully",
+        description: "Your journal entry has been securely updated",
       });
     } catch (error: any) {
       console.error('Error updating journal entry:', error);
@@ -372,8 +388,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     return entries.filter(entry => 
       entry.content.toLowerCase().includes(lowercaseQuery) ||
       (entry.weather?.location.toLowerCase().includes(lowercaseQuery)) ||
-      (entry.track?.name.toLowerCase().includes(lowercaseQuery)) ||
-      (entry.track?.artist.toLowerCase().includes(lowercaseQuery))
+      (entry.track?.name?.toLowerCase().includes(lowercaseQuery)) ||
+      (entry.track?.artist?.toLowerCase().includes(lowercaseQuery))
     );
   };
   
