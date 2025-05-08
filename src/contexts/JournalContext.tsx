@@ -18,6 +18,7 @@ interface JournalContextType {
   setCurrentEntry: (entry: JournalEntry | null) => void;
   searchEntries: (query: string) => JournalEntry[];
   addCommentToEntry: (entryId: string, content: string) => Promise<void>;
+  deleteCommentFromEntry: (entryId: string, commentId: string) => Promise<void>;
   isLoading: boolean;
   statsData: {
     totalEntries: number;
@@ -465,6 +466,71 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     }
   };
   
+  // Delete a comment from an entry
+  const deleteCommentFromEntry = async (entryId: string, commentId: string) => {
+    if (!authState.user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to delete comments",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Find the entry to update
+      const entryToUpdate = entries.find(e => e.id === entryId);
+      
+      if (!entryToUpdate) {
+        throw new Error("Entry not found");
+      }
+
+      // Filter out the comment to delete
+      const updatedComments = (entryToUpdate.comments || []).filter(
+        comment => comment.id !== commentId
+      );
+
+      // Update the entry with the filtered comments
+      const updatedEntry: JournalEntry = {
+        ...entryToUpdate,
+        comments: updatedComments
+      };
+
+      // Encrypt the updated entry before saving
+      const encryptedEntry = await encryptJournalEntry(updatedEntry, authState.user.id);
+      
+      // Update the entry in the database
+      const now = new Date();
+      const { error } = await supabase
+        .from('journal_entries')
+        .update({
+          entry_text: encryptedEntry.content,
+          updated_at: now.toISOString()
+        })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      // Update local state
+      setEntries(prev => prev.map(entry => 
+        entry.id === entryId ? {
+          ...entry,
+          comments: updatedComments,
+          updatedAt: now.getTime()
+        } : entry
+      ));
+
+    } catch (error: any) {
+      console.error('Error deleting comment:', error);
+      toast({
+        title: "Error deleting note",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+  
   // Create a new empty entry using the user's local timezone
   const createNewEntry = (date?: string) => {
     const now = new Date();
@@ -503,6 +569,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     setCurrentEntry,
     searchEntries,
     addCommentToEntry,
+    deleteCommentFromEntry,
     isLoading,
     statsData
   };

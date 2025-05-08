@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { JournalComment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { MessageCircle, Calendar, Clock, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { MessageCircle, Calendar, Clock, ChevronDown, ChevronUp, Trash2, Plus } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   AlertDialog,
@@ -133,7 +133,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
               className="w-full justify-start"
               onClick={() => setIsAddingComment(true)}
             >
-              <MessageCircle className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4 mr-2" />
               New note
             </Button>
           )}
