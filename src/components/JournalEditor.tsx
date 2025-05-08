@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { JournalEntry, SpotifyTrack, WeatherData, Mood } from '@/types';
+import { JournalEntry, WeatherData, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -84,7 +85,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         content,
         mood: selectedMood,
         weather: weatherData || undefined,
-        track: undefined, // Remove Spotify track reference
       };
 
       if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
