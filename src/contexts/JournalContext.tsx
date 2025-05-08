@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { JournalEntry, Mood, SpotifyTrack, WeatherData, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
@@ -541,7 +542,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     const now = new Date();
     
     // Format the date in ISO format but use local date (YYYY-MM-DD)
-    const localDate = date || now.toISOString().split('T')[0];
+    // Using toLocaleDateString with 'en-CA' locale which produces YYYY-MM-DD format
+    const localDate = date || now.toLocaleDateString('en-CA'); 
     
     const newEntry: JournalEntry = {
       id: `temp-${Date.now()}`,

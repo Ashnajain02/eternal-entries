@@ -29,7 +29,8 @@ const Index = () => {
             const parsedDraft = JSON.parse(savedDraft);
             
             // Verify it's from today to avoid showing old drafts
-            const today = new Date().toISOString().split('T')[0];
+            // Using en-CA locale to get YYYY-MM-DD format
+            const today = new Date().toLocaleDateString('en-CA');
             if (parsedDraft && parsedDraft.date === today && parsedDraft.content?.trim()) {
               setIsWriting(true);
             }

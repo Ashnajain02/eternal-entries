@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { JournalEntry, WeatherData, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -37,8 +38,9 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         const parsedDraft = JSON.parse(savedDraft);
         // Verify this is a valid journal entry object and not expired
         if (parsedDraft && parsedDraft.content && parsedDraft.date) {
-          // Check if the draft is from today (to avoid showing old drafts)
-          const today = new Date().toISOString().split('T')[0];
+          // Get today's date in YYYY-MM-DD format in the user's local timezone
+          const today = new Date().toLocaleDateString('en-CA'); // en-CA produces YYYY-MM-DD format
+          
           if (parsedDraft.date === today) {
             toast({
               title: "Draft restored",
@@ -54,9 +56,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       }
     }
     
-    // Make sure we use the current date in correct timezone when creating a new entry
-    const now = new Date();
-    return createNewEntry(now.toISOString().split('T')[0]);
+    // Create a new entry with the current date
+    return createNewEntry();
   });
 
   const [content, setContent] = useState(initialEntry?.content || entry.content || '');
