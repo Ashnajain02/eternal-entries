@@ -46,6 +46,7 @@ export const getUserLocation = (): Promise<GeolocationCoordinates> => {
 
 /**
  * Default coordinates to use as fallback when user location cannot be obtained
+ * Note: We'll still get weather data but won't display the location name
  */
 export const DEFAULT_COORDINATES = {
   lat: 40.7831, 
@@ -58,8 +59,19 @@ export const DEFAULT_COORDINATES = {
  * @param lon Longitude
  * @returns A string representing the location name
  */
-export const getLocationNameFromCoordinates = async (lat: number, lon: number): Promise<string> => {
+export const getLocationNameFromCoordinates = async (lat: number, lon: number): Promise<string | null> => {
   try {
+    // Check if these are the default coordinates
+    const isDefaultLocation = 
+      Math.abs(lat - DEFAULT_COORDINATES.lat) < 0.001 && 
+      Math.abs(lon - DEFAULT_COORDINATES.lon) < 0.001;
+    
+    // If these are default coordinates, don't fetch the location name
+    if (isDefaultLocation) {
+      console.log('Using default coordinates - not displaying location name');
+      return null;
+    }
+    
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,
       {
@@ -93,7 +105,7 @@ export const getLocationNameFromCoordinates = async (lat: number, lon: number): 
     }
   } catch (error) {
     console.error('Error getting location name:', error);
-    return "Unknown Location";
+    return null;
   }
 };
 
@@ -126,7 +138,7 @@ export const getWeatherForLocation = async (lat: number, lon: number): Promise<W
       temperature: weatherData.current.temperature_2m,
       description,
       icon,
-      location: locationName
+      location: locationName || ''
     };
   } catch (error) {
     console.error('Error fetching weather data:', error);

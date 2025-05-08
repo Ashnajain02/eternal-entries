@@ -60,12 +60,14 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       console.error('Error getting weather:', error);
       setLocationError(error instanceof Error ? error.message : "Failed to get location");
       
-      // Use fallback coordinates
+      // Use fallback coordinates - but don't display the location name
       try {
         const fallbackData = await getWeatherForLocation(
           DEFAULT_COORDINATES.lat, 
           DEFAULT_COORDINATES.lon
         );
+        // Clear the location when using default coordinates
+        fallbackData.location = '';
         setWeatherData(fallbackData);
       } catch (fallbackError) {
         console.error('Even fallback weather failed:', fallbackError);

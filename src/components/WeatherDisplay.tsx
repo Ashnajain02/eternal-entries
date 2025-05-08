@@ -113,16 +113,29 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
     );
   }
 
+  // Check if we should display the location
+  // If it contains any of the default data, don't show it
+  const isDefaultLocation = 
+    !weatherData.location || 
+    weatherData.location.includes("New York") || 
+    weatherData.location.includes("Manhattan") ||
+    weatherData.location === "Unknown Location";
+
   return (
     <div className={cn("flex items-center space-x-2 group", className)}>
       <div className="flex items-center space-x-2">
         {getWeatherIcon(weatherData.icon)}
         <div className="space-y-0">
           <p className="text-sm font-medium leading-none">
-            {formatTemperature(weatherData.temperature)} in {weatherData.location}
+            {formatTemperature(weatherData.temperature)}
+            {!isDefaultLocation && weatherData.location && (
+              <> in {weatherData.location}</>
+            )}
           </p>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
+            {!isDefaultLocation && weatherData.location && (
+              <MapPin className="h-3 w-3" />
+            )}
             {weatherData.description}
           </p>
         </div>
