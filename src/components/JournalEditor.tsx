@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import MoodSelector from './MoodSelector';
 import WeatherDisplay from './WeatherDisplay';
-import { fetchWeatherData } from '@/services/api';
+import { getUserLocation, getWeatherForLocation, DEFAULT_COORDINATES } from '@/utils/weatherUtils';
 import { format } from 'date-fns';
 import AutoResizeTextarea from './AutoResizeTextarea';
 
@@ -31,22 +31,10 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const [locationRequested, setLocationRequested] = useState(false);
-  const [locationAttempts, setLocationAttempts] = useState(0);
-
-  // Default coordinates for different regions - used as fallbacks
-  const defaultCoordinates = {
-    // Manhattan, New York City
-    nyc: { lat: 40.7831, lon: -73.9712 },
-    // San Francisco
-    sf: { lat: 37.7749, lon: -122.4194 },
-    // Chicago
-    chicago: { lat: 41.8781, lon: -87.6298 }
-  };
 
   // Get current weather on first load if not already present
   useEffect(() => {
-    if (!weatherData && !isLoadingWeather && !locationRequested) {
+    if (!weatherData && !isLoadingWeather) {
       handleGetWeather();
     }
   }, []);
@@ -54,108 +42,26 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const handleGetWeather = async () => {
     setIsLoadingWeather(true);
     setLocationError(null);
-    setLocationRequested(true);
     
     try {
-      // Check if we've tried multiple times and should fall back immediately
-      if (locationAttempts >= 2) {
-        console.log("Using fallback location after multiple failed attempts");
-        // Use NYC as primary fallback for better east coast coverage
-        const data = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
-        setWeatherData(data);
-        setIsLoadingWeather(false);
-        return;
-      }
-      
-      // Use the browser's geolocation API to get the user's coordinates
-      if (!navigator.geolocation) {
-        console.log("Geolocation not supported by browser");
-        setLocationError("Geolocation is not supported by your browser");
-        // Fall back to NYC coordinates as fallback
-        const data = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
-        setWeatherData(data);
-        return;
-      }
-      
-      // Request location from user with a timeout
-      const positionPromise = new Promise<GeolocationPosition>((resolve, reject) => {
-        // Set a shorter timeout to improve user experience
-        const timeoutDuration = 5000; // 5 seconds
-        
-        navigator.geolocation.getCurrentPosition(
-          // Success callback
-          (position) => {
-            resolve(position);
-          },
-          // Error callback
-          (error) => {
-            console.error('Geolocation error:', error);
-            let errorMsg = "Location access denied";
-            
-            switch(error.code) {
-              case error.PERMISSION_DENIED:
-                errorMsg = "You denied permission to access your location";
-                break;
-              case error.POSITION_UNAVAILABLE:
-                errorMsg = "Location information is unavailable";
-                break;
-              case error.TIMEOUT:
-                errorMsg = "The request to get your location timed out";
-                break;
-              default:
-                errorMsg = "An unknown error occurred";
-            }
-            
-            reject(new Error(errorMsg));
-          },
-          // Options
-          {
-            enableHighAccuracy: false, // Set to false to prioritize speed over accuracy
-            timeout: timeoutDuration,
-            maximumAge: 60000 // Accept positions up to 1 minute old
-          }
-        );
-      });
-      
-      try {
-        const position = await positionPromise;
-        const { latitude, longitude } = position.coords;
-        console.log(`Successfully got coordinates: ${latitude}, ${longitude}`);
-        try {
-          const data = await fetchWeatherData(latitude, longitude);
-          setWeatherData(data);
-        } catch (error) {
-          console.error('Error fetching weather data:', error);
-          setLocationError("Could not retrieve weather for your location");
-          // Fall back to NYC coordinates
-          const fallbackData = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
-          setWeatherData(fallbackData);
-        }
-      } catch (error: any) {
-        console.error('Geolocation promise error:', error);
-        setLocationError(error.message || "Could not access your location");
-        
-        // Fall back to NYC coordinates
-        const data = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
-        setWeatherData(data);
-        
-        // Increment attempts counter
-        setLocationAttempts(prev => prev + 1);
-      }
+      // Try to get user's location
+      const coords = await getUserLocation();
+      const data = await getWeatherForLocation(coords.latitude, coords.longitude);
+      setWeatherData(data);
     } catch (error) {
       console.error('Error getting weather:', error);
-      setLocationError("An error occurred while fetching weather data");
+      setLocationError(error instanceof Error ? error.message : "Failed to get location");
       
-      // Final fallback
+      // Use fallback coordinates
       try {
-        const data = await fetchWeatherData(defaultCoordinates.nyc.lat, defaultCoordinates.nyc.lon);
-        setWeatherData(data);
-      } catch (e) {
-        console.error('Even fallback failed:', e);
+        const fallbackData = await getWeatherForLocation(
+          DEFAULT_COORDINATES.lat, 
+          DEFAULT_COORDINATES.lon
+        );
+        setWeatherData(fallbackData);
+      } catch (fallbackError) {
+        console.error('Even fallback weather failed:', fallbackError);
       }
-      
-      // Increment attempts counter
-      setLocationAttempts(prev => prev + 1);
     } finally {
       setIsLoadingWeather(false);
     }
