@@ -1,6 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import React, { useState } from 'react';
 import { useJournal } from '@/contexts/JournalContext';
 import Layout from '@/components/Layout';
 import JournalEditor from '@/components/JournalEditor';
@@ -12,50 +11,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
-  const { entries, createNewEntry, isLoading } = useJournal();
+  const { entries, isLoading } = useJournal();
   const { authState } = useAuth();
   const [isWriting, setIsWriting] = useState(false);
-  const [todayEntries, setTodayEntries] = useState<any[]>([]);
-  const [pastEntries, setPastEntries] = useState<any[]>([]);
   
-  // Check for entries made today and on this day in previous years
-  useEffect(() => {
-    // Get today's date in user's local timezone
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Find today's entries
-    const todaysEntries = entries.filter(entry => 
-      entry.date === today
-    );
-    
-    // Sort by most recent first
-    todaysEntries.sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-    
-    setTodayEntries(todaysEntries);
-    
-    // Find entries from this day in previous years
-    const thisMonth = new Date().getMonth();
-    const thisDay = new Date().getDate();
-    
-    const sameDayEntries = entries.filter(entry => {
-      const entryDate = new Date(entry.date);
-      return (
-        entryDate.getMonth() === thisMonth && 
-        entryDate.getDate() === thisDay &&
-        entryDate.toISOString().split('T')[0] !== today
-      );
-    });
-    
-    // Sort by most recent first
-    sameDayEntries.sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    
-    setPastEntries(sameDayEntries);
-  }, [entries]);
-
   const handleCreateNewEntry = () => {
     setIsWriting(true);
   };
@@ -63,6 +22,11 @@ const Index = () => {
   const handleFinishWriting = () => {
     setIsWriting(false);
   };
+
+  // Sort entries by timestamp, most recent first
+  const sortedEntries = [...entries].sort((a, b) => 
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
 
   if (!authState.user) {
     return (
@@ -80,7 +44,7 @@ const Index = () => {
       <div className="max-w-3xl mx-auto space-y-8">
         <div>
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">Today's Journal</h1>
+            <h1 className="text-3xl font-bold">Journal</h1>
             
             {!isWriting && (
               <Button onClick={handleCreateNewEntry} className="flex items-center gap-1">
@@ -95,15 +59,15 @@ const Index = () => {
             </div>
           ) : isWriting ? (
             <JournalEditor onSave={handleFinishWriting} />
-          ) : todayEntries.length > 0 ? (
+          ) : sortedEntries.length > 0 ? (
             <div className="space-y-6">
-              {todayEntries.map(entry => (
+              {sortedEntries.map(entry => (
                 <JournalEntryView key={entry.id} entry={entry} />
               ))}
             </div>
           ) : (
             <Card className="p-6 text-center space-y-4 animated-gradient">
-              <h2 className="text-xl font-semibold">Start today's journal entry</h2>
+              <h2 className="text-xl font-semibold">Start your journal</h2>
               <p className="text-muted-foreground">
                 Capture your thoughts, the weather, and what you're listening to.
               </p>
@@ -113,25 +77,6 @@ const Index = () => {
             </Card>
           )}
         </div>
-        
-        {pastEntries.length > 0 && (
-          <div>
-            <h2 className="text-2xl font-semibold mb-4">
-              This day in past years
-            </h2>
-            <ScrollArea className="h-[500px] pr-4">
-              <div className="space-y-6">
-                {pastEntries.map(entry => (
-                  <JournalEntryView 
-                    key={entry.id} 
-                    entry={entry} 
-                    isPreview 
-                  />
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-        )}
       </div>
     </Layout>
   );
