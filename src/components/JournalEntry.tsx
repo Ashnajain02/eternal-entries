@@ -34,7 +34,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   isPreview = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const { deleteEntry, addCommentToEntry } = useJournal();
+  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry } = useJournal();
   const { toast } = useToast();
   const [isSpotifyExpanded, setIsSpotifyExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -82,6 +82,14 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   const handleAddComment = async (content: string) => {
     await addCommentToEntry(entry.id, content);
+  };
+  
+  const handleDeleteComment = async (commentId: string) => {
+    await deleteCommentFromEntry(entry.id, commentId);
+    toast({
+      title: "Note deleted",
+      description: "Your note has been permanently deleted."
+    });
   };
   
   if (isEditing) {
@@ -186,6 +194,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             <CommentSection
               comments={entry.comments || []}
               onAddComment={handleAddComment}
+              onDeleteComment={handleDeleteComment}
             />
           </div>
 

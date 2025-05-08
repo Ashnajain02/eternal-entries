@@ -4,29 +4,49 @@ import { format } from 'date-fns';
 import { JournalComment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { MessageCircle, Calendar, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageCircle, Calendar, Clock, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface CommentSectionProps {
   comments: JournalComment[];
   onAddComment: (content: string) => void;
+  onDeleteComment?: (commentId: string) => void;
   className?: string;
 }
 
 const CommentSection: React.FC<CommentSectionProps> = ({
   comments = [],
   onAddComment,
+  onDeleteComment,
   className,
 }) => {
   const [newComment, setNewComment] = useState('');
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
 
   const handleSubmitComment = () => {
     if (newComment.trim()) {
       onAddComment(newComment);
       setNewComment('');
       setIsAddingComment(false);
+    }
+  };
+
+  const handleDeleteComment = () => {
+    if (commentToDelete && onDeleteComment) {
+      onDeleteComment(commentToDelete);
+      setCommentToDelete(null);
     }
   };
 
@@ -40,7 +60,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
               <h4 className="font-medium">
                 {comments.length > 0
                   ? `Notes (${comments.length})`
-                  : 'Add a note'}
+                  : 'Notes'}
               </h4>
             </div>
             {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -55,7 +75,19 @@ const CommentSection: React.FC<CommentSectionProps> = ({
                   key={comment.id}
                   className="p-3 bg-muted rounded-md border border-border"
                 >
-                  <div className="text-sm mb-2">{comment.content}</div>
+                  <div className="flex justify-between">
+                    <div className="text-sm mb-2">{comment.content}</div>
+                    {onDeleteComment && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setCommentToDelete(comment.id)}
+                        className="h-6 w-6 -mt-1 -mr-1 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                   <div className="flex items-center text-xs text-muted-foreground gap-2">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
@@ -102,11 +134,31 @@ const CommentSection: React.FC<CommentSectionProps> = ({
               onClick={() => setIsAddingComment(true)}
             >
               <MessageCircle className="h-4 w-4 mr-2" />
-              Add a note
+              New note
             </Button>
           )}
         </CollapsibleContent>
       </Collapsible>
+
+      <AlertDialog open={!!commentToDelete} onOpenChange={(open) => !open && setCommentToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete note</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this note? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteComment} 
+              className="bg-destructive text-destructive-foreground"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
