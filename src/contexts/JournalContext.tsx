@@ -541,23 +541,19 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     const now = new Date();
     
     // Format the date in ISO format but use local date (YYYY-MM-DD)
-    const localDate = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    ).toISOString().split('T')[0];
-    
-    const formattedDate = date || localDate;
+    const localDate = date || now.toISOString().split('T')[0];
     
     const newEntry: JournalEntry = {
       id: `temp-${Date.now()}`,
       content: '',
-      date: formattedDate,
+      date: localDate,
       timestamp: now.toISOString(),
       mood: 'neutral',
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      comments: []
     };
     
+    console.log(`Creating new entry with date: ${localDate}`);
     return newEntry;
   };
   

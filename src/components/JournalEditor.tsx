@@ -24,7 +24,15 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const { addEntry, updateEntry, createNewEntry } = useJournal();
   const { toast } = useToast();
   
-  const [entry, setEntry] = useState<JournalEntry>(initialEntry || createNewEntry());
+  // Make sure we use the correct current date when creating a new entry
+  const [entry, setEntry] = useState<JournalEntry>(() => {
+    if (initialEntry) return initialEntry;
+    
+    // Make sure we use the current date in correct timezone when creating a new entry
+    const now = new Date();
+    return createNewEntry(now.toISOString().split('T')[0]);
+  });
+
   const [content, setContent] = useState(initialEntry?.content || '');
   const [selectedMood, setSelectedMood] = useState<Mood>(initialEntry?.mood || 'neutral');
   const [weatherData, setWeatherData] = useState<WeatherData | null>(initialEntry?.weather || null);
@@ -131,44 +139,46 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
 
   return (
     <Card className="journal-card animated-gradient">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-xl font-semibold">{formattedDate}</h2>
-        <WeatherDisplay 
-          weatherData={weatherData} 
-          isLoading={isLoadingWeather} 
-          onRefresh={handleGetWeather} 
-        />
-      </div>
-      
-      {locationError && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertDescription>
-            {locationError} <Button variant="link" className="p-0 h-auto" onClick={handleGetWeather}>Try again</Button>
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      <div className="mb-6">
-        <MoodSelector selectedMood={selectedMood} onChange={setSelectedMood} />
-      </div>
-      
-      <div className="mb-6">
-        <AutoResizeTextarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Write your thoughts here..."
-          className="journal-input"
-          minHeight="200px"
-        />
-      </div>
-      
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={onSave}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? "Saving..." : "Save Entry"}
-        </Button>
+      <div className="p-6">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h2 className="text-xl font-semibold">{formattedDate}</h2>
+          <WeatherDisplay 
+            weatherData={weatherData} 
+            isLoading={isLoadingWeather} 
+            onRefresh={handleGetWeather} 
+          />
+        </div>
+        
+        {locationError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>
+              {locationError} <Button variant="link" className="p-0 h-auto" onClick={handleGetWeather}>Try again</Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        <div className="mb-6">
+          <MoodSelector selectedMood={selectedMood} onChange={setSelectedMood} />
+        </div>
+        
+        <div className="mb-6">
+          <AutoResizeTextarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Write your thoughts here..."
+            className="journal-input"
+            minHeight="200px"
+          />
+        </div>
+        
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onSave}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Saving..." : "Save Entry"}
+          </Button>
+        </div>
       </div>
     </Card>
   );
