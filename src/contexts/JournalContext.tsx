@@ -541,7 +541,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
   const createNewEntry = (date?: string) => {
     const now = new Date();
     
-    // Format the date in ISO format but use local date (YYYY-MM-DD)
+    // Format the date in YYYY-MM-DD format but use local date in the user's timezone
     // Using toLocaleDateString with 'en-CA' locale which produces YYYY-MM-DD format
     const localDate = date || now.toLocaleDateString('en-CA'); 
     

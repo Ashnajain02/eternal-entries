@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { JournalEntry, WeatherData, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -56,7 +55,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       }
     }
     
-    // Create a new entry with the current date
+    // Create a new entry with the current date - this will use the createNewEntry function
+    // that now correctly uses toLocaleDateString('en-CA') to get the current date
     return createNewEntry();
   });
 

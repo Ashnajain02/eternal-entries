@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const DRAFT_STORAGE_KEY = 'journal_draft_entry';
 
 const Index = () => {
-  const { entries, isLoading } = useJournal();
+  const { entries, isLoading, createNewEntry } = useJournal();
   const { authState } = useAuth();
   const [isWriting, setIsWriting] = useState(false);
   
