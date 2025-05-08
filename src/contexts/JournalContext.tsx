@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { JournalEntry, Mood, SpotifyTrack, WeatherData } from '@/types';
+import { JournalEntry, Mood, SpotifyTrack, WeatherData, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ interface JournalContextType {
   createNewEntry: (date?: string) => JournalEntry;
   setCurrentEntry: (entry: JournalEntry | null) => void;
   searchEntries: (query: string) => JournalEntry[];
+  addCommentToEntry: (entryId: string, content: string) => Promise<void>;
   isLoading: boolean;
   statsData: {
     totalEntries: number;
@@ -393,6 +394,77 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     );
   };
   
+  // Add a comment to an entry
+  const addCommentToEntry = async (entryId: string, content: string) => {
+    if (!authState.user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to add comments",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Create a new comment object
+      const now = new Date();
+      const newComment: JournalComment = {
+        id: `comment-${Date.now()}`,
+        content,
+        createdAt: now.getTime()
+      };
+
+      // Find the entry to update
+      const entryToUpdate = entries.find(e => e.id === entryId);
+      
+      if (!entryToUpdate) {
+        throw new Error("Entry not found");
+      }
+
+      // Add the comment to the entry
+      const updatedEntry: JournalEntry = {
+        ...entryToUpdate,
+        comments: [...(entryToUpdate.comments || []), newComment]
+      };
+
+      // Encrypt the updated entry before saving
+      const encryptedEntry = await encryptJournalEntry(updatedEntry, authState.user.id);
+      
+      // Update the entry in the database
+      const { error } = await supabase
+        .from('journal_entries')
+        .update({
+          entry_text: encryptedEntry.content,
+          updated_at: now.toISOString()
+        })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      // Update local state
+      setEntries(prev => prev.map(entry => 
+        entry.id === entryId ? {
+          ...entry,
+          comments: [...(entry.comments || []), newComment],
+          updatedAt: now.getTime()
+        } : entry
+      ));
+
+      toast({
+        title: "Comment added",
+        description: "Your note has been added to this journal entry"
+      });
+    } catch (error: any) {
+      console.error('Error adding comment:', error);
+      toast({
+        title: "Error adding comment",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+  
   // Create a new empty entry using the user's local timezone
   const createNewEntry = (date?: string) => {
     const now = new Date();
@@ -430,6 +502,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     createNewEntry,
     setCurrentEntry,
     searchEntries,
+    addCommentToEntry,
     isLoading,
     statsData
   };

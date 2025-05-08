@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import CommentSection from './CommentSection';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -33,7 +34,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   isPreview = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const { deleteEntry } = useJournal();
+  const { deleteEntry, addCommentToEntry } = useJournal();
   const { toast } = useToast();
   const [isSpotifyExpanded, setIsSpotifyExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -77,6 +78,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     if (entry.track?.uri) {
       window.open(`https://open.spotify.com/track/${entry.track.uri.split(':')[2]}`, '_blank');
     }
+  };
+  
+  const handleAddComment = async (content: string) => {
+    await addCommentToEntry(entry.id, content);
   };
   
   if (isEditing) {
@@ -176,23 +181,32 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       </div>
       
       {!isPreview && (
-        <div className="flex justify-end gap-2">
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={() => setIsEditing(true)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={handleDelete}
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash className="h-4 w-4" />
-          </Button>
-        </div>
+        <>
+          <div className="border-t border-border my-4 pt-4">
+            <CommentSection
+              comments={entry.comments || []}
+              onAddComment={handleAddComment}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleDelete}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
+        </>
       )}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

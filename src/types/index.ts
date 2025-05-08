@@ -25,6 +25,13 @@ export interface SpotifyTrack {
   uri: string;
 }
 
+export interface JournalComment {
+  id: string;
+  content: string;
+  createdAt: number;
+  updatedAt?: number;
+}
+
 export interface JournalEntry {
   id: string;
   content: string;
@@ -36,4 +43,5 @@ export interface JournalEntry {
   createdAt: number;
   updatedAt?: number;
   user_id?: string;
+  comments?: JournalComment[];
 }
