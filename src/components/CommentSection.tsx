@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { JournalComment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar, Clock, MessageCircle } from 'lucide-react';
+import { MessageCircle, Calendar, Clock } from 'lucide-react';
 
 interface CommentSectionProps {
   comments: JournalComment[];
@@ -34,8 +34,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({
         <MessageCircle className="h-4 w-4" />
         <h4 className="font-medium">
           {comments.length > 0
-            ? `Notes from your future self (${comments.length})`
-            : 'Add notes from your future self'}
+            ? `Notes (${comments.length})`
+            : 'Add a note'}
         </h4>
       </div>
 
@@ -67,7 +67,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
           <Textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Leave a note to your past self..."
+            placeholder="Write a note..."
             className="min-h-[100px]"
           />
           <div className="flex justify-end gap-2">
@@ -82,7 +82,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
               Cancel
             </Button>
             <Button size="sm" onClick={handleSubmitComment}>
-              Add Note
+              Add
             </Button>
           </div>
         </div>
@@ -93,7 +93,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
           onClick={() => setIsAddingComment(true)}
         >
           <MessageCircle className="h-4 w-4 mr-2" />
-          Add a note from your future self
+          Add a note
         </Button>
       )}
     </div>
