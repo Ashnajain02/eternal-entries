@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useJournal } from '@/contexts/JournalContext';
 import Layout from '@/components/Layout';
 import JournalEditor from '@/components/JournalEditor';
@@ -10,10 +10,39 @@ import { Plus, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Key used for checking if we have a draft
+const DRAFT_STORAGE_KEY = 'journal_draft_entry';
+
 const Index = () => {
   const { entries, isLoading } = useJournal();
   const { authState } = useAuth();
   const [isWriting, setIsWriting] = useState(false);
+  
+  // Check for existing draft on component mount
+  useEffect(() => {
+    const checkForDraft = () => {
+      // Only check for drafts if authenticated and not already in writing mode
+      if (authState.user && !isWriting) {
+        try {
+          const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+          if (savedDraft) {
+            const parsedDraft = JSON.parse(savedDraft);
+            
+            // Verify it's from today to avoid showing old drafts
+            const today = new Date().toISOString().split('T')[0];
+            if (parsedDraft && parsedDraft.date === today && parsedDraft.content?.trim()) {
+              setIsWriting(true);
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing saved draft:", e);
+          localStorage.removeItem(DRAFT_STORAGE_KEY);
+        }
+      }
+    };
+    
+    checkForDraft();
+  }, [authState.user]);
   
   const handleCreateNewEntry = () => {
     setIsWriting(true);

@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { JournalEntry, WeatherData, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,9 @@ interface JournalEditorProps {
   onSave?: () => void;
 }
 
+// Key used for local storage of draft entries
+const DRAFT_STORAGE_KEY = 'journal_draft_entry';
+
 const JournalEditor: React.FC<JournalEditorProps> = ({
   entry: initialEntry,
   onSave
@@ -28,17 +30,42 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [entry, setEntry] = useState<JournalEntry>(() => {
     if (initialEntry) return initialEntry;
     
+    // Check if there's a saved draft in localStorage
+    const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (savedDraft) {
+      try {
+        const parsedDraft = JSON.parse(savedDraft);
+        // Verify this is a valid journal entry object and not expired
+        if (parsedDraft && parsedDraft.content && parsedDraft.date) {
+          // Check if the draft is from today (to avoid showing old drafts)
+          const today = new Date().toISOString().split('T')[0];
+          if (parsedDraft.date === today) {
+            toast({
+              title: "Draft restored",
+              description: "Your unsaved journal entry has been restored."
+            });
+            return parsedDraft;
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing saved draft:", e);
+        // Clear invalid draft
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      }
+    }
+    
     // Make sure we use the current date in correct timezone when creating a new entry
     const now = new Date();
     return createNewEntry(now.toISOString().split('T')[0]);
   });
 
-  const [content, setContent] = useState(initialEntry?.content || '');
-  const [selectedMood, setSelectedMood] = useState<Mood>(initialEntry?.mood || 'neutral');
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(initialEntry?.weather || null);
+  const [content, setContent] = useState(initialEntry?.content || entry.content || '');
+  const [selectedMood, setSelectedMood] = useState<Mood>(initialEntry?.mood || entry.mood || 'neutral');
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(initialEntry?.weather || entry.weather || null);
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
 
   // Get current weather on first load if not already present
   useEffect(() => {
@@ -46,6 +73,59 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       handleGetWeather();
     }
   }, []);
+
+  // Auto-save the draft entry
+  const saveDraft = useCallback(() => {
+    // Don't auto-save if this is an existing entry that's being edited
+    if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
+      return;
+    }
+    
+    // Only save if there's content
+    if (!content.trim()) {
+      return;
+    }
+    
+    const draftEntry = {
+      ...entry,
+      content,
+      mood: selectedMood,
+      weather: weatherData || undefined,
+      timestamp: new Date().toISOString(),
+    };
+    
+    try {
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftEntry));
+      setLastAutoSave(new Date());
+      console.log("Auto-saved draft entry");
+    } catch (e) {
+      console.error("Error saving draft:", e);
+    }
+  }, [entry, content, selectedMood, weatherData, initialEntry]);
+  
+  // Auto-save on content changes (debounced to avoid too many saves)
+  useEffect(() => {
+    const autoSaveTimer = setTimeout(() => {
+      if (content.trim()) {
+        saveDraft();
+      }
+    }, 5000); // Auto-save 5 seconds after typing stops
+    
+    return () => clearTimeout(autoSaveTimer);
+  }, [content, saveDraft]);
+  
+  // Clear draft when component unmounts if we've saved properly
+  useEffect(() => {
+    return () => {
+      // We only want to clear the draft when navigating away if we've properly saved the entry
+      const shouldClearDraft = !content.trim() || !initialEntry?.id?.startsWith('temp-');
+      
+      if (shouldClearDraft) {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        console.log("Cleared draft entry on component unmount");
+      }
+    };
+  }, [content, initialEntry]);
 
   const handleGetWeather = async () => {
     setIsLoadingWeather(true);
@@ -109,6 +189,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           title: "Journal saved",
           description: "Your journal entry has been saved successfully."
         });
+        // Clear the draft since we've properly saved it
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
       }
 
       if (onSave) {
@@ -118,6 +200,23 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       console.error('Error saving journal entry:', error);
     } finally {
       setIsSaving(false);
+    }
+  };
+  
+  const handleCancel = () => {
+    // Ask for confirmation if there is content and this is a new entry
+    if (content.trim() && (!initialEntry || initialEntry.id.startsWith('temp-'))) {
+      const confirmCancel = window.confirm("You have unsaved changes. Your draft has been auto-saved, but are you sure you want to exit the editor?");
+      if (!confirmCancel) {
+        return;
+      }
+    }
+    
+    // If this is a new entry being canceled, we keep the draft
+    // The draft will be cleared when the entry is actually saved
+    
+    if (onSave) {
+      onSave();
     }
   };
   
@@ -144,11 +243,18 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       <div className="p-6">
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h2 className="text-xl font-semibold">{formattedDate}</h2>
-          <WeatherDisplay 
-            weatherData={weatherData} 
-            isLoading={isLoadingWeather} 
-            onRefresh={handleGetWeather} 
-          />
+          <div className="flex items-center gap-2">
+            {lastAutoSave && (
+              <p className="text-xs text-muted-foreground">
+                Auto-saved {format(lastAutoSave, 'h:mm a')}
+              </p>
+            )}
+            <WeatherDisplay 
+              weatherData={weatherData} 
+              isLoading={isLoadingWeather} 
+              onRefresh={handleGetWeather} 
+            />
+          </div>
         </div>
         
         {locationError && (
@@ -174,7 +280,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         </div>
         
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onSave}>
+          <Button variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isSaving}>
