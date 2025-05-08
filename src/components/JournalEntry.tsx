@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import WeatherDisplay from './WeatherDisplay';
 import MoodSelector from './MoodSelector';
@@ -111,87 +110,95 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   }[entry.mood] || '😐';
 
   return (
-    <div className="space-y-4">
-      <Card className={cn("journal-card", className)}>
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h3 className="text-xl font-semibold">{formattedDate}</h3>
-            <p className="text-sm text-muted-foreground">{formattedTime}</p>
-            {entry.updatedAt && (
-              <p className="text-xs text-muted-foreground">
-                Updated: {format(new Date(entry.updatedAt), 'MMM d, yyyy h:mm a')}
-              </p>
-            )}
-          </div>
-          {entry.weather && (
-            <WeatherDisplay weatherData={entry.weather} isLoading={false} />
+    <Card className={cn("journal-card", className)}>
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-semibold">{formattedDate}</h3>
+          <p className="text-sm text-muted-foreground">{formattedTime}</p>
+          {entry.updatedAt && (
+            <p className="text-xs text-muted-foreground">
+              Updated: {format(new Date(entry.updatedAt), 'MMM d, yyyy h:mm a')}
+            </p>
           )}
         </div>
-        
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-2xl">{moodEmoji}</span>
-          <span className="text-sm text-muted-foreground capitalize">{entry.mood.replace('-', ' ')}</span>
-        </div>
-        
-        {entry.track && (
-          <div className="mb-4">
-            <div className="p-2 bg-muted rounded-md">
-              <div className="flex items-center gap-3">
-                <img 
-                  src={entry.track.albumArt} 
-                  alt={`${entry.track.album} cover`} 
-                  className="h-12 w-12 rounded"
-                />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{entry.track.name}</p>
-                  <p className="text-xs text-muted-foreground">{entry.track.artist}</p>
-                </div>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950" 
-                  onClick={openSpotify}
-                  title="Play on Spotify"
-                >
-                  <Play className="h-4 w-4 fill-current" />
-                </Button>
+        {entry.weather && (
+          <WeatherDisplay weatherData={entry.weather} isLoading={false} />
+        )}
+      </div>
+      
+      <div className="mb-4 flex items-center gap-2">
+        <span className="text-2xl">{moodEmoji}</span>
+        <span className="text-sm text-muted-foreground capitalize">{entry.mood.replace('-', ' ')}</span>
+      </div>
+      
+      {entry.track && (
+        <div className="mb-4">
+          <div className="p-2 bg-muted rounded-md">
+            <div className="flex items-center gap-3">
+              <img 
+                src={entry.track.albumArt} 
+                alt={`${entry.track.album} cover`} 
+                className="h-12 w-12 rounded"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium">{entry.track.name}</p>
+                <p className="text-xs text-muted-foreground">{entry.track.artist}</p>
               </div>
-              
-              {isSpotifyExpanded && (
-                <div className="mt-2 pt-2 border-t">
-                  <iframe
-                    title={`Spotify player for ${entry.track.name}`}
-                    src={`https://open.spotify.com/embed/track/${entry.track.uri.split(':')[2]}`}
-                    width="100%"
-                    height="80"
-                    frameBorder="0"
-                    allow="encrypted-media"
-                    loading="lazy"
-                    className="rounded"
-                  ></iframe>
-                </div>
-              )}
-              
-              <div className="text-center mt-1">
-                <Button 
-                  variant="link" 
-                  size="sm" 
-                  className="text-xs text-muted-foreground h-auto py-0" 
-                  onClick={() => setIsSpotifyExpanded(prev => !prev)}
-                >
-                  {isSpotifyExpanded ? 'Hide player' : 'Show player'}
-                </Button>
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950" 
+                onClick={openSpotify}
+                title="Play on Spotify"
+              >
+                <Play className="h-4 w-4 fill-current" />
+              </Button>
+            </div>
+            
+            {isSpotifyExpanded && (
+              <div className="mt-2 pt-2 border-t">
+                <iframe
+                  title={`Spotify player for ${entry.track.name}`}
+                  src={`https://open.spotify.com/embed/track/${entry.track.uri.split(':')[2]}`}
+                  width="100%"
+                  height="80"
+                  frameBorder="0"
+                  allow="encrypted-media"
+                  loading="lazy"
+                  className="rounded"
+                ></iframe>
               </div>
+            )}
+            
+            <div className="text-center mt-1">
+              <Button 
+                variant="link" 
+                size="sm" 
+                className="text-xs text-muted-foreground h-auto py-0" 
+                onClick={() => setIsSpotifyExpanded(prev => !prev)}
+              >
+                {isSpotifyExpanded ? 'Hide player' : 'Show player'}
+              </Button>
             </div>
           </div>
-        )}
-        
-        <div className="mb-6">
-          <div className="whitespace-pre-wrap text-left">{entry.content}</div>
         </div>
-        
-        {!isPreview && (
-          <div className="flex justify-end gap-2 border-t border-border pt-4 mt-4">
+      )}
+      
+      <div className="mb-6">
+        <div className="whitespace-pre-wrap text-left">{entry.content}</div>
+      </div>
+      
+      {!isPreview && (
+        <>
+          <div className="border-t border-border my-4 pt-4">
+            <CommentSection
+              comments={entry.comments || []}
+              onAddComment={handleAddComment}
+              onDeleteComment={handleDeleteComment}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
             <Button 
               variant="outline" 
               size="icon"
@@ -208,18 +215,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
               <Trash className="h-4 w-4" />
             </Button>
           </div>
-        )}
-      </Card>
-      
-      {!isPreview && entry.comments && (
-        <Card className={cn("journal-card bg-background", className)}>
-          <CommentSection
-            comments={entry.comments || []}
-            onAddComment={handleAddComment}
-            onDeleteComment={handleDeleteComment}
-            className="py-2"
-          />
-        </Card>
+        </>
       )}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -238,7 +234,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </Card>
   );
 };
 
