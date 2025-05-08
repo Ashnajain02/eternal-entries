@@ -1,14 +1,14 @@
+
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import WeatherDisplay from './WeatherDisplay';
-import MoodSelector from './MoodSelector';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
-import { Pencil, Trash, Play, Music } from 'lucide-react';
+import { Pencil, Trash } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -36,7 +36,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry } = useJournal();
   const { toast } = useToast();
-  const [isSpotifyExpanded, setIsSpotifyExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   // Parse the date to ensure proper local timezone handling
@@ -72,12 +71,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       description: "Your journal entry has been permanently deleted."
     });
     setIsDeleteDialogOpen(false);
-  };
-
-  const openSpotify = () => {
-    if (entry.track?.uri) {
-      window.open(`https://open.spotify.com/track/${entry.track.uri.split(':')[2]}`, '_blank');
-    }
   };
   
   const handleAddComment = async (content: string) => {
@@ -130,59 +123,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         <span className="text-2xl">{moodEmoji}</span>
         <span className="text-sm text-muted-foreground capitalize">{entry.mood.replace('-', ' ')}</span>
       </div>
-      
-      {entry.track && (
-        <div className="mb-4">
-          <div className="p-2 bg-muted rounded-md">
-            <div className="flex items-center gap-3">
-              <img 
-                src={entry.track.albumArt} 
-                alt={`${entry.track.album} cover`} 
-                className="h-12 w-12 rounded"
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium">{entry.track.name}</p>
-                <p className="text-xs text-muted-foreground">{entry.track.artist}</p>
-              </div>
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                className="text-green-500 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950" 
-                onClick={openSpotify}
-                title="Play on Spotify"
-              >
-                <Play className="h-4 w-4 fill-current" />
-              </Button>
-            </div>
-            
-            {isSpotifyExpanded && (
-              <div className="mt-2 pt-2 border-t">
-                <iframe
-                  title={`Spotify player for ${entry.track.name}`}
-                  src={`https://open.spotify.com/embed/track/${entry.track.uri.split(':')[2]}`}
-                  width="100%"
-                  height="80"
-                  frameBorder="0"
-                  allow="encrypted-media"
-                  loading="lazy"
-                  className="rounded"
-                ></iframe>
-              </div>
-            )}
-            
-            <div className="text-center mt-1">
-              <Button 
-                variant="link" 
-                size="sm" 
-                className="text-xs text-muted-foreground h-auto py-0" 
-                onClick={() => setIsSpotifyExpanded(prev => !prev)}
-              >
-                {isSpotifyExpanded ? 'Hide player' : 'Show player'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
       
       <div className="mb-6">
         <div className="whitespace-pre-wrap text-left">{entry.content}</div>
