@@ -1,4 +1,3 @@
-
 import { SpotifyTrack, WeatherData } from "@/types";
 import { getWeatherForLocation } from "@/utils/weatherUtils";
 

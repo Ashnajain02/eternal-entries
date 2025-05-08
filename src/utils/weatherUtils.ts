@@ -1,4 +1,3 @@
-
 import { WeatherData } from "@/types";
 
 /**
@@ -60,9 +59,27 @@ export const DEFAULT_COORDINATES = {
  */
 export const getWeatherForLocation = async (lat: number, lon: number): Promise<WeatherData> => {
   try {
-    // In a real app, this would call an actual weather API
-    // For this demo, we generate pseudo-random but deterministic weather
-    const temperature = Math.floor(Math.abs((lat * lon * 0.01) % 30) + 5);
+    // Generate a more varied temperature based on latitude and season
+    // Northern hemisphere: higher latitude = colder
+    // Southern hemisphere: lower latitude = colder
+    // Add a seasonal component based on the current month
+    
+    // Current date to simulate seasonal variations
+    const now = new Date();
+    const monthFactor = Math.sin(((now.getMonth() + 1) / 12) * Math.PI * 2);
+    
+    // Base temperature varies with latitude (equator is warmer)
+    let baseTemp = 75 - Math.abs(lat) * 1.5;
+    
+    // Add seasonal variation (stronger effect at higher latitudes)
+    const seasonalEffect = monthFactor * Math.abs(lat) * 0.5;
+    baseTemp += seasonalEffect;
+    
+    // Add some random variation (±5 degrees)
+    const randomVariation = (Math.random() * 10) - 5;
+    
+    // Calculate final temperature
+    const temperature = Math.round(baseTemp + randomVariation);
     
     const descriptions = [
       'Clear sky', 'Few clouds', 'Scattered clouds', 
@@ -71,13 +88,13 @@ export const getWeatherForLocation = async (lat: number, lon: number): Promise<W
     ];
     
     const weatherIcons = [
-      'cloud-sun', 'cloud-rain', 'sun', 
-      'cloud', 'cloud-moon-rain', 'thermometer-sun',
-      'thermometer-snowflake', 'droplet', 'cloud-moon-rain'
+      'cloud-sun', 'cloud-rain', 'thermometer-sun', 
+      'cloud', 'cloud-moon-rain', 'droplet',
+      'thermometer-snowflake', 'cloud-rain', 'cloud'
     ];
     
-    // Use coordinates to select weather conditions deterministically
-    const hash = Math.abs((lat * 100 + lon * 100));
+    // Use coordinates and current time to select weather conditions
+    const hash = Math.abs((lat * 100 + lon * 100 + now.getHours()));
     const descriptionIndex = hash % descriptions.length;
     const iconIndex = (hash * 31) % weatherIcons.length;
     
