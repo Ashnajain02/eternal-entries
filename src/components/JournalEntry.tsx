@@ -74,12 +74,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   };
   
   const handleAddComment = async (content: string) => {
-    console.log("Adding comment to entry", entry.id, content);
     await addCommentToEntry(entry.id, content);
   };
   
   const handleDeleteComment = async (commentId: string) => {
-    console.log("Deleting comment", commentId, "from entry", entry.id);
     await deleteCommentFromEntry(entry.id, commentId);
     toast({
       title: "Note deleted",
@@ -104,65 +102,61 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     'tired': '😴'
   }[entry.mood] || '😐';
 
-  console.log(`Rendering JournalEntry ${entry.id} with ${entry.comments?.length || 0} comments`);
-
   return (
     <Card className={cn("journal-card", className)}>
-      <CardContent className="p-6">
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h3 className="text-xl font-semibold">{formattedDate}</h3>
-            <p className="text-sm text-muted-foreground">{formattedTime}</p>
-            {entry.updatedAt && (
-              <p className="text-xs text-muted-foreground">
-                Updated: {format(new Date(entry.updatedAt), 'MMM d, yyyy h:mm a')}
-              </p>
-            )}
-          </div>
-          {entry.weather && (
-            <WeatherDisplay weatherData={entry.weather} isLoading={false} />
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-semibold">{formattedDate}</h3>
+          <p className="text-sm text-muted-foreground">{formattedTime}</p>
+          {entry.updatedAt && (
+            <p className="text-xs text-muted-foreground">
+              Updated: {format(new Date(entry.updatedAt), 'MMM d, yyyy h:mm a')}
+            </p>
           )}
         </div>
-        
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-2xl">{moodEmoji}</span>
-          <span className="text-sm text-muted-foreground capitalize">{entry.mood.replace('-', ' ')}</span>
-        </div>
-        
-        <div className="mb-6">
-          <div className="whitespace-pre-wrap text-left">{entry.content}</div>
-        </div>
-        
-        {!isPreview && (
-          <>
-            <div className="border-t border-border my-4 pt-4">
-              <CommentSection
-                comments={entry.comments || []}
-                onAddComment={handleAddComment}
-                onDeleteComment={handleDeleteComment}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button 
-                variant="outline" 
-                size="icon"
-                onClick={() => setIsEditing(true)}
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={handleDelete}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash className="h-4 w-4" />
-              </Button>
-            </div>
-          </>
+        {entry.weather && (
+          <WeatherDisplay weatherData={entry.weather} isLoading={false} />
         )}
-      </CardContent>
+      </div>
+      
+      <div className="mb-4 flex items-center gap-2">
+        <span className="text-2xl">{moodEmoji}</span>
+        <span className="text-sm text-muted-foreground capitalize">{entry.mood.replace('-', ' ')}</span>
+      </div>
+      
+      <div className="mb-6">
+        <div className="whitespace-pre-wrap text-left">{entry.content}</div>
+      </div>
+      
+      {!isPreview && (
+        <>
+          <div className="border-t border-border my-4 pt-4">
+            <CommentSection
+              comments={entry.comments || []}
+              onAddComment={handleAddComment}
+              onDeleteComment={handleDeleteComment}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleDelete}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
+        </>
+      )}
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
