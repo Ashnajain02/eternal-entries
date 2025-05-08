@@ -95,7 +95,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             } : undefined,
             createdAt: new Date(entry.created_at).getTime(),
             updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
-            user_id: entry.user_id
+            user_id: entry.user_id,
+            comments: [] // Initialize comments array (will be populated during decryption)
           };
           
           // Decrypt the content
@@ -520,6 +521,10 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         } : entry
       ));
 
+      toast({
+        title: "Note deleted",
+        description: "Your note has been deleted successfully"
+      });
     } catch (error: any) {
       console.error('Error deleting comment:', error);
       toast({

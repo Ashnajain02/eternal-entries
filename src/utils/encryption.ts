@@ -140,9 +140,20 @@ export const encryptJournalEntry = async (entry: any, userId: string): Promise<a
   
   const encryptedEntry = { ...entry };
   
-  // Encrypt only the content field
+  // Convert the entire entry to JSON string for encryption
+  // We include comments in the encrypted content
   if (entry.content) {
-    encryptedEntry.content = await encryptText(entry.content, userId);
+    // Prepare a structured object that includes content and comments
+    const dataToEncrypt = JSON.stringify({
+      content: entry.content,
+      comments: entry.comments || []
+    });
+    
+    // Encrypt the structured data
+    encryptedEntry.content = await encryptText(dataToEncrypt, userId);
+    
+    // Remove comments from the encrypted entry since they're now part of the encrypted content
+    delete encryptedEntry.comments;
   }
   
   return encryptedEntry;
@@ -159,9 +170,34 @@ export const decryptJournalEntry = async (entry: any, userId: string): Promise<a
   
   const decryptedEntry = { ...entry };
   
-  // Decrypt only the content field
+  // Decrypt the content field if it exists
   if (entry.content) {
-    decryptedEntry.content = await decryptText(entry.content, userId);
+    try {
+      // Decrypt the content field
+      const decryptedText = await decryptText(entry.content, userId);
+      
+      // Try to parse it as JSON (new format)
+      try {
+        const parsedData = JSON.parse(decryptedText);
+        if (parsedData && typeof parsedData === 'object') {
+          // New format: has structured data with content and comments
+          decryptedEntry.content = parsedData.content || '';
+          decryptedEntry.comments = parsedData.comments || [];
+        } else {
+          // Legacy format: just plain content
+          decryptedEntry.content = decryptedText;
+          decryptedEntry.comments = [];
+        }
+      } catch (parseError) {
+        // If parsing fails, it's probably just plain text (legacy format)
+        decryptedEntry.content = decryptedText;
+        decryptedEntry.comments = [];
+      }
+    } catch (decryptError) {
+      console.error("Error decrypting entry:", decryptError);
+      decryptedEntry.content = entry.content;  // Keep encrypted if decryption fails
+      decryptedEntry.comments = [];
+    }
   }
   
   return decryptedEntry;
