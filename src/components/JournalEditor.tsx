@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, SpotifyTrack, WeatherData, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -112,8 +111,23 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     }
   };
   
-  // Use the current date in the user's local timezone
-  const formattedDate = format(new Date(entry.date), 'EEEE, MMMM d, yyyy');
+  // Ensure we use the current date in the user's local timezone
+  let entryDate;
+  try {
+    // Parse the date string from entry.date
+    entryDate = new Date(entry.date);
+    
+    // Check if the date is valid
+    if (isNaN(entryDate.getTime())) {
+      // If invalid, use the current date
+      entryDate = new Date();
+    }
+  } catch (error) {
+    // Fallback to current date if there's any error
+    entryDate = new Date();
+  }
+  
+  const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
 
   return (
     <Card className="journal-card animated-gradient">

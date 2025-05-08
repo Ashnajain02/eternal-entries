@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -39,10 +38,23 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [isSpotifyExpanded, setIsSpotifyExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Ensure we use the local timezone for date display
-  const entryDate = new Date(entry.date);
+  // Parse the date to ensure proper local timezone handling
+  let entryDate;
+  try {
+    entryDate = new Date(entry.date);
+    
+    // If the date is invalid, use current date
+    if (isNaN(entryDate.getTime())) {
+      entryDate = new Date();
+    }
+  } catch (error) {
+    // Fallback to current date
+    entryDate = new Date();
+  }
+  
   const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
   
+  // Format time from timestamp if available
   const formattedTime = entry.timestamp 
     ? format(new Date(entry.timestamp), 'h:mm a')
     : '';
