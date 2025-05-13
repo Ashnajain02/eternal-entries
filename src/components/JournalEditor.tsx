@@ -67,7 +67,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   // } catch (error) {
   //   entryDate = new Date();
   // }
-  let entryDate = new Date()
+  let entryDate = new Date(entry.date)
   
   const handleSave = async () => {
     if (!content.trim()) {
