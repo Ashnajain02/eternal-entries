@@ -51,9 +51,16 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   };
 
   // Helper function to parse dates consistently
-  const parseDate = (dateString: string) => {
-    if (!dateString) return new Date();
-    return dateString.includes('T') ? parseISO(dateString) : parseISO(`${dateString}T00:00:00.000Z`);
+  const parseDate = (dateValue: string | number) => {
+    if (!dateValue) return new Date();
+    
+    // Handle both string and number timestamp values
+    if (typeof dateValue === 'number') {
+      return new Date(dateValue);
+    }
+    
+    // Handle string formats (ISO or date-only)
+    return dateValue.includes('T') ? parseISO(dateValue) : parseISO(`${dateValue}T00:00:00.000Z`);
   };
 
   return (
