@@ -57,9 +57,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     return () => clearTimeout(autoSaveTimer);
   }, [content, selectedMood, weatherData, entry, saveDraft]);
   
-  let entryDate: Date;
-
-    useEffect(() => {
+  // Ensure entry has date and timestamp
+  useEffect(() => {
     if (!entry.date || !entry.timestamp) {
       const now = new Date();
       const isoDate = now.toISOString().split('T')[0];
@@ -72,9 +71,11 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     }
   }, []);
 
-const entryDate = entry.date
-  ? new Date(entry.date + 'T00:00:00')
-  : new Date();  
+  // Calculate the entry date for display
+  const entryDate = entry.date
+    ? new Date(entry.date + 'T00:00:00')
+    : new Date();  
+
   const handleSave = async () => {
     if (!content.trim()) {
       toast({
