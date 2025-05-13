@@ -77,7 +77,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           const journalEntry: JournalEntry = {
             id: entry.id,
             content: entry.entry_text,
-            date: new Date(entry.date).toISOString().split('T')[0],
+            date: new Date(entry.timestamp_started).toISOString().split('T')[0],
             timestamp: entry.timestamp_started,
             mood: entry.mood as Mood,
             weather: entry.weather_temperature ? {
