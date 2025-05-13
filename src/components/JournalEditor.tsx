@@ -237,7 +237,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     entryDate = new Date();
   }
   
-  const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
+  // const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
+  const formattedDate = 'Ashna Jain';
 
   return (
     <Card className="journal-card animated-gradient">
