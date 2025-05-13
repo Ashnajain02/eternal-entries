@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,25 +38,20 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Parse the date to ensure proper local timezone handling
-  let entryDate;
-  try {
-    entryDate = new Date(entry.date);
+  // Parse ISO date string properly to display in local timezone
+  const parseDate = (dateString: string) => {
+    if (!dateString) return new Date();
     
-    // If the date is invalid, use current date
-    if (isNaN(entryDate.getTime())) {
-      entryDate = new Date();
-    }
-  } catch (error) {
-    // Fallback to current date
-    entryDate = new Date();
-  }
+    // Handle both full ISO strings and date-only strings
+    return dateString.includes('T') ? parseISO(dateString) : parseISO(`${dateString}T00:00:00.000Z`);
+  };
   
+  const entryDate = parseDate(entry.date);
   const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
   
   // Format time from timestamp if available
   const formattedTime = entry.timestamp 
-    ? format(new Date(entry.timestamp), 'h:mm a')
+    ? format(parseDate(entry.timestamp), 'h:mm a')
     : '';
   
   const handleDelete = () => {
@@ -110,7 +105,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           <p className="text-sm text-muted-foreground">{formattedTime}</p>
           {entry.updatedAt && (
             <p className="text-xs text-muted-foreground">
-              Updated: {format(new Date(entry.updatedAt), 'MMM d, yyyy h:mm a')}
+              Updated: {format(parseDate(entry.updatedAt), 'MMM d, yyyy h:mm a')}
             </p>
           )}
         </div>

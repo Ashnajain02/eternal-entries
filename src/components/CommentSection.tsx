@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { JournalComment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -50,6 +50,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({
     }
   };
 
+  // Helper function to parse dates consistently
+  const parseDate = (dateString: string) => {
+    if (!dateString) return new Date();
+    return dateString.includes('T') ? parseISO(dateString) : parseISO(`${dateString}T00:00:00.000Z`);
+  };
+
   return (
     <div className={className}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -91,11 +97,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({
                   <div className="flex items-center text-xs text-muted-foreground gap-2">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {format(new Date(comment.createdAt), 'MMM d, yyyy')}
+                      {format(parseDate(comment.createdAt), 'MMM d, yyyy')}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {format(new Date(comment.createdAt), 'h:mm a')}
+                      {format(parseDate(comment.createdAt), 'h:mm a')}
                     </span>
                   </div>
                 </div>
