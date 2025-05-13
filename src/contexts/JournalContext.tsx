@@ -77,8 +77,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           const journalEntry: JournalEntry = {
             id: entry.id,
             content: entry.entry_text,
-            // date: new Date(entry.timestamp_started).toISOString().split('T')[0],
-            date: new Date(entry.date),
+            date: new Date(entry.date).toISOString().split('T')[0],
             timestamp: entry.timestamp_started,
             mood: entry.mood as Mood,
             weather: entry.weather_temperature ? {
@@ -86,14 +85,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
               description: entry.weather_description || '',
               icon: entry.weather_icon || '',
               location: entry.weather_location || ''
-            } : undefined,
-            track: entry.spotify_track_uri ? {
-              id: entry.spotify_track_uri,
-              name: entry.spotify_track_name || '',
-              artist: entry.spotify_track_artist || '',
-              album: entry.spotify_track_album || '',
-              albumArt: entry.spotify_track_image || '',
-              uri: entry.spotify_track_uri
             } : undefined,
             createdAt: new Date(entry.created_at).getTime(),
             updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
