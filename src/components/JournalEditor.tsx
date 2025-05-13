@@ -57,16 +57,17 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     return () => clearTimeout(autoSaveTimer);
   }, [content, selectedMood, weatherData, entry, saveDraft]);
   
-  // Parse date from entry
-  let entryDate;
-  try {
-    entryDate = new Date(entry.date);
-    if (isNaN(entryDate.getTime())) {
-      entryDate = new Date();
-    }
-  } catch (error) {
-    entryDate = new Date();
-  }
+  // Parse date from entryx
+  // let entryDate;
+  // try {
+  //   entryDate = new Date(entry.date);
+  //   if (isNaN(entryDate.getTime())) {
+  //     entryDate = new Date();
+  //   }
+  // } catch (error) {
+  //   entryDate = new Date();
+  // }
+  let entryDate = new Date()
   
   const handleSave = async () => {
     if (!content.trim()) {
