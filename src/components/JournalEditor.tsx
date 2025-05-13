@@ -59,19 +59,22 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   
   let entryDate: Date;
 
-  if (entry.date) {
-    try {
-      entryDate = new Date(entry.date + 'T00:00:00'); // Safely parse local YYYY-MM-DD
-      if (isNaN(entryDate.getTime())) throw new Error();
-    } catch {
-      entryDate = new Date();
-      setEntry({ ...entry, date: new Date().toLocaleDateString('en-CA') }); // Fix invalid date
-    }
-  } else {
-    entryDate = new Date();
-    setEntry({ ...entry, date: new Date().toLocaleDateString('en-CA') }); // Fix missing date
-  }
+    useEffect(() => {
+    if (!entry.date || !entry.timestamp) {
+      const now = new Date();
+      const isoDate = now.toISOString().split('T')[0];
   
+      setEntry({
+        ...entry,
+        date: entry.date || isoDate,
+        timestamp: entry.timestamp || now.toISOString(),
+      });
+    }
+  }, []);
+
+const entryDate = entry.date
+  ? new Date(entry.date + 'T00:00:00')
+  : new Date();  
   const handleSave = async () => {
     if (!content.trim()) {
       toast({
