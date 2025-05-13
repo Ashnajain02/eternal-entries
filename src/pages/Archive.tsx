@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useJournal } from '@/contexts/JournalContext';
 import Layout from '@/components/Layout';
 import JournalEntryView from '@/components/JournalEntry';
@@ -49,9 +49,31 @@ const Archive = () => {
     label: String(i + 1),
   }));
   
+  // Get years from entries (properly parsed from date strings)
   const years = Array.from(
-    new Set(entries.map((entry) => new Date(entry.date).getFullYear()))
-  ).sort((a, b) => b - a);
+    new Set(entries.map((entry) => {
+      // Ensure we're extracting the year from the correct date property
+      // First try to get it from timestamp, then fall back to date property
+      const entryDate = entry.timestamp 
+        ? new Date(entry.timestamp) 
+        : new Date(entry.date + 'T00:00:00');
+      return entryDate.getFullYear();
+    }))
+  ).sort((a, b) => b - a); // Sort years in descending order
+  
+  // Parse a date string to ensure consistent date handling
+  const parseEntryDate = (entry: typeof entries[0]) => {
+    if (entry.timestamp) {
+      return new Date(entry.timestamp);
+    }
+    
+    if (entry.date) {
+      // Ensure proper parsing by adding time component
+      return new Date(entry.date + 'T00:00:00');
+    }
+    
+    return new Date(); // Fallback, should never happen
+  };
   
   // Filter entries based on the current search mode and criteria
   useEffect(() => {
@@ -60,7 +82,7 @@ const Archive = () => {
     if (searchMode === 'thisDay') {
       // Show entries from this day in previous years
       filtered = entries.filter(entry => {
-        const entryDate = new Date(entry.date);
+        const entryDate = parseEntryDate(entry);
         return (
           entryDate.getMonth() === currentMonth && 
           entryDate.getDate() === currentDay &&
@@ -72,9 +94,9 @@ const Archive = () => {
       const lowercaseQuery = searchQuery.toLowerCase();
       filtered = entries.filter(entry => 
         entry.content.toLowerCase().includes(lowercaseQuery) ||
-        (entry.weather?.location.toLowerCase().includes(lowercaseQuery)) ||
-        (entry.track?.name.toLowerCase().includes(lowercaseQuery)) ||
-        (entry.track?.artist.toLowerCase().includes(lowercaseQuery))
+        (entry.weather?.location?.toLowerCase().includes(lowercaseQuery)) ||
+        (entry.track?.name?.toLowerCase().includes(lowercaseQuery)) ||
+        (entry.track?.artist?.toLowerCase().includes(lowercaseQuery))
       );
     } else if (searchMode === 'specificDate') {
       if (selectedMonth !== null && selectedDay !== null) {
@@ -82,7 +104,7 @@ const Archive = () => {
         const day = parseInt(selectedDay);
         
         filtered = entries.filter(entry => {
-          const entryDate = new Date(entry.date);
+          const entryDate = parseEntryDate(entry);
           
           const monthMatches = entryDate.getMonth() === month;
           const dayMatches = entryDate.getDate() === day;
@@ -100,12 +122,14 @@ const Archive = () => {
     }
     
     // Sort filtered entries by date (newest first)
-    filtered.sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    filtered.sort((a, b) => {
+      const dateA = parseEntryDate(a).getTime();
+      const dateB = parseEntryDate(b).getTime();
+      return dateB - dateA;
+    });
     
     setFilteredEntries(filtered);
-  }, [entries, searchQuery, selectedDate, searchMode, selectedMonth, selectedDay, selectedYear]);
+  }, [entries, searchQuery, selectedDate, searchMode, selectedMonth, selectedDay, selectedYear, currentMonth, currentDay, today]);
   
   // Generate the header text based on current filters
   const getHeaderText = () => {
@@ -151,7 +175,8 @@ const Archive = () => {
   
   // Group entries by year for display
   const entriesByYear = filteredEntries.reduce((groups, entry) => {
-    const year = new Date(entry.date).getFullYear();
+    // Use the same parse function to get a consistent year value
+    const year = parseEntryDate(entry).getFullYear();
     if (!groups[year]) {
       groups[year] = [];
     }
