@@ -21,6 +21,7 @@ const EditorHeader: React.FC<EditorHeaderProps> = ({
   lastAutoSave,
   locationError
 }) => {
+  // Format the date consistently as full weekday, month day, year
   const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
 
   return (

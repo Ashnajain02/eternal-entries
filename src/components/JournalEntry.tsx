@@ -48,12 +48,22 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     }
     
     // Handle string formats (ISO or date-only)
-    return dateValue.includes('T') ? parseISO(dateValue) : parseISO(`${dateValue}T00:00:00.000Z`);
+    if (typeof dateValue === 'string') {
+      return dateValue.includes('T') 
+        ? parseISO(dateValue) 
+        : parseISO(`${dateValue}T00:00:00.000Z`);
+    }
+    
+    return new Date(dateValue);
   };
   
-  const entryDate = parseDate(entry.date);
-  const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
+  // Use the actual entry timestamp for the date display when available
+  const entryDateTime = entry.timestamp 
+    ? parseDate(entry.timestamp)
+    : parseDate(entry.date);
   
+  // Format the date consistently as full weekday, month day, year - matching the editor
+  const formattedDate = format(entryDateTime, 'EEEE, MMMM d, yyyy');
   
   // Format time from timestamp if available
   const formattedTime = entry.timestamp 

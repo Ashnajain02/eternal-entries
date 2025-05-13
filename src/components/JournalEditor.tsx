@@ -49,7 +49,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           content,
           mood: selectedMood,
           weather: weatherData || undefined,
-          timestamp: new Date().toISOString(),
+          timestamp: entry.timestamp || new Date().toISOString(), // Preserve original timestamp
         });
       }
     }, 5000); // Auto-save 5 seconds after typing stops
@@ -57,11 +57,11 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     return () => clearTimeout(autoSaveTimer);
   }, [content, selectedMood, weatherData, entry, saveDraft]);
   
-  // Ensure entry has date and timestamp
+  // Ensure entry has date and timestamp - only set these once when creating a new entry
   useEffect(() => {
     if (!entry.date || !entry.timestamp) {
       const now = new Date();
-      const isoDate = now.toISOString().split('T')[0];
+      const isoDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
   
       setEntry({
         ...entry,
@@ -69,11 +69,11 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         timestamp: entry.timestamp || now.toISOString(),
       });
     }
-  }, []);
+  }, [entry, setEntry]);
 
-  // Calculate the entry date for display
+  // Calculate the entry date for display from the entry's date property
   const entryDate = entry.date
-    ? new Date(entry.date + 'T00:00:00')
+    ? new Date(entry.date + 'T00:00:00') // Add time part to ensure consistent parsing
     : new Date();  
 
   const handleSave = async () => {
@@ -89,6 +89,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     setIsSaving(true);
 
     try {
+      // Always preserve the original timestamp when saving
       const updatedEntry: JournalEntry = {
         ...entry,
         content,
