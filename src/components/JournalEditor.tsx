@@ -57,17 +57,20 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     return () => clearTimeout(autoSaveTimer);
   }, [content, selectedMood, weatherData, entry, saveDraft]);
   
-  // Parse date from entryx
-  // let entryDate;
-  // try {
-  //   entryDate = new Date(entry.date);
-  //   if (isNaN(entryDate.getTime())) {
-  //     entryDate = new Date();
-  //   }
-  // } catch (error) {
-  //   entryDate = new Date();
-  // }
-  let entryDate = new Date(entry.date)
+  let entryDate: Date;
+
+  if (entry.date) {
+    try {
+      entryDate = new Date(entry.date + 'T00:00:00'); // Safely parse local YYYY-MM-DD
+      if (isNaN(entryDate.getTime())) throw new Error();
+    } catch {
+      entryDate = new Date();
+      setEntry({ ...entry, date: new Date().toLocaleDateString('en-CA') }); // Fix invalid date
+    }
+  } else {
+    entryDate = new Date();
+    setEntry({ ...entry, date: new Date().toLocaleDateString('en-CA') }); // Fix missing date
+  }
   
   const handleSave = async () => {
     if (!content.trim()) {
