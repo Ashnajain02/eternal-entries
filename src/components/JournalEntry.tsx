@@ -52,7 +52,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   };
   
   const entryDate = parseDate(entry.date);
-  const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
+  // const formattedDate = format(entryDate, 'EEEE, MMMM d, yyyy');
+  const formattedDate = "Ashi Jain";
   
   // Format time from timestamp if available
   const formattedTime = entry.timestamp 
