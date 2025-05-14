@@ -35,29 +35,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener first
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state change event:', event);
+    let didCancel = false;
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    // Helper function for updating auth state
+    const updateAuthState = (session: Session | null) => {
+      if (!didCancel) {
         setAuthState({
           session,
           user: session?.user ?? null,
           loading: false,
         });
       }
-    );
+    };
 
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setAuthState({
-        session,
-        user: session?.user ?? null,
-        loading: false,
-      });
-    });
+    const setupAuthSubscription = async () => {
+      try {
+        // First check for existing session
+        const { data: sessionData } = await supabase.auth.getSession();
+        updateAuthState(sessionData.session);
+        
+        // Then set up auth state listener
+        const { data } = supabase.auth.onAuthStateChange((event, session) => {
+          console.log('Auth state change event:', event);
+          // Don't update state if the component is unmounted
+          if (!didCancel) {
+            updateAuthState(session);
+          }
+        });
+        
+        subscription = data.subscription;
+      } catch (error) {
+        console.error("Error setting up auth subscription:", error);
+        if (!didCancel) {
+          setAuthState(prev => ({ ...prev, loading: false }));
+        }
+      }
+    };
 
+    setupAuthSubscription();
+
+    // Cleanup function
     return () => {
-      subscription.unsubscribe();
+      didCancel = true;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 

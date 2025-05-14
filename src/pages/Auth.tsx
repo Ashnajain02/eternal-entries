@@ -66,10 +66,14 @@ const Auth = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
+    // Only redirect if we have a user and we've finished loading
     if (authState.user && !authState.loading) {
-      navigate('/');
+      // Get the intended destination or default to home page
+      const from = location.state?.from?.pathname || '/';
+      // Use replace: true to avoid adding another entry to the history stack
+      navigate(from, { replace: true });
     }
-  }, [authState.user, authState.loading, navigate]);
+  }, [authState.user, authState.loading, navigate, location.state]);
 
   const handleSignIn = async (values: SignInValues) => {
     setIsLoading(true);

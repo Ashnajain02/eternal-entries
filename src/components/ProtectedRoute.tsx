@@ -18,6 +18,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (!authState.user) {
     // Redirect to the auth page but save the location they tried to access
+    // Add replace=true to prevent building up the history stack
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
