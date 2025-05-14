@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthState } from '@/types/auth';
@@ -33,54 +33,60 @@ const AuthContext = createContext<{
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>(initialState);
   const { toast } = useToast();
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    let didCancel = false;
-    let subscription: { unsubscribe: () => void } | null = null;
+    if (hasInitialized.current) return;
+    
+    let isMounted = true;
+    hasInitialized.current = true;
 
-    // Helper function for updating auth state
-    const updateAuthState = (session: Session | null) => {
-      if (!didCancel) {
-        setAuthState({
-          session,
-          user: session?.user ?? null,
-          loading: false,
-        });
-      }
-    };
-
-    const setupAuthSubscription = async () => {
+    const setupAuth = async () => {
       try {
-        // First check for existing session
+        // First get the session - do this once at startup
         const { data: sessionData } = await supabase.auth.getSession();
-        updateAuthState(sessionData.session);
         
-        // Then set up auth state listener
-        const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (isMounted) {
+          setAuthState({
+            session: sessionData.session,
+            user: sessionData.session?.user ?? null,
+            loading: false,
+          });
+        }
+        
+        // Then set up the subscription for future changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
           console.log('Auth state change event:', event);
-          // Don't update state if the component is unmounted
-          if (!didCancel) {
-            updateAuthState(session);
+          
+          if (isMounted) {
+            setAuthState({
+              session,
+              user: session?.user ?? null,
+              loading: false,
+            });
           }
         });
         
-        subscription = data.subscription;
+        return () => {
+          isMounted = false;
+          subscription.unsubscribe();
+        };
       } catch (error) {
-        console.error("Error setting up auth subscription:", error);
-        if (!didCancel) {
+        console.error('Error during auth setup:', error);
+        if (isMounted) {
           setAuthState(prev => ({ ...prev, loading: false }));
         }
+        return () => {
+          isMounted = false;
+        };
       }
     };
-
-    setupAuthSubscription();
-
-    // Cleanup function
+    
+    const cleanup = setupAuth();
     return () => {
-      didCancel = true;
-      if (subscription) {
-        subscription.unsubscribe();
-      }
+      cleanup.then(unsubscribeFn => {
+        if (unsubscribeFn) unsubscribeFn();
+      });
     };
   }, []);
 
