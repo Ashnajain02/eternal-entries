@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import CommentSection from './CommentSection';
+import AiReflection from './journal/AiReflection';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -138,6 +139,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       <div className="mb-6">
         <div className="whitespace-pre-wrap text-left">{entry.content}</div>
       </div>
+      
+      {!isPreview && !isEditing && (
+        <AiReflection entryContent={entry.content} className="mb-6" />
+      )}
       
       {!isPreview && (
         <>
