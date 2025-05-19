@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -45,7 +44,6 @@ const Auth = () => {
   const { authState, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectAttempted = useRef(false);
   
   const signInForm = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
@@ -68,20 +66,10 @@ const Auth = () => {
 
   // Redirect if already authenticated
   useEffect(() => {
-    // Prevent multiple redirects by tracking if we've already attempted one
-    if (redirectAttempted.current) {
-      return;
-    }
-    
-    // Only redirect if we have a user and we've finished loading
     if (authState.user && !authState.loading) {
-      redirectAttempted.current = true;
-      // Get the intended destination or default to home page
-      const from = location.state?.from?.pathname || '/';
-      // Use replace: true to prevent adding to history stack
-      navigate(from, { replace: true });
+      navigate('/');
     }
-  }, [authState.user, authState.loading, navigate, location.state]);
+  }, [authState.user, authState.loading, navigate]);
 
   const handleSignIn = async (values: SignInValues) => {
     setIsLoading(true);

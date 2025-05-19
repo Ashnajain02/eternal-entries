@@ -12,7 +12,6 @@ import EditorHeader from './journal/EditorHeader';
 import EditorControls from './journal/EditorControls';
 import { useJournalDraft } from '@/hooks/useJournalDraft';
 import { useWeatherData } from '@/hooks/useWeatherData';
-import AiReflection from './journal/AiReflection';
 
 interface JournalEditorProps {
   entry?: JournalEntry;
@@ -40,7 +39,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [content, setContent] = useState(initialEntry?.content || entry.content || '');
   const [selectedMood, setSelectedMood] = useState<Mood>(initialEntry?.mood || entry.mood || 'neutral');
   const [isSaving, setIsSaving] = useState(false);
-  const [showReflection, setShowReflection] = useState(false);
   
   // Auto-save on content changes (debounced to avoid too many saves)
   useEffect(() => {
@@ -115,8 +113,9 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         clearDraft();
       }
 
-      // Show reflection option after saving
-      setShowReflection(true);
+      if (onSave) {
+        onSave();
+      }
     } catch (error) {
       console.error('Error saving journal entry:', error);
     } finally {
@@ -171,10 +170,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
             minHeight="200px"
           />
         </div>
-        
-        {showReflection && (
-          <AiReflection entryContent={content} className="mb-6" />
-        )}
         
         <EditorControls
           isSaving={isSaving}

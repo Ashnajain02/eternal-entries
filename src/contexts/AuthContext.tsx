@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthState } from '@/types/auth';
@@ -33,60 +33,31 @@ const AuthContext = createContext<{
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [authState, setAuthState] = useState<AuthState>(initialState);
   const { toast } = useToast();
-  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    if (hasInitialized.current) return;
-    
-    let isMounted = true;
-    hasInitialized.current = true;
-
-    const setupAuth = async () => {
-      try {
-        // First get the session - do this once at startup
-        const { data: sessionData } = await supabase.auth.getSession();
-        
-        if (isMounted) {
-          setAuthState({
-            session: sessionData.session,
-            user: sessionData.session?.user ?? null,
-            loading: false,
-          });
-        }
-        
-        // Then set up the subscription for future changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-          console.log('Auth state change event:', event);
-          
-          if (isMounted) {
-            setAuthState({
-              session,
-              user: session?.user ?? null,
-              loading: false,
-            });
-          }
+    // Set up auth state listener first
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log('Auth state change event:', event);
+        setAuthState({
+          session,
+          user: session?.user ?? null,
+          loading: false,
         });
-        
-        return () => {
-          isMounted = false;
-          subscription.unsubscribe();
-        };
-      } catch (error) {
-        console.error('Error during auth setup:', error);
-        if (isMounted) {
-          setAuthState(prev => ({ ...prev, loading: false }));
-        }
-        return () => {
-          isMounted = false;
-        };
       }
-    };
-    
-    const cleanup = setupAuth();
-    return () => {
-      cleanup.then(unsubscribeFn => {
-        if (unsubscribeFn) unsubscribeFn();
+    );
+
+    // Then check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthState({
+        session,
+        user: session?.user ?? null,
+        loading: false,
       });
+    });
+
+    return () => {
+      subscription.unsubscribe();
     };
   }, []);
 

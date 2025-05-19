@@ -4,6 +4,3 @@ project_id = "veorhexddrwlwxtkuycb"
 [functions.spotify-auth]
 verify_jwt = true
 
-[functions.journal-reflection]
-verify_jwt = true
-
