@@ -75,16 +75,9 @@ serve(async (req) => {
 
 // Exchange the authorization code for access and refresh tokens
 async function exchangeCodeForToken(code: string, redirect_uri: string, supabase: any, user_id: string) {
-  const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
-  const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
-
-  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-    console.error("Missing Spotify credentials");
-    return new Response(
-      JSON.stringify({ error: "Server configuration error" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  }
+  // Using the new client ID and secret that were provided
+  const SPOTIFY_CLIENT_ID = "834fb4c11be949b2b527500c41e2cec5";
+  const SPOTIFY_CLIENT_SECRET = "91843f81dc254191988e61a23993aa18";
 
   // Hard-coded redirect URI as requested
   const REDIRECT_URI = "https://eternal-entries.vercel.app/callback";
