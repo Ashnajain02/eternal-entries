@@ -4,3 +4,4 @@ project_id = "veorhexddrwlwxtkuycb"
 [functions.spotify-auth]
 verify_jwt = true
 
+
