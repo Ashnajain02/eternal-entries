@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
 
@@ -75,12 +74,9 @@ serve(async (req) => {
 
 // Exchange the authorization code for access and refresh tokens
 async function exchangeCodeForToken(code: string, redirect_uri: string, supabase: any, user_id: string) {
-  // Using the new client ID and secret that were provided
+  // Using the client ID and secret
   const SPOTIFY_CLIENT_ID = "834fb4c11be949b2b527500c41e2cec5";
   const SPOTIFY_CLIENT_SECRET = "91843f81dc254191988e61a23993aa18";
-
-  // Hard-coded redirect URI as requested
-  const REDIRECT_URI = "https://eternal-entries.vercel.app/callback";
 
   try {
     // Exchange code for token
@@ -93,7 +89,7 @@ async function exchangeCodeForToken(code: string, redirect_uri: string, supabase
       body: new URLSearchParams({
         grant_type: "authorization_code",
         code,
-        redirect_uri: REDIRECT_URI,
+        redirect_uri,
       }),
     });
 

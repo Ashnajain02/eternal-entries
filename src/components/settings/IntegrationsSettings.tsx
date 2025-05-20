@@ -4,16 +4,54 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Music } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { getAuthorizationUrl, isSpotifyConnected } from '@/services/spotify';
+import { getAuthorizationUrl, isSpotifyConnected, handleSpotifyCallback } from '@/services/spotify';
+import { useSearchParams } from 'react-router-dom';
 
 export const IntegrationsSettings: React.FC = () => {
   const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    checkSpotifyConnection();
-  }, []);
+    // Check for auth code in URL (coming back from Spotify)
+    const code = searchParams.get('code');
+    if (code) {
+      handleCallback(code);
+    } else {
+      checkSpotifyConnection();
+    }
+  }, [searchParams]);
+
+  const handleCallback = async (code: string) => {
+    setIsLoading(true);
+    try {
+      const success = await handleSpotifyCallback(code);
+      
+      if (success) {
+        toast({
+          title: "Spotify Connected",
+          description: "Your Spotify account has been successfully connected.",
+        });
+        setSpotifyConnected(true);
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: "Failed to connect your Spotify account. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error processing Spotify callback:", error);
+      toast({
+        title: "Connection Error",
+        description: "An error occurred while connecting to Spotify.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const checkSpotifyConnection = async () => {
     setIsLoading(true);
