@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -44,6 +43,10 @@ const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL") || "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
 );
+
+// Use the Spotify client credentials from the secrets
+const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID") || "834fb4c11be949b2b527500c41e2cec5";
+const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET") || "91843f81dc254191988e61a23993aa18";
 
 // Helper to store tokens in the database
 async function storeSpotifyTokens(userId: string, tokens: SpotifyTokenResponse, profile: SpotifyUserResponse) {
@@ -134,8 +137,9 @@ async function getSpotifyTokens(userId: string) {
 // Helper to refresh an expired token
 async function refreshSpotifyToken(userId: string, refresh_token: string) {
   try {
-    const clientId = Deno.env.get("SPOTIFY_CLIENT_ID");
-    const clientSecret = Deno.env.get("SPOTIFY_CLIENT_SECRET");
+    // Use the client credentials from the secrets
+    const clientId = SPOTIFY_CLIENT_ID;
+    const clientSecret = SPOTIFY_CLIENT_SECRET;
     
     if (!clientId || !clientSecret) {
       throw new Error("Spotify client credentials not configured");
@@ -231,25 +235,47 @@ serve(async (req) => {
     
     // Handle different actions
     switch (action) {
-      case "check-connection": {
-        const tokens = await getSpotifyTokens(user.id);
+      case "authorize": {
+        // The authorize action should generate a Spotify authorization URL
+        const { redirect_uri, scope, show_dialog } = requestData;
+        
+        if (!redirect_uri) {
+          return new Response(
+            JSON.stringify({ error: "Missing redirect URI" }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+        
+        // Generate a state parameter for security
+        const state = crypto.randomUUID();
+        
+        // Build the authorization URL
+        const authUrl = new URL("https://accounts.spotify.com/authorize");
+        authUrl.searchParams.append("client_id", SPOTIFY_CLIENT_ID);
+        authUrl.searchParams.append("response_type", "code");
+        authUrl.searchParams.append("redirect_uri", redirect_uri);
+        authUrl.searchParams.append("state", state);
+        authUrl.searchParams.append("scope", scope || "");
+        if (show_dialog === "true") {
+          authUrl.searchParams.append("show_dialog", "true");
+        }
         
         return new Response(
-          JSON.stringify({
-            connected: !!tokens,
-            expired: tokens ? new Date() >= new Date(tokens.expires_at) : false,
-            username: tokens?.username || null,
-          }),
+          JSON.stringify({ url: authUrl.toString(), state }),
           {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
       }
       
-      case "exchange-token": {
-        const { code, redirectUri } = requestData;
+      case "callback": {
+        // Handle the callback from Spotify
+        const { code, redirect_uri, user_id } = requestData;
         
-        if (!code || !redirectUri) {
+        if (!code || !redirect_uri) {
           return new Response(
             JSON.stringify({ error: "Missing code or redirect URI" }),
             {
@@ -259,39 +285,30 @@ serve(async (req) => {
           );
         }
         
-        const clientId = Deno.env.get("SPOTIFY_CLIENT_ID");
-        const clientSecret = Deno.env.get("SPOTIFY_CLIENT_SECRET");
-        
-        if (!clientId || !clientSecret) {
-          return new Response(
-            JSON.stringify({ error: "Spotify client credentials not configured" }),
-            {
-              status: 500,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-        
-        // Exchange the authorization code for an access token
+        // Exchange the authorization code for tokens
         const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+            "Authorization": `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
           },
           body: new URLSearchParams({
             grant_type: "authorization_code",
             code,
-            redirect_uri: redirectUri,
+            redirect_uri,
           }),
         });
         
         if (!tokenResponse.ok) {
-          const error = await tokenResponse.text();
-          console.error("Token exchange failed:", error);
+          const errorText = await tokenResponse.text();
+          console.error("Token exchange failed:", errorText);
           
           return new Response(
-            JSON.stringify({ error: "Failed to exchange token" }),
+            JSON.stringify({ 
+              success: false, 
+              error: "Failed to exchange token", 
+              details: errorText 
+            }),
             {
               status: 400,
               headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -310,7 +327,7 @@ serve(async (req) => {
         
         if (!profileResponse.ok) {
           return new Response(
-            JSON.stringify({ error: "Failed to get Spotify profile" }),
+            JSON.stringify({ success: false, error: "Failed to get Spotify profile" }),
             {
               status: 400,
               headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -320,13 +337,79 @@ serve(async (req) => {
         
         const profile: SpotifyUserResponse = await profileResponse.json();
         
-        // Store the tokens in the database
-        await storeSpotifyTokens(user.id, tokens, profile);
+        // Calculate token expiration
+        const expires_at = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+        
+        // Get or create the user's profile
+        const { data: profileData, error: profileError } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("id", user_id)
+          .single();
+          
+        if (profileError && profileError.code !== "PGRST116") {
+          // Try to create the profile if it doesn't exist
+          await supabaseAdmin
+            .from("profiles")
+            .insert({
+              id: user_id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+        }
+        
+        // Update the profile with Spotify data
+        const { error: updateError } = await supabaseAdmin
+          .from("profiles")
+          .update({
+            spotify_access_token: tokens.access_token,
+            spotify_refresh_token: tokens.refresh_token,
+            spotify_token_expires_at: expires_at,
+            spotify_username: profile.display_name,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user_id);
+        
+        if (updateError) {
+          console.error("Error updating profile:", updateError);
+          
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: "Failed to store tokens", 
+              details: updateError.message
+            }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
         
         return new Response(
           JSON.stringify({
             success: true,
-            username: profile.display_name,
+            display_name: profile.display_name,
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+            expires_at,
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      
+      case "check-connection": {
+        const tokens = await getSpotifyTokens(user.id);
+        
+        return new Response(
+          JSON.stringify({
+            connected: !!tokens,
+            expired: tokens ? new Date() >= new Date(tokens.expires_at) : false,
+            username: tokens?.username || null,
           }),
           {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -411,7 +494,7 @@ serve(async (req) => {
         });
       }
       
-      case "disconnect": {
+      case "revoke": {
         const success = await removeSpotifyTokens(user.id);
         
         return new Response(

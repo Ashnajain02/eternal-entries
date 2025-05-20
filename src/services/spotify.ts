@@ -1,4 +1,3 @@
-
 import { SpotifyTrack } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -406,5 +405,5 @@ export async function manualProfileUpdate(
 
 // Constants
 const SPOTIFY_AUTH_ENDPOINT = 'https://accounts.spotify.com/authorize';
-const SPOTIFY_CLIENT_ID = '1f801b5480f34838a68ad552ed406151';
+const SPOTIFY_CLIENT_ID = '834fb4c11be949b2b527500c41e2cec5';
 const REDIRECT_URI = `${window.location.origin}/settings`;
