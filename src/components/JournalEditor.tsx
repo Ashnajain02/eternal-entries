@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { JournalEntry, Mood, SpotifyTrack } from '@/types';
+import { JournalEntry, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -12,8 +12,6 @@ import EditorHeader from './journal/EditorHeader';
 import EditorControls from './journal/EditorControls';
 import { useJournalDraft } from '@/hooks/useJournalDraft';
 import { useWeatherData } from '@/hooks/useWeatherData';
-import SpotifySearch from './SpotifySearch';
-import { checkSpotifyConnection } from '@/services/spotify';
 
 interface JournalEditorProps {
   entry?: JournalEntry;
@@ -41,22 +39,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [content, setContent] = useState(initialEntry?.content || entry.content || '');
   const [selectedMood, setSelectedMood] = useState<Mood>(initialEntry?.mood || entry.mood || 'neutral');
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedTrack, setSelectedTrack] = useState<SpotifyTrack | null>(initialEntry?.track || entry.track || null);
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
-  
-  // Check if Spotify is connected
-  useEffect(() => {
-    const checkSpotify = async () => {
-      try {
-        const connected = await checkSpotifyConnection();
-        setSpotifyConnected(connected);
-      } catch (error) {
-        console.error('Error checking Spotify connection:', error);
-      }
-    };
-    
-    checkSpotify();
-  }, []);
   
   // Auto-save on content changes (debounced to avoid too many saves)
   useEffect(() => {
@@ -67,14 +49,13 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           content,
           mood: selectedMood,
           weather: weatherData || undefined,
-          track: selectedTrack || undefined,
           timestamp: entry.timestamp || new Date().toISOString(), // Preserve original timestamp
         });
       }
     }, 5000); // Auto-save 5 seconds after typing stops
     
     return () => clearTimeout(autoSaveTimer);
-  }, [content, selectedMood, weatherData, selectedTrack, entry, saveDraft]);
+  }, [content, selectedMood, weatherData, entry, saveDraft]);
   
   // Ensure entry has date and timestamp - only set these once when creating a new entry
   useEffect(() => {
@@ -114,7 +95,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         content,
         mood: selectedMood,
         weather: weatherData || undefined,
-        track: selectedTrack || undefined,
       };
 
       if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
@@ -190,15 +170,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
             minHeight="200px"
           />
         </div>
-        
-        {spotifyConnected && (
-          <div className="mb-6">
-            <SpotifySearch 
-              onSelectTrack={setSelectedTrack}
-              selectedTrack={selectedTrack}
-            />
-          </div>
-        )}
         
         <EditorControls
           isSaving={isSaving}
