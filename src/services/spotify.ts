@@ -5,8 +5,8 @@ import { SpotifyTrack } from '@/types';
 // Get Spotify authorization URL
 export const getSpotifyAuthUrl = async (): Promise<string> => {
   try {
-    // Pass the current origin to the function for proper redirect handling
-    const redirectUri = window.location.origin + '/callback';
+    // Use fixed redirect URI for Spotify OAuth
+    const redirectUri = "https://eternal-entries.vercel.app/callback";
     
     const { data, error } = await supabase.functions.invoke('spotify-auth/authorize', {
       body: { redirectUri }
@@ -28,8 +28,8 @@ export const handleSpotifyCallback = async (code: string): Promise<any> => {
     throw new Error('You must be logged in to connect Spotify');
   }
   
-  // Include current origin as redirect URI
-  const redirectUri = window.location.origin + '/callback';
+  // Use fixed redirect URI for Spotify OAuth
+  const redirectUri = "https://eternal-entries.vercel.app/callback";
   
   const { data, error } = await supabase.functions.invoke('spotify-auth/callback', {
     body: { 
