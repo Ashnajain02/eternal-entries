@@ -39,7 +39,17 @@ export const handleSpotifyCallback = async (code: string): Promise<boolean> => {
 // Get the user's recent tracks
 export const getRecentTracks = async (): Promise<any> => {
   try {
-    const { data, error } = await supabase.rpc('is_spotify_token_expired', {});
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      return null;
+    }
+
+    const { data, error } = await supabase.rpc('is_spotify_token_expired', {
+      user_id: user.id
+    });
     
     if (error) {
       console.error('Error checking Spotify token:', error);
@@ -70,7 +80,17 @@ export const getRecentTracks = async (): Promise<any> => {
 // Check if the user has connected their Spotify account
 export const isSpotifyConnected = async (): Promise<boolean> => {
   try {
-    const { data, error } = await supabase.rpc('is_spotify_token_expired', {});
+    // Get the current user
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.error('No authenticated user found');
+      return false;
+    }
+    
+    const { data, error } = await supabase.rpc('is_spotify_token_expired', {
+      user_id: user.id
+    });
     
     if (error) {
       console.error('Error checking Spotify connection:', error);
