@@ -9,7 +9,7 @@ const SCOPES = ['user-read-private', 'user-read-email', 'user-top-read', 'user-r
 // Get the authorization URL for Spotify
 export const getAuthorizationUrl = () => {
   const params = new URLSearchParams({
-    client_id: '834fb4c11be949b2b527500c41e2cec5', // Using the new client ID directly
+    client_id: '834fb4c11be949b2b527500c41e2cec5',
     response_type: 'code',
     redirect_uri: REDIRECT_URI,
     scope: SCOPES.join(' '),
