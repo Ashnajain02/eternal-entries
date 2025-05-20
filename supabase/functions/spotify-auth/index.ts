@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { encode as base64Encode } from "https://deno.land/std@0.177.0/encoding/base64.ts";
@@ -7,7 +6,6 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SPOTIFY_CLIENT_ID = Deno.env.get('SPOTIFY_CLIENT_ID') || '834fb4c11be949b2b527500c41e2cec5';
 const SPOTIFY_CLIENT_SECRET = Deno.env.get('SPOTIFY_CLIENT_SECRET') || '91843f81dc254191988e61a23993aa18';
-const REDIRECT_URI = 'https://eternal-entries.vercel.app/callback';
 
 // CORS headers for all responses
 const corsHeaders = {
@@ -41,6 +39,12 @@ serve(async (req) => {
         'user-read-playback-state'
       ];
       
+      // Get origin from request headers to set the correct redirect URI
+      const origin = req.headers.get('origin') || 'http://localhost:5173';
+      const REDIRECT_URI = `${origin}/callback`;
+      
+      console.log(`Using redirect URI: ${REDIRECT_URI}`);
+      
       const authUrl = new URL('https://accounts.spotify.com/authorize');
       authUrl.searchParams.append('client_id', SPOTIFY_CLIENT_ID);
       authUrl.searchParams.append('response_type', 'code');
@@ -60,7 +64,7 @@ serve(async (req) => {
     // Callback endpoint to exchange code for token
     if (path === 'callback') {
       const requestData = await req.json();
-      const { code } = requestData;
+      const { code, redirectUri } = requestData;
       
       if (!code) {
         return new Response(JSON.stringify({ error: 'Authorization code is required' }), {
@@ -68,6 +72,11 @@ serve(async (req) => {
           status: 400
         });
       }
+      
+      // Use the provided redirectUri or fall back to a default
+      const REDIRECT_URI = redirectUri || req.headers.get('origin') + '/callback' || 'http://localhost:5173/callback';
+      
+      console.log(`Using callback redirect URI: ${REDIRECT_URI}`);
       
       const authHeader = base64Encode(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`);
       
@@ -87,6 +96,7 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json();
       
       if (tokenData.error) {
+        console.error('Token error:', tokenData);
         return new Response(JSON.stringify({ error: tokenData.error }), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 400
