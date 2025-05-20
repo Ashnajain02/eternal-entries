@@ -32,6 +32,7 @@ serve(async (req) => {
 
     // Authorization URL endpoint
     if (path === 'authorize') {
+      const requestData = await req.json().catch(() => ({}));
       const scopes = [
         'user-read-private',
         'user-read-email',
@@ -39,8 +40,10 @@ serve(async (req) => {
         'user-read-playback-state'
       ];
       
-      // Get origin from request headers to set the correct redirect URI
-      const origin = req.headers.get('origin') || 'http://localhost:5173';
+      // Get redirect URI from request body or fallback to origin
+      const origin = requestData.redirectUri?.split('/callback')[0] || 
+                     req.headers.get('origin') || 
+                     'http://localhost:5173';
       const REDIRECT_URI = `${origin}/callback`;
       
       console.log(`Using redirect URI: ${REDIRECT_URI}`);

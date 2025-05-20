@@ -5,7 +5,12 @@ import { SpotifyTrack } from '@/types';
 // Get Spotify authorization URL
 export const getSpotifyAuthUrl = async (): Promise<string> => {
   try {
-    const { data, error } = await supabase.functions.invoke('spotify-auth/authorize');
+    // Pass the current origin to the function for proper redirect handling
+    const redirectUri = window.location.origin + '/callback';
+    
+    const { data, error } = await supabase.functions.invoke('spotify-auth/authorize', {
+      body: { redirectUri }
+    });
     
     if (error) throw error;
     return data.url;
