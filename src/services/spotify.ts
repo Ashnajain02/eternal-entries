@@ -1,14 +1,18 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { SpotifyTrack } from '@/types';
-import { useAuth } from '@/contexts/AuthContext';
 
 // Get Spotify authorization URL
 export const getSpotifyAuthUrl = async (): Promise<string> => {
-  const { data, error } = await supabase.functions.invoke('spotify-auth/authorize');
-  
-  if (error) throw error;
-  return data.url;
+  try {
+    const { data, error } = await supabase.functions.invoke('spotify-auth/authorize');
+    
+    if (error) throw error;
+    return data.url;
+  } catch (error) {
+    console.error('Error getting Spotify auth URL:', error);
+    throw error;
+  }
 };
 
 // Handle the callback from Spotify

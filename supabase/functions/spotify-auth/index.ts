@@ -5,14 +5,29 @@ import { encode as base64Encode } from "https://deno.land/std@0.177.0/encoding/b
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
-const SPOTIFY_CLIENT_ID = Deno.env.get('SPOTIFY_CLIENT_ID')!;
-const SPOTIFY_CLIENT_SECRET = Deno.env.get('SPOTIFY_CLIENT_SECRET')!;
+const SPOTIFY_CLIENT_ID = Deno.env.get('SPOTIFY_CLIENT_ID') || '834fb4c11be949b2b527500c41e2cec5';
+const SPOTIFY_CLIENT_SECRET = Deno.env.get('SPOTIFY_CLIENT_SECRET') || '91843f81dc254191988e61a23993aa18';
 const REDIRECT_URI = 'https://eternal-entries.vercel.app/callback';
+
+// CORS headers for all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};
 
 // Create a Supabase client
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders,
+    });
+  }
+
   try {
     const url = new URL(req.url);
     const path = url.pathname.split('/').pop();
@@ -37,7 +52,7 @@ serve(async (req) => {
       authUrl.searchParams.append('state', state);
       
       return new Response(JSON.stringify({ url: authUrl.toString() }), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
         status: 200
       });
     }
@@ -49,7 +64,7 @@ serve(async (req) => {
       
       if (!code) {
         return new Response(JSON.stringify({ error: 'Authorization code is required' }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 400
         });
       }
@@ -73,7 +88,7 @@ serve(async (req) => {
       
       if (tokenData.error) {
         return new Response(JSON.stringify({ error: tokenData.error }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 400
         });
       }
@@ -88,20 +103,20 @@ serve(async (req) => {
       const userData = await userResponse.json();
       
       // Get the user's ID from the JWT token in the request
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
+      const authorizationHeader = req.headers.get('Authorization');
+      if (!authorizationHeader) {
         return new Response(JSON.stringify({ error: 'No authorization header' }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 401
         });
       }
       
-      const token = authHeader.replace('Bearer ', '');
+      const token = authorizationHeader.replace('Bearer ', '');
       const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
       
       if (userError || !user) {
         return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 401
         });
       }
@@ -122,7 +137,7 @@ serve(async (req) => {
       if (updateError) {
         console.error('Error updating profile:', updateError);
         return new Response(JSON.stringify({ error: 'Failed to save Spotify credentials' }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 500
         });
       }
@@ -136,7 +151,7 @@ serve(async (req) => {
           avatar: userData.images?.[0]?.url
         }
       }), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
         status: 200
       });
     }
@@ -148,7 +163,7 @@ serve(async (req) => {
       
       if (!query) {
         return new Response(JSON.stringify({ error: 'Search query is required' }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 400
         });
       }
@@ -162,7 +177,7 @@ serve(async (req) => {
         // Token is expired, we need to refresh it
         // This would be implemented in a real app
         return new Response(JSON.stringify({ error: 'Spotify token expired. Please reconnect your Spotify account.' }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 401
         });
       }
@@ -174,7 +189,7 @@ serve(async (req) => {
       
       if (!accessToken) {
         return new Response(JSON.stringify({ error: 'Spotify not connected' }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 401
         });
       }
@@ -190,7 +205,7 @@ serve(async (req) => {
       
       if (searchData.error) {
         return new Response(JSON.stringify({ error: searchData.error.message }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
           status: 400
         });
       }
@@ -206,20 +221,20 @@ serve(async (req) => {
       }));
       
       return new Response(JSON.stringify({ tracks }), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
         status: 200
       });
     }
     
     // If no matching path is found
     return new Response(JSON.stringify({ error: 'Not found' }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
       status: 404
     });
   } catch (error) {
     console.error('Error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
       status: 500
     });
   }
