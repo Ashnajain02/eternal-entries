@@ -4,8 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ExternalLink, Music, X } from 'lucide-react';
-import { connectToSpotify, disconnectSpotify, getSpotifyConnectionStatus, handleSpotifyCallback } from '@/services/spotify';
-import { useLocation } from 'react-router-dom';
+import { openSpotifyAuthWindow, disconnectSpotify, getSpotifyConnectionStatus } from '@/services/spotify';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogAction, AlertDialogCancel, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -13,61 +12,7 @@ export const IntegrationsSettings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [spotifyUsername, setSpotifyUsername] = useState<string | null>(null);
-  const [isProcessingCode, setIsProcessingCode] = useState(false);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
-  const location = useLocation();
-
-  // Handle Spotify callback
-  useEffect(() => {
-    const handleCallback = async () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get('code');
-      const state = searchParams.get('state');
-      const error = searchParams.get('error');
-      
-      // Clean the URL without refreshing the page
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      if (error) {
-        toast({
-          title: "Authentication Failed",
-          description: `Spotify connection was denied: ${error}`,
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      if (code && state) {
-        setIsProcessingCode(true);
-        try {
-          const savedState = localStorage.getItem('spotify_auth_state');
-          if (state !== savedState) {
-            throw new Error('State mismatch. Authentication attempt may have been compromised.');
-          }
-          
-          const success = await handleSpotifyCallback(code);
-          if (success) {
-            // Refresh connection status
-            checkConnection();
-          }
-        } catch (error: any) {
-          console.error('Error handling Spotify callback:', error);
-          toast({
-            title: "Connection Failed",
-            description: error.message || "Could not connect to Spotify",
-            variant: "destructive"
-          });
-        } finally {
-          localStorage.removeItem('spotify_auth_state');
-          setIsProcessingCode(false);
-        }
-      }
-    };
-
-    if (location.search) {
-      handleCallback();
-    }
-  }, [location]);
 
   // Check connection status
   const checkConnection = async () => {
@@ -97,14 +42,38 @@ export const IntegrationsSettings: React.FC = () => {
     checkConnection();
   }, []);
 
+  // Handle connect button click
+  const handleConnect = async () => {
+    try {
+      await openSpotifyAuthWindow();
+    } catch (error: any) {
+      toast({
+        title: "Connection Error",
+        description: error.message || "Could not open Spotify authentication",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Handle disconnect confirmation
   const handleDisconnect = async () => {
     try {
       await disconnectSpotify();
       setSpotifyConnected(false);
       setSpotifyUsername(null);
+      
+      toast({
+        title: "Spotify Disconnected",
+        description: "Your Spotify account has been disconnected.",
+      });
     } catch (error) {
       console.error("Error disconnecting from Spotify:", error);
+      
+      toast({
+        title: "Disconnection Error",
+        description: "Could not disconnect from Spotify. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setShowDisconnectDialog(false);
     }
@@ -134,7 +103,7 @@ export const IntegrationsSettings: React.FC = () => {
                 </div>
               </div>
               
-              {isLoading || isProcessingCode ? (
+              {isLoading ? (
                 <Skeleton className="h-9 w-24" />
               ) : spotifyConnected ? (
                 <Button 
@@ -149,7 +118,7 @@ export const IntegrationsSettings: React.FC = () => {
               ) : (
                 <Button 
                   size="sm"
-                  onClick={connectToSpotify}
+                  onClick={handleConnect}
                   className="gap-2"
                 >
                   <span>Connect</span>
