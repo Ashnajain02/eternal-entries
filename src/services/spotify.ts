@@ -2,7 +2,8 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // Constants
-const REDIRECT_URI = 'https://eternal-entries.vercel.app/callback';
+// const REDIRECT_URI = 'https://eternal-entries.vercel.app/callback';
+const REDIRECT_URI = window.location.origin + '/settings';
 const SCOPES = ['user-read-private', 'user-read-email', 'user-top-read', 'user-read-recently-played'];
 
 // Get the authorization URL for Spotify
