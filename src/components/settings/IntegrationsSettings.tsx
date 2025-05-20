@@ -1,88 +1,8 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Music } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
-import { getAuthorizationUrl, isSpotifyConnected, handleSpotifyCallback } from '@/services/spotify';
-import { useSearchParams, useLocation } from 'react-router-dom';
 
 export const IntegrationsSettings: React.FC = () => {
-  const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
-  const [searchParams] = useSearchParams();
-  const location = useLocation();
-
-  useEffect(() => {
-    // Check for auth code in URL (coming back from Spotify)
-    const code = searchParams.get('code');
-    if (code) {
-      console.log("Found Spotify auth code in URL, handling callback");
-      handleCallback(code);
-    } else {
-      console.log("No Spotify auth code found, checking connection status");
-      checkSpotifyConnection();
-    }
-  }, [searchParams, location.search]);
-
-  const handleCallback = async (code: string) => {
-    setIsLoading(true);
-    try {
-      console.log("Processing Spotify callback with code");
-      const success = await handleSpotifyCallback(code);
-      
-      if (success) {
-        console.log("Spotify connection successful");
-        toast({
-          title: "Spotify Connected",
-          description: "Your Spotify account has been successfully connected.",
-        });
-        setSpotifyConnected(true);
-      } else {
-        console.error("Spotify connection failed");
-        toast({
-          title: "Connection Failed",
-          description: "Failed to connect your Spotify account. Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Error processing Spotify callback:", error);
-      toast({
-        title: "Connection Error",
-        description: "An error occurred while connecting to Spotify.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const checkSpotifyConnection = async () => {
-    setIsLoading(true);
-    try {
-      console.log("Checking Spotify connection status");
-      const connected = await isSpotifyConnected();
-      console.log("Spotify connected status:", connected);
-      setSpotifyConnected(connected);
-    } catch (error) {
-      console.error('Error checking Spotify connection:', error);
-      toast({
-        title: "Error",
-        description: "Failed to check Spotify connection status.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleConnectSpotify = () => {
-    // Redirect to Spotify authorization page
-    window.location.href = getAuthorizationUrl();
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -93,26 +13,7 @@ export const IntegrationsSettings: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          <div className="flex items-center justify-between p-4 border rounded-md">
-            <div className="flex items-center gap-4">
-              <div className="bg-green-100 p-2 rounded-full">
-                <Music className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <h3 className="font-medium">Spotify</h3>
-                <p className="text-sm text-muted-foreground">
-                  Connect your Spotify account to add songs to your journal entries
-                </p>
-              </div>
-            </div>
-            <Button 
-              variant={spotifyConnected ? "outline" : "default"}
-              disabled={isLoading}
-              onClick={handleConnectSpotify}
-            >
-              {isLoading ? "Checking..." : (spotifyConnected ? "Reconnect" : "Connect")}
-            </Button>
-          </div>
+          <p className="text-muted-foreground">No integrations available at this time.</p>
         </div>
       </CardContent>
     </Card>
