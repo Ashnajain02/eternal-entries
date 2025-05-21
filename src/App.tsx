@@ -13,7 +13,6 @@ import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
-import SpotifyCallback from "./pages/SpotifyCallback";
 import Callback from "./pages/Callback";
 
 const queryClient = new QueryClient();
@@ -28,7 +27,6 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<Auth />} />
-              <Route path="/spotify-callback" element={<SpotifyCallback />} />
               <Route path="/callback" element={<Callback />} />
               <Route 
                 path="/" 
