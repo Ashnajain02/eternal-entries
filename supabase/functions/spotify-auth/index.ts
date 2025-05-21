@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
 
@@ -23,12 +22,9 @@ serve(async (req) => {
     // Parse request body
     const requestData = await req.json();
     const { action, code, redirect_uri } = requestData;
-    console.log(`Action requested: ${action}, ${code}, ${redirect_uri} `);
+    console.log(`Action requested: ${action}`);
     
-    // Create a Supabase client with the provided auth token
-    const authHeader = req.headers.get("Authorization");
-    console.log(`Auth header present: ${Boolean(authHeader)}`);
-    
+    // Create a Supabase client with the service role key
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     console.log(`Supabase URL available: ${Boolean(supabaseUrl)}`);
@@ -36,28 +32,25 @@ serve(async (req) => {
 
     const supabase = createClient(
       supabaseUrl ?? "",
-      supabaseKey ?? "",
-      {
-        global: { headers: { Authorization: authHeader ?? "" } },
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-          detectSessionInUrl: false,
-        },
-      }
+      supabaseKey ?? ""
     );
-
-    // Get the authenticated user if the auth header is present
+    
+    // Extract JWT token from Authorization header
+    const authHeader = req.headers.get("Authorization");
+    console.log(`Auth header present: ${Boolean(authHeader)}`);
+    
+    // Get user ID from JWT if Authorization header is present
     let userId = null;
     if (authHeader) {
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
+        // Extract the JWT token (remove 'Bearer ' prefix if present)
+        const token = authHeader.replace(/^Bearer\s/, "");
+        
+        // Verify the JWT and get user information
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+        
         if (userError) {
-          console.error("Error getting user:", userError);
+          console.error("Error getting user from token:", userError);
         } else if (user) {
           userId = user.id;
           console.log(`User authenticated: ${userId}`);
