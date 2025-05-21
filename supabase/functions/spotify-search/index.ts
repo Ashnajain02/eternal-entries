@@ -1,7 +1,16 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
-import { SpotifyTrack } from "../../../src/types/index.ts";
+
+// Define SpotifyTrack type directly in this file instead of importing from frontend
+interface SpotifyTrack {
+  id: string;
+  name: string;
+  artist: string;
+  album: string;
+  albumArt: string;
+  uri: string;
+}
 
 // CORS headers for the function
 const corsHeaders = {
