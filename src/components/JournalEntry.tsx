@@ -102,15 +102,15 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         });
         
         toast({
-          title: "Reflection prompt generated",
-          description: "A reflection prompt has been created based on your journal entry."
+          title: "Reflection prompt created",
+          description: "We've added a thoughtful reflection question based on your entry."
         });
       }
     } catch (error) {
       console.error('Error generating AI prompt:', error);
       toast({
-        title: "Error generating prompt",
-        description: "Could not generate a reflection prompt. Please try again later.",
+        title: "Couldn't create reflection prompt",
+        description: "We ran into an issue while creating your reflection question. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -131,14 +131,14 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       });
       
       toast({
-        title: "Response saved",
-        description: "Your reflection response has been saved successfully."
+        title: "Thoughts saved",
+        description: "Your reflection has been saved to your journal."
       });
     } catch (error) {
       console.error('Error saving AI response:', error);
       toast({
-        title: "Error saving response",
-        description: "Could not save your response. Please try again.",
+        title: "Couldn't save your thoughts",
+        description: "There was a problem saving your reflection. Please try again.",
         variant: "destructive"
       });
     }
@@ -146,6 +146,28 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   const handleCancelResponse = () => {
     setAiResponse(entry.ai_response); // Reset to the original saved response
+  };
+  
+  const handleDeleteResponse = async () => {
+    try {
+      await updateEntry({
+        ...entry,
+        ai_response: null
+      });
+      
+      setAiResponse(null);
+      toast({
+        title: "Reflection deleted",
+        description: "Your reflection has been removed from this entry."
+      });
+    } catch (error) {
+      console.error('Error deleting response:', error);
+      toast({
+        title: "Couldn't delete reflection",
+        description: "There was a problem removing your reflection. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
   
   const handleDelete = () => {
@@ -233,6 +255,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             onResponseChange={handleResponseChange}
             onSaveResponse={handleSaveResponse}
             onCancelResponse={handleCancelResponse}
+            onDeleteResponse={handleDeleteResponse}
             isReadOnly={isPreview}
           />
         </div>
@@ -248,12 +271,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             {isGeneratingPrompt ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Generating reflection prompt...</span>
+                <span>Creating a reflection question...</span>
               </>
             ) : (
               <>
                 <MessageSquare className="h-4 w-4" />
-                <span>Generate reflection prompt</span>
+                <span>Add a reflection question</span>
               </>
             )}
           </Button>

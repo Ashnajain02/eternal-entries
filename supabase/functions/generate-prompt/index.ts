@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    // Call Gemini API instead of OpenAI
+    // Call Gemini API with updated prompt to generate more friendly, conversational questions
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
       method: 'POST',
       headers: {
@@ -38,13 +38,14 @@ serve(async (req) => {
             role: "user",
             parts: [
               {
-                text: `You are a compassionate and emotionally intelligent journaling coach.
-                Based on the journal entry provided, write one warm and thoughtful follow-up question that encourages deeper reflection.
-                The question should be:
-                1. Specific to the content shared
-                2. Emotionally intelligent and empathetic
-                3. Open-ended to encourage reflection
-                4. Concise (one sentence only)
+                text: `You are a thoughtful, empathetic journaling companion.
+                Based on the journal entry below, create a gentle, caring follow-up question that feels like it comes from a supportive friend, not an AI.
+                The reflection question should:
+                1. Feel warm and conversational (use "you" and avoid academic or clinical phrasing)
+                2. Reference specific content from their entry to feel personalized
+                3. Invite deeper emotional reflection in a gentle way
+                4. Be phrased in a casual, friendly tone like a trusted friend would use
+                5. Be concise (one sentence only)
                 
                 Respond with ONLY the question itself, no introduction or explanation.
                 
@@ -55,7 +56,7 @@ serve(async (req) => {
           }
         ],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.8,
           maxOutputTokens: 100,
         }
       }),
