@@ -75,6 +75,7 @@ serve(async (req) => {
 
 // Exchange the authorization code for access and refresh tokens
 async function exchangeCodeForToken(code: string, redirect_uri: string, supabase: any, user_id: string) {
+  console.log("Inside exchangeCodeForToken")
   const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
   const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
 
@@ -103,7 +104,7 @@ async function exchangeCodeForToken(code: string, redirect_uri: string, supabase
         redirect_uri: REDIRECT_URI,
       }),
     });
-
+    console.log("tokenData")
     const tokenData = await tokenResponse.json();
 
     if (tokenData.error) {
