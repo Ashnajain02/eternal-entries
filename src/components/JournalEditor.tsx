@@ -16,7 +16,6 @@ import { Loader2, Music } from 'lucide-react';
 import SpotifyTrackSearch from './spotify/SpotifyTrackSearch';
 import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
 import AIPrompt from './journal/AIPrompt';
-import { supabase } from '@/integrations/supabase/client';
 
 interface JournalEditorProps {
   entry?: JournalEntry;
@@ -48,11 +47,9 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState(initialEntry?.track || entry.track || null);
   
-  // AI prompt states
+  // AI prompt states - keeping the states but removing auto-generation
   const [aiPrompt, setAiPrompt] = useState<string | null>(initialEntry?.ai_prompt || null);
   const [aiResponse, setAiResponse] = useState<string | null>(initialEntry?.ai_response || null);
-  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
-  const [lastAnalyzedContent, setLastAnalyzedContent] = useState('');
   
   // Check if Spotify is connected
   useEffect(() => {
@@ -97,43 +94,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       });
     }
   }, [entry, setEntry]);
-
-  // Effect to generate AI prompt when content reaches sufficient length
-  useEffect(() => {
-    const shouldGeneratePrompt = 
-      content.length > 50 && 
-      content.trim() !== lastAnalyzedContent.trim() && 
-      content.split(/\s+/).length >= 10 && 
-      !aiPrompt && 
-      !isGeneratingPrompt;
-    
-    if (shouldGeneratePrompt) {
-      generateAIPrompt(content);
-    }
-  }, [content, lastAnalyzedContent, aiPrompt, isGeneratingPrompt]);
-
-  // Function to generate AI prompt
-  const generateAIPrompt = async (journalContent: string) => {
-    setIsGeneratingPrompt(true);
-    setLastAnalyzedContent(journalContent);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-prompt', {
-        body: { journalContent }
-      });
-      
-      if (error) throw error;
-      
-      if (data && data.prompt) {
-        setAiPrompt(data.prompt);
-      }
-    } catch (error) {
-      console.error('Error generating AI prompt:', error);
-      // We don't show an error toast here to avoid disrupting the user's writing flow
-    } finally {
-      setIsGeneratingPrompt(false);
-    }
-  };
 
   // Calculate the entry date for display from the entry's date property
   const entryDate = entry.date
@@ -263,21 +223,14 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           />
         </div>
         
-        {/* AI Prompt Section */}
-        {(aiPrompt || isGeneratingPrompt) && (
+        {/* AI Prompt Section - Only showing if there's an existing prompt */}
+        {aiPrompt && (
           <div className="mb-6">
-            {isGeneratingPrompt ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Generating reflection prompt...</span>
-              </div>
-            ) : (
-              <AIPrompt 
-                prompt={aiPrompt} 
-                response={aiResponse} 
-                onResponseChange={setAiResponse} 
-              />
-            )}
+            <AIPrompt 
+              prompt={aiPrompt} 
+              response={aiResponse} 
+              onResponseChange={setAiResponse} 
+            />
           </div>
         )}
         

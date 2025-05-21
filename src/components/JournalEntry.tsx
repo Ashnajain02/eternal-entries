@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import WeatherDisplay from './WeatherDisplay';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
-import { Pencil, Trash, MessageSquare } from 'lucide-react';
+import { Pencil, Trash, MessageSquare, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -24,6 +24,7 @@ import CommentSection from './CommentSection';
 import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
 import AIPrompt from './journal/AIPrompt';
+import { supabase } from '@/integrations/supabase/client';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -37,9 +38,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   isPreview = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry } = useJournal();
+  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState<string | null>(entry.ai_prompt);
+  const [aiResponse, setAiResponse] = useState<string | null>(entry.ai_response);
   
   console.log("Rendering entry with track:", entry.track);
   
@@ -74,6 +78,59 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const formattedTime = entry.timestamp 
     ? format(parseDate(entry.timestamp), 'h:mm a')
     : '';
+  
+  // Function to generate an AI prompt for this entry
+  const generateAIPrompt = async () => {
+    if (isGeneratingPrompt || entry.ai_prompt) return;
+    
+    setIsGeneratingPrompt(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-prompt', {
+        body: { journalContent: entry.content }
+      });
+      
+      if (error) throw error;
+      
+      if (data && data.prompt) {
+        setAiPrompt(data.prompt);
+        
+        // Update the entry in the database with the new prompt
+        await updateEntry({
+          ...entry,
+          ai_prompt: data.prompt
+        });
+        
+        toast({
+          title: "Reflection prompt generated",
+          description: "A reflection prompt has been created based on your journal entry."
+        });
+      }
+    } catch (error) {
+      console.error('Error generating AI prompt:', error);
+      toast({
+        title: "Error generating prompt",
+        description: "Could not generate a reflection prompt. Please try again later.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  };
+  
+  // Function to save the AI response to the entry
+  const handleResponseChange = async (response: string) => {
+    setAiResponse(response);
+    
+    try {
+      await updateEntry({
+        ...entry,
+        ai_response: response
+      });
+    } catch (error) {
+      console.error('Error saving AI response:', error);
+    }
+  };
   
   const handleDelete = () => {
     // Now we just open the confirmation dialog
@@ -152,14 +209,36 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       </div>
       
       {/* AI Prompt Section */}
-      {entry.ai_prompt && (
+      {aiPrompt ? (
         <div className="mb-6">
           <AIPrompt
-            prompt={entry.ai_prompt}
-            response={entry.ai_response}
-            onResponseChange={() => {}} // No-op since this is read-only view
-            isReadOnly={true}
+            prompt={aiPrompt}
+            response={aiResponse}
+            onResponseChange={handleResponseChange}
+            isReadOnly={isPreview}
           />
+        </div>
+      ) : !isPreview && (
+        <div className="mb-6">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={generateAIPrompt}
+            disabled={isGeneratingPrompt}
+            className="flex items-center gap-2"
+          >
+            {isGeneratingPrompt ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Generating reflection prompt...</span>
+              </>
+            ) : (
+              <>
+                <MessageSquare className="h-4 w-4" />
+                <span>Generate reflection prompt</span>
+              </>
+            )}
+          </Button>
         </div>
       )}
       
