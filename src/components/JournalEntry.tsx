@@ -119,17 +119,33 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   };
   
   // Function to save the AI response to the entry
-  const handleResponseChange = async (response: string) => {
+  const handleResponseChange = (response: string) => {
     setAiResponse(response);
-    
+  };
+  
+  const handleSaveResponse = async () => {
     try {
       await updateEntry({
         ...entry,
-        ai_response: response
+        ai_response: aiResponse
+      });
+      
+      toast({
+        title: "Response saved",
+        description: "Your reflection response has been saved successfully."
       });
     } catch (error) {
       console.error('Error saving AI response:', error);
+      toast({
+        title: "Error saving response",
+        description: "Could not save your response. Please try again.",
+        variant: "destructive"
+      });
     }
+  };
+  
+  const handleCancelResponse = () => {
+    setAiResponse(entry.ai_response); // Reset to the original saved response
   };
   
   const handleDelete = () => {
@@ -215,6 +231,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             prompt={aiPrompt}
             response={aiResponse}
             onResponseChange={handleResponseChange}
+            onSaveResponse={handleSaveResponse}
+            onCancelResponse={handleCancelResponse}
             isReadOnly={isPreview}
           />
         </div>

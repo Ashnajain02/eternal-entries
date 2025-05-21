@@ -9,17 +9,37 @@ interface AIPromptProps {
   response: string | null;
   onResponseChange: (response: string) => void;
   isReadOnly?: boolean;
+  onSaveResponse?: () => void;
+  onCancelResponse?: () => void;
 }
 
 const AIPrompt: React.FC<AIPromptProps> = ({ 
   prompt, 
   response, 
   onResponseChange,
-  isReadOnly = false
+  isReadOnly = false,
+  onSaveResponse,
+  onCancelResponse
 }) => {
   const [isExpanded, setIsExpanded] = useState(!!response);
+  const [localResponse, setLocalResponse] = useState(response || '');
 
   if (!prompt) return null;
+  
+  const handleSave = () => {
+    onResponseChange(localResponse);
+    if (onSaveResponse) {
+      onSaveResponse();
+    }
+  };
+  
+  const handleCancel = () => {
+    setLocalResponse(response || ''); // Reset to the original response
+    if (onCancelResponse) {
+      onCancelResponse();
+    }
+    setIsExpanded(false);
+  };
 
   return (
     <div className="border rounded-md p-4 bg-secondary/50 mt-4">
@@ -43,11 +63,23 @@ const AIPrompt: React.FC<AIPromptProps> = ({
                 <div className="space-y-2">
                   <Textarea
                     placeholder="Write your response here..."
-                    value={response || ''}
-                    onChange={(e) => onResponseChange(e.target.value)}
+                    value={localResponse}
+                    onChange={(e) => setLocalResponse(e.target.value)}
                     rows={3}
                     className="resize-none w-full"
                   />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={handleCancel}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={handleSave}
+                      disabled={!localResponse.trim()}
+                    >
+                      Save
+                    </Button>
+                  </div>
                 </div>
               )}
             </>
