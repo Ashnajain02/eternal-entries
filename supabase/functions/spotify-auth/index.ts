@@ -9,6 +9,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("AJ: 1")
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -53,6 +54,7 @@ serve(async (req) => {
     // Parse request body
     const requestData = await req.json();
     const { action, code, redirect_uri } = requestData;
+    console.log("AJ: requestData", action, code, redirect_uri)
 
     // Handle different actions
     if (action === "get_recent_tracks") {
@@ -65,9 +67,7 @@ serve(async (req) => {
       return await handleCallback(code, redirect_uri, supabase, user.id);
     } else if (action === "revoke") {
       return await revokeAccess(supabase, user.id);
-    } else if (code) {
-      return await exchangeCodeForToken(code, redirect_uri, supabase, user.id);
-    }
+  
 
     return new Response(
       JSON.stringify({ error: "Invalid request" }),
