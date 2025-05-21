@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
@@ -33,6 +34,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [aiPrompt, setAiPrompt] = useState<string | null>(entry.ai_prompt);
   const [aiResponse, setAiResponse] = useState<string | null>(entry.ai_response);
+  
+  // Add an effect to update state when entry prop changes
+  useEffect(() => {
+    setAiPrompt(entry.ai_prompt);
+    setAiResponse(entry.ai_response);
+  }, [entry.ai_prompt, entry.ai_response]);
   
   if (isEditing) {
     return <JournalEditor entry={entry} onSave={() => setIsEditing(false)} />;
@@ -128,11 +135,13 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const handleSaveResponse = async () => {
     try {
       // Only now do we save both the prompt and response to the database
-      await updateEntry({
+      const updatedEntry = {
         ...entry,
         ai_prompt: aiPrompt,
         ai_response: aiResponse
-      });
+      };
+      
+      await updateEntry(updatedEntry);
       
       toast({
         title: "Thoughts saved",
@@ -202,6 +211,14 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       description: "Your note has been permanently deleted."
     });
   };
+
+  console.log("Entry with reflection:", { 
+    id: entry.id,
+    prompt: aiPrompt, 
+    response: aiResponse, 
+    entryPrompt: entry.ai_prompt, 
+    entryResponse: entry.ai_response
+  });
   
   return (
     <Card className={cn("journal-card", className)}>
