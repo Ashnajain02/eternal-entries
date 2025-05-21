@@ -13,20 +13,23 @@ serve(async (req) => {
   }
 
   try {
-    // Set up Supabase client with auth from request
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    
+    // Parse request body
+    const requestData = await req.json();
+    const { action, code, redirect_uri } = requestData;
+    
+    // Create a Supabase client with the authorization header if it exists
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No authorization header" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      supabaseUrl,
+      authHeader ? supabaseServiceRoleKey : supabaseAnonKey,
       {
-        global: { headers: { Authorization: authHeader } },
+        global: { 
+          headers: authHeader ? { Authorization: authHeader } : {} 
+        },
         auth: {
           autoRefreshToken: false,
           persistSession: false,
@@ -34,29 +37,41 @@ serve(async (req) => {
         },
       }
     );
-
-    // Get authenticated user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "User not authenticated" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+    
+    // Get authenticated user if authorization header exists
+    let userId = null;
+    if (authHeader) {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (user && !userError) {
+        userId = user.id;
+      }
     }
-
-    // Parse request body
-    const requestData = await req.json();
-    const { action, code, redirect_uri } = requestData;
-
-    // Handle different actions
-    if (action === "is_token_expired") {
-      return await isTokenExpired(supabase, user.id);
+    
+    // For actions that require authentication, verify the user
+    if (action === "is_token_expired" || action === "revoke") {
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: "Authentication required" }),
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+      
+      if (action === "is_token_expired") {
+        return await isTokenExpired(supabase, userId);
+      } else if (action === "revoke") {
+        return await revokeAccess(supabase, userId);
+      }
     } else if (action === "authorize") {
       return await getAuthorizationUrl(redirect_uri);
     } else if (action === "callback" && code) {
-      return await handleCallback(code, redirect_uri, supabase, user.id);
-    } else if (action === "revoke") {
-      return await revokeAccess(supabase, user.id);
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: "Authentication required for callback" }),
+          { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+      return await handleCallback(code, redirect_uri, supabase, userId);
     } else {
       return new Response(
         JSON.stringify({ error: "Invalid request" }),
