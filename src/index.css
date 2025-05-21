@@ -135,6 +135,10 @@
     @apply bg-journal-green text-white hover:bg-opacity-90 transition-colors;
   }
 
+  .spotify-player-compact {
+    @apply scale-90 -my-2 origin-left;
+  }
+
   .animated-gradient {
     background: linear-gradient(120deg, rgba(155, 135, 245, 0.2), rgba(14, 165, 233, 0.2), rgba(155, 135, 245, 0.2));
     background-size: 200% 200%;

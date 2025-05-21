@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -138,10 +139,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         <span className="text-sm text-muted-foreground capitalize">{entry.mood.replace('-', ' ')}</span>
       </div>
       
-      {/* Spotify Track Section */}
+      {/* Spotify Track Section - Now using compact player */}
       {entry.track && (
-        <div className="mb-6">
-          <SpotifyPlayer track={entry.track} className="mb-2" />
+        <div className="mb-4">
+          <SpotifyPlayer track={entry.track} className="mb-2" compact={true} />
         </div>
       )}
       
