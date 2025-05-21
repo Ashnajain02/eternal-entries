@@ -19,10 +19,11 @@ serve(async (req) => {
 
   try {
     console.log("Parsing request body");
+
     // Parse request body
     const requestData = await req.json();
     const { action, code, redirect_uri } = requestData;
-    console.log(`Action requested: ${action}`);
+    console.log(`Action requested: ${action}, ${code}, ${redirect_uri} `);
     
     // Create a Supabase client with the provided auth token
     const authHeader = req.headers.get("Authorization");
