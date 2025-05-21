@@ -1,14 +1,25 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import Layout from '@/components/Layout';
 import { IntegrationsSettings } from '@/components/settings/IntegrationsSettings';
 import { AccountSettings } from '@/components/settings/AccountSettings';
 import { TemperatureSettings } from '@/components/settings/TemperatureSettings';
+import { useSearchParams } from 'react-router-dom';
 
 const Settings = () => {
   const { authState } = useAuth();
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = React.useState('integrations');
+
+  // Set active tab based on URL param if available
+  useEffect(() => {
+    if (tabParam && ['integrations', 'account', 'display'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   if (!authState.user) {
     return (
@@ -26,7 +37,7 @@ const Settings = () => {
       <div className="container max-w-4xl py-8">
         <h1 className="text-3xl font-bold mb-6">Settings</h1>
         
-        <Tabs defaultValue="integrations">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>

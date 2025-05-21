@@ -21,6 +21,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import CommentSection from './CommentSection';
+import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
+import SpotifyPlayer from './spotify/SpotifyPlayer';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -134,6 +136,13 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         <span className="text-2xl">{moodEmoji}</span>
         <span className="text-sm text-muted-foreground capitalize">{entry.mood.replace('-', ' ')}</span>
       </div>
+      
+      {/* Spotify Track Section */}
+      {entry.track && (
+        <div className="mb-6">
+          <SpotifyPlayer track={entry.track} className="mb-2" />
+        </div>
+      )}
       
       <div className="mb-6">
         <div className="whitespace-pre-wrap text-left">{entry.content}</div>

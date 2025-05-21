@@ -12,6 +12,10 @@ import EditorHeader from './journal/EditorHeader';
 import EditorControls from './journal/EditorControls';
 import { useJournalDraft } from '@/hooks/useJournalDraft';
 import { useWeatherData } from '@/hooks/useWeatherData';
+import { isSpotifyConnected } from '@/services/spotify';
+import { Music } from 'lucide-react';
+import SpotifyTrackSearch from './spotify/SpotifyTrackSearch';
+import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
 
 interface JournalEditorProps {
   entry?: JournalEntry;
@@ -39,6 +43,19 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [content, setContent] = useState(initialEntry?.content || entry.content || '');
   const [selectedMood, setSelectedMood] = useState<Mood>(initialEntry?.mood || entry.mood || 'neutral');
   const [isSaving, setIsSaving] = useState(false);
+  const [isSpotifySearchOpen, setIsSpotifySearchOpen] = useState(false);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState(initialEntry?.track || entry.track);
+  
+  // Check if Spotify is connected
+  useEffect(() => {
+    const checkSpotify = async () => {
+      const connected = await isSpotifyConnected();
+      setSpotifyConnected(connected);
+    };
+    
+    checkSpotify();
+  }, []);
   
   // Auto-save on content changes (debounced to avoid too many saves)
   useEffect(() => {
@@ -49,13 +66,14 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           content,
           mood: selectedMood,
           weather: weatherData || undefined,
+          track: selectedTrack,
           timestamp: entry.timestamp || new Date().toISOString(), // Preserve original timestamp
         });
       }
     }, 5000); // Auto-save 5 seconds after typing stops
     
     return () => clearTimeout(autoSaveTimer);
-  }, [content, selectedMood, weatherData, entry, saveDraft]);
+  }, [content, selectedMood, weatherData, selectedTrack, entry, saveDraft]);
   
   // Ensure entry has date and timestamp - only set these once when creating a new entry
   useEffect(() => {
@@ -95,6 +113,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         content,
         mood: selectedMood,
         weather: weatherData || undefined,
+        track: selectedTrack,
       };
 
       if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
@@ -137,6 +156,29 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     }
   };
 
+  const handleSpotifyConnect = () => {
+    // Use the existing Spotify auth flow
+    window.location.href = '/settings?tab=integrations';
+  };
+
+  const handleAddSong = () => {
+    setIsSpotifySearchOpen(true);
+  };
+
+  const handleRemoveTrack = () => {
+    setSelectedTrack(undefined);
+    
+    // Also update the draft
+    saveDraft({
+      ...entry,
+      content,
+      mood: selectedMood,
+      weather: weatherData || undefined,
+      track: undefined,
+      timestamp: entry.timestamp || new Date().toISOString(),
+    });
+  };
+
   return (
     <Card className="journal-card animated-gradient">
       <div className="p-6">
@@ -171,12 +213,52 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           />
         </div>
         
+        {/* Spotify Track Section */}
+        <div className="mb-6">
+          {selectedTrack ? (
+            <div className="mb-2">
+              <SpotifyTrackDisplay 
+                track={selectedTrack} 
+                onRemove={handleRemoveTrack} 
+              />
+            </div>
+          ) : (
+            <div>
+              {spotifyConnected ? (
+                <Button 
+                  variant="outline" 
+                  onClick={handleAddSong} 
+                  className="w-full border-dashed"
+                >
+                  <Music className="mr-2 h-4 w-4" />
+                  Add song from Spotify
+                </Button>
+              ) : (
+                <Button 
+                  variant="outline" 
+                  onClick={handleSpotifyConnect} 
+                  className="w-full border-dashed"
+                >
+                  <Music className="mr-2 h-4 w-4" />
+                  Connect to Spotify
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+        
         <EditorControls
           isSaving={isSaving}
           onSave={handleSave}
           onCancel={handleCancel}
         />
       </div>
+      
+      <SpotifyTrackSearch 
+        isOpen={isSpotifySearchOpen} 
+        onClose={() => setIsSpotifySearchOpen(false)} 
+        onTrackSelect={setSelectedTrack} 
+      />
     </Card>
   );
 };
