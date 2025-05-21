@@ -1,29 +1,21 @@
+
 import React, { useState } from 'react';
-import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import WeatherDisplay from './WeatherDisplay';
+import { Card } from '@/components/ui/card';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
-import { Pencil, Trash, MessageSquare, Loader2, RefreshCcw } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import CommentSection from './CommentSection';
-import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
-import AIPrompt from './journal/AIPrompt';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+// Import our new components
+import EntryHeader from './journal/EntryHeader';
+import MoodDisplay from './journal/MoodDisplay';
+import EntryContent from './journal/EntryContent';
+import EntryActions from './journal/EntryActions';
+import ReflectionSection from './journal/ReflectionSection';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -39,44 +31,13 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
   const { toast } = useToast();
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [aiPrompt, setAiPrompt] = useState<string | null>(entry.ai_prompt);
   const [aiResponse, setAiResponse] = useState<string | null>(entry.ai_response);
   
-  console.log("Rendering entry with track:", entry.track);
-  
-  // Parse ISO date string properly to display in local timezone
-  const parseDate = (dateValue: string | number) => {
-    if (!dateValue) return new Date();
-    
-    // Handle both string and number timestamp values
-    if (typeof dateValue === 'number') {
-      return new Date(dateValue);
-    }
-    
-    // Handle string formats (ISO or date-only)
-    if (typeof dateValue === 'string') {
-      return dateValue.includes('T') 
-        ? parseISO(dateValue) 
-        : parseISO(`${dateValue}T00:00:00.000Z`);
-    }
-    
-    return new Date(dateValue);
-  };
-  
-  // Use the actual entry timestamp for the date display when available
-  const entryDateTime = entry.timestamp 
-    ? parseDate(entry.timestamp)
-    : parseDate(entry.date);
-  
-  // Format the date consistently as full weekday, month day, year - matching the editor
-  const formattedDate = format(entryDateTime, 'EEEE, MMMM d, yyyy');
-  
-  // Format time from timestamp if available
-  const formattedTime = entry.timestamp 
-    ? format(parseDate(entry.timestamp), 'h:mm a')
-    : '';
+  if (isEditing) {
+    return <JournalEditor entry={entry} onSave={() => setIsEditing(false)} />;
+  }
   
   // Function to generate an AI prompt for this entry
   const generateAIPrompt = async () => {
@@ -207,18 +168,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     }
   };
   
-  const handleDelete = () => {
-    // Now we just open the confirmation dialog
-    setIsDeleteDialogOpen(true);
-  };
-
-  const confirmDelete = async () => {
+  const handleDelete = async () => {
     await deleteEntry(entry.id);
     toast({
       title: "Entry deleted",
       description: "Your journal entry has been permanently deleted."
     });
-    setIsDeleteDialogOpen(false);
   };
   
   const handleAddComment = async (content: string) => {
@@ -233,44 +188,16 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     });
   };
   
-  if (isEditing) {
-    return <JournalEditor entry={entry} onSave={() => setIsEditing(false)} />;
-  }
-  
-  const moodEmoji = {
-    'happy': '😄',
-    'content': '😊',
-    'neutral': '😐',
-    'sad': '😔',
-    'anxious': '😰',
-    'angry': '😠',
-    'emotional': '🥹',
-    'in-love': '😍',
-    'excited': '🤩',
-    'tired': '😴'
-  }[entry.mood] || '😐';
-
   return (
     <Card className={cn("journal-card", className)}>
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h3 className="text-xl font-semibold">{formattedDate}</h3>
-          <p className="text-sm text-muted-foreground">{formattedTime}</p>
-          {entry.updatedAt && (
-            <p className="text-xs text-muted-foreground">
-              Updated: {format(parseDate(entry.updatedAt), 'MMM d, yyyy h:mm a')}
-            </p>
-          )}
-        </div>
-        {entry.weather && (
-          <WeatherDisplay weatherData={entry.weather} isLoading={false} />
-        )}
-      </div>
+      <EntryHeader 
+        timestamp={entry.timestamp}
+        date={entry.date}
+        updatedAt={entry.updatedAt}
+        weather={entry.weather}
+      />
       
-      <div className="mb-4 flex items-center gap-2">
-        <span className="text-2xl">{moodEmoji}</span>
-        <span className="text-sm text-muted-foreground capitalize">{entry.mood.replace('-', ' ')}</span>
-      </div>
+      <MoodDisplay mood={entry.mood} />
       
       {/* Spotify Track Section */}
       {entry.track && (
@@ -279,47 +206,20 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         </div>
       )}
       
-      <div className="mb-6">
-        <div className="whitespace-pre-wrap text-left">{entry.content}</div>
-      </div>
+      <EntryContent content={entry.content} />
       
-      {/* AI Prompt Section */}
-      {aiPrompt ? (
-        <div className="mb-6">
-          <AIPrompt
-            prompt={aiPrompt}
-            response={aiResponse}
-            onResponseChange={handleResponseChange}
-            onSaveResponse={handleSaveResponse}
-            onCancelResponse={handleCancelResponse}
-            onDeleteResponse={handleDeleteResponse}
-            onRegeneratePrompt={!isPreview ? handleRegeneratePrompt : undefined}
-            isReadOnly={isPreview}
-          />
-        </div>
-      ) : !isPreview && (
-        <div className="mb-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generateAIPrompt}
-            disabled={isGeneratingPrompt}
-            className="flex items-center gap-2"
-          >
-            {isGeneratingPrompt ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Creating a reflection question...</span>
-              </>
-            ) : (
-              <>
-                <MessageSquare className="h-4 w-4" />
-                <span>Add a reflection question</span>
-              </>
-            )}
-          </Button>
-        </div>
-      )}
+      <ReflectionSection
+        aiPrompt={aiPrompt}
+        aiResponse={aiResponse}
+        isGeneratingPrompt={isGeneratingPrompt}
+        onGeneratePrompt={generateAIPrompt}
+        onRegeneratePrompt={handleRegeneratePrompt}
+        onResponseChange={handleResponseChange}
+        onSaveResponse={handleSaveResponse}
+        onCancelResponse={handleCancelResponse}
+        onDeleteResponse={handleDeleteResponse}
+        isPreview={isPreview}
+      />
       
       {!isPreview && (
         <>
@@ -331,42 +231,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             />
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button 
-              variant="outline" 
-              size="icon"
-              onClick={() => setIsEditing(true)}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={handleDelete}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash className="h-4 w-4" />
-            </Button>
-          </div>
+          <EntryActions
+            onEdit={() => setIsEditing(true)}
+            onDelete={handleDelete}
+          />
         </>
       )}
-
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your journal entry.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Card>
   );
 };
