@@ -5,6 +5,39 @@ import { supabase } from '@/integrations/supabase/client';
 const REDIRECT_URI = `${window.location.origin}/callback`;
 
 /**
+ * Check if the user has connected their Spotify account
+ * and the token is still valid
+ */
+export const isSpotifyConnected = async (): Promise<boolean> => {
+  try {
+    console.log("Checking if Spotify is connected");
+    
+    // Get the current session to ensure we have a valid token
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      console.warn('No active session. Assuming Spotify is not connected.');
+      return false;
+    }
+    
+    const { data, error } = await supabase.functions.invoke('spotify-auth', {
+      body: { action: 'is_token_expired' }
+    });
+    
+    console.log("Token expiration check response:", data, error);
+    
+    if (error) {
+      console.error('Error checking token expiration:', error);
+      return false; // Assume not connected on error
+    }
+    
+    return !(data?.expired || false);
+  } catch (error) {
+    console.error('Failed to check Spotify connection:', error);
+    return false;
+  }
+};
+
+/**
  * Initiate the Spotify authorization process
  */
 export const initiateSpotifyAuth = async (): Promise<void> => {
@@ -82,38 +115,6 @@ export const handleSpotifyCallback = async (code: string): Promise<{
 };
 
 /**
- * Check if the Spotify token is expired
- */
-export const isSpotifyTokenExpired = async (): Promise<boolean> => {
-  try {
-    console.log("Checking if Spotify token is expired");
-    
-    // Get the current session to ensure we have a valid token
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      console.warn('No active session. Assuming token is expired.');
-      return true;
-    }
-    
-    const { data, error } = await supabase.functions.invoke('spotify-auth', {
-      body: { action: 'is_token_expired' }
-    });
-    
-    console.log("Token expiration check response:", data, error);
-    
-    if (error) {
-      console.error('Error checking token expiration:', error);
-      return true; // Assume expired on error
-    }
-    
-    return data?.expired || false;
-  } catch (error) {
-    console.error('Failed to check token expiration:', error);
-    return true; // Assume expired on error
-  }
-};
-
-/**
  * Revoke Spotify access
  */
 export const disconnectSpotify = async (): Promise<boolean> => {
@@ -141,19 +142,6 @@ export const disconnectSpotify = async (): Promise<boolean> => {
     return data?.success || false;
   } catch (error) {
     console.error('Failed to disconnect Spotify:', error);
-    return false;
-  }
-};
-
-/**
- * Check if the user has connected their Spotify account
- */
-export const isSpotifyConnected = async (): Promise<boolean> => {
-  try {
-    console.log("Checking if Spotify is connected");
-    return !(await isSpotifyTokenExpired());
-  } catch (error) {
-    console.error('Failed to check Spotify connection:', error);
     return false;
   }
 };
