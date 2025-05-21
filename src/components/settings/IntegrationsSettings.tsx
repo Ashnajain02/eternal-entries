@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { initiateSpotifyAuth, isSpotifyConnected, disconnectSpotify } from '@/services/spotify';
 
 export const IntegrationsSettings: React.FC = () => {
-  const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(null);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -80,37 +80,35 @@ export const IntegrationsSettings: React.FC = () => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-6">
-          <div className="flex items-center justify-between p-4 border rounded-md">
-            <div className="flex items-center gap-4">
-              <div className="bg-green-100 p-2 rounded-full">
-                <Music className="h-5 w-5 text-green-500" />
-              </div>
-              <div>
-                <h3 className="font-medium">Spotify</h3>
-                <p className="text-sm text-muted-foreground">
-                  Connect your Spotify account to add songs to your journal entries
-                </p>
-              </div>
+        <div className="flex items-center justify-between p-4 border rounded-md">
+          <div className="flex items-center gap-4">
+            <div className="bg-green-100 p-2 rounded-full">
+              <Music className="h-5 w-5 text-green-500" />
             </div>
-            {spotifyConnected ? (
-              <Button 
-                variant="outline"
-                disabled={isLoading}
-                onClick={handleDisconnectSpotify}
-              >
-                {isLoading ? "Processing..." : "Disconnect"}
-              </Button>
-            ) : (
-              <Button 
-                variant="default"
-                disabled={isLoading}
-                onClick={handleConnectSpotify}
-              >
-                {isLoading ? "Checking..." : "Connect"}
-              </Button>
-            )}
+            <div>
+              <h3 className="font-medium">Spotify</h3>
+              <p className="text-sm text-muted-foreground">
+                Connect your Spotify account to add songs to your journal entries
+              </p>
+            </div>
           </div>
+          {spotifyConnected ? (
+            <Button 
+              variant="outline"
+              disabled={isLoading}
+              onClick={handleDisconnectSpotify}
+            >
+              {isLoading ? "Processing..." : "Disconnect"}
+            </Button>
+          ) : (
+            <Button 
+              variant="default"
+              disabled={isLoading}
+              onClick={handleConnectSpotify}
+            >
+              {isLoading ? "Checking..." : "Connect"}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

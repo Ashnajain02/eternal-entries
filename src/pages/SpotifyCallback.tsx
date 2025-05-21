@@ -10,7 +10,7 @@ const SpotifyCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('Processing Spotify authorization...');
 
   useEffect(() => {
@@ -19,7 +19,6 @@ const SpotifyCallback = () => {
       const error = searchParams.get('error');
 
       if (error) {
-        console.error('Spotify auth error:', error);
         setStatus('error');
         setMessage(`Authorization failed: ${error}`);
         toast({
@@ -63,10 +62,8 @@ const SpotifyCallback = () => {
           });
         }
         
-        // Redirect to settings after a short delay
         setTimeout(() => navigate('/settings'), 3000);
-      } catch (err: any) {
-        console.error('Error in callback processing:', err);
+      } catch (err) {
         setStatus('error');
         setMessage(`Error: ${err.message || 'Unknown error'}`);
         toast({

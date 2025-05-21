@@ -7,7 +7,6 @@ const SCOPES = ['user-read-private', 'user-read-email', 'user-top-read', 'user-r
 
 /**
  * Initiate the Spotify authorization process
- * Opens a new window for the Spotify OAuth flow
  */
 export const initiateSpotifyAuth = async (): Promise<void> => {
   try {
@@ -18,16 +17,10 @@ export const initiateSpotifyAuth = async (): Promise<void> => {
       }
     });
 
-    if (error) {
-      console.error('Error getting authorization URL:', error);
-      throw new Error('Failed to get Spotify authorization URL');
+    if (error || !data?.url) {
+      throw new Error(error?.message || 'Failed to get Spotify authorization URL');
     }
 
-    if (!data?.url) {
-      throw new Error('No authorization URL returned');
-    }
-
-    // Open Spotify auth page in a new tab
     window.open(data.url, '_blank');
   } catch (error) {
     console.error('Error initiating Spotify auth:', error);
@@ -53,7 +46,6 @@ export const handleSpotifyCallback = async (code: string): Promise<{
     });
 
     if (error) {
-      console.error('Error handling callback:', error);
       return { success: false, error: error.message };
     }
 
@@ -110,39 +102,10 @@ export const disconnectSpotify = async (): Promise<boolean> => {
 };
 
 /**
- * Get the user's recent tracks from Spotify
- */
-export const getRecentTracks = async (): Promise<any> => {
-  try {
-    // Check if token is expired
-    const isExpired = await isSpotifyTokenExpired();
-    
-    if (isExpired) {
-      return { error: 'EXPIRED_TOKEN' };
-    }
-
-    const { data, error } = await supabase.functions.invoke('spotify-auth', {
-      body: { action: 'get_recent_tracks' }
-    });
-
-    if (error) {
-      console.error('Error getting recent tracks:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Failed to get recent tracks:', error);
-    return null;
-  }
-};
-
-/**
  * Check if the user has connected their Spotify account
  */
 export const isSpotifyConnected = async (): Promise<boolean> => {
   try {
-    // If the token is not expired, the user is connected
     return !(await isSpotifyTokenExpired());
   } catch (error) {
     console.error('Failed to check Spotify connection:', error);
