@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Music } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { getAuthorizationUrl, isSpotifyConnected } from '@/services/spotify';
+import { initiateSpotifyAuth, isSpotifyConnected, disconnectSpotify } from '@/services/spotify';
 
 export const IntegrationsSettings: React.FC = () => {
   const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(null);
@@ -32,9 +32,43 @@ export const IntegrationsSettings: React.FC = () => {
     }
   };
 
-  const handleConnectSpotify = () => {
-    // Redirect to Spotify authorization page
-    window.location.href = getAuthorizationUrl();
+  const handleConnectSpotify = async () => {
+    try {
+      await initiateSpotifyAuth();
+    } catch (error) {
+      console.error('Error connecting to Spotify:', error);
+      toast({
+        title: "Error",
+        description: "Failed to connect to Spotify. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDisconnectSpotify = async () => {
+    setIsLoading(true);
+    try {
+      const success = await disconnectSpotify();
+      
+      if (success) {
+        setSpotifyConnected(false);
+        toast({
+          title: "Disconnected",
+          description: "Your Spotify account has been disconnected.",
+        });
+      } else {
+        throw new Error("Failed to disconnect");
+      }
+    } catch (error) {
+      console.error('Error disconnecting Spotify:', error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect from Spotify. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -59,13 +93,23 @@ export const IntegrationsSettings: React.FC = () => {
                 </p>
               </div>
             </div>
-            <Button 
-              variant={spotifyConnected ? "outline" : "default"}
-              disabled={isLoading}
-              onClick={handleConnectSpotify}
-            >
-              {isLoading ? "Checking..." : (spotifyConnected ? "Reconnect" : "Connect")}
-            </Button>
+            {spotifyConnected ? (
+              <Button 
+                variant="outline"
+                disabled={isLoading}
+                onClick={handleDisconnectSpotify}
+              >
+                {isLoading ? "Processing..." : "Disconnect"}
+              </Button>
+            ) : (
+              <Button 
+                variant="default"
+                disabled={isLoading}
+                onClick={handleConnectSpotify}
+              >
+                {isLoading ? "Checking..." : "Connect"}
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>

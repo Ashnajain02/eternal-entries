@@ -2,83 +2,148 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // Constants
-const REDIRECT_URI = 'https://eternal-entries.vercel.app/callback';
+const REDIRECT_URI = `${window.location.origin}/spotify-callback`;
 const SCOPES = ['user-read-private', 'user-read-email', 'user-top-read', 'user-read-recently-played'];
 
-// Get the authorization URL for Spotify
-export const getAuthorizationUrl = () => {
-  const params = new URLSearchParams({
-    client_id: 'CLIENT_ID_PLACEHOLDER', // This will be handled by the edge function
-    response_type: 'code',
-    redirect_uri: REDIRECT_URI,
-    scope: SCOPES.join(' '),
-  });
-
-  return `https://accounts.spotify.com/authorize?${params.toString()}`;
-};
-
-// Handle the callback from Spotify with the auth code
-export const handleSpotifyCallback = async (code: string): Promise<boolean> => {
+/**
+ * Initiate the Spotify authorization process
+ * Opens a new window for the Spotify OAuth flow
+ */
+export const initiateSpotifyAuth = async (): Promise<void> => {
   try {
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
-      body: { code, redirect_uri: REDIRECT_URI }
+      body: { 
+        action: 'authorize',
+        redirect_uri: REDIRECT_URI
+      }
     });
 
     if (error) {
-      console.error('Error exchanging code for token:', error);
-      return false;
+      console.error('Error getting authorization URL:', error);
+      throw new Error('Failed to get Spotify authorization URL');
     }
 
+    if (!data?.url) {
+      throw new Error('No authorization URL returned');
+    }
+
+    // Open Spotify auth page in a new tab
+    window.open(data.url, '_blank');
+  } catch (error) {
+    console.error('Error initiating Spotify auth:', error);
+    throw error;
+  }
+};
+
+/**
+ * Handle the callback from Spotify with the auth code
+ */
+export const handleSpotifyCallback = async (code: string): Promise<{
+  success: boolean;
+  display_name?: string;
+  error?: string;
+}> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('spotify-auth', {
+      body: { 
+        action: 'callback',
+        code, 
+        redirect_uri: REDIRECT_URI 
+      }
+    });
+
+    if (error) {
+      console.error('Error handling callback:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { 
+      success: data.success,
+      display_name: data.display_name
+    };
+  } catch (error: any) {
+    console.error('Failed to handle Spotify callback:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Check if the Spotify token is expired
+ */
+export const isSpotifyTokenExpired = async (): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('spotify-auth', {
+      body: { action: 'is_token_expired' }
+    });
+    
+    if (error) {
+      console.error('Error checking token expiration:', error);
+      return true; // Assume expired on error
+    }
+    
+    return data?.expired || false;
+  } catch (error) {
+    console.error('Failed to check token expiration:', error);
+    return true; // Assume expired on error
+  }
+};
+
+/**
+ * Revoke Spotify access
+ */
+export const disconnectSpotify = async (): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('spotify-auth', {
+      body: { action: 'revoke' }
+    });
+    
+    if (error) {
+      console.error('Error disconnecting Spotify:', error);
+      return false;
+    }
+    
     return data?.success || false;
   } catch (error) {
-    console.error('Failed to exchange auth code:', error);
+    console.error('Failed to disconnect Spotify:', error);
     return false;
   }
 };
 
-// Get the user's recent tracks
+/**
+ * Get the user's recent tracks from Spotify
+ */
 export const getRecentTracks = async (): Promise<any> => {
   try {
-    const { data, error } = await supabase.rpc('is_spotify_token_expired', {});
+    // Check if token is expired
+    const isExpired = await isSpotifyTokenExpired();
     
-    if (error) {
-      console.error('Error checking Spotify token:', error);
-      return null;
-    }
-
-    if (data === true) {
-      // Token is expired, user needs to re-authenticate
+    if (isExpired) {
       return { error: 'EXPIRED_TOKEN' };
     }
 
-    const { data: tracks, error: tracksError } = await supabase.functions.invoke('spotify-auth', {
+    const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { action: 'get_recent_tracks' }
     });
 
-    if (tracksError) {
-      console.error('Error getting recent tracks:', tracksError);
+    if (error) {
+      console.error('Error getting recent tracks:', error);
       return null;
     }
 
-    return tracks;
+    return data;
   } catch (error) {
     console.error('Failed to get recent tracks:', error);
     return null;
   }
 };
 
-// Check if the user has connected their Spotify account
+/**
+ * Check if the user has connected their Spotify account
+ */
 export const isSpotifyConnected = async (): Promise<boolean> => {
   try {
-    const { data, error } = await supabase.rpc('is_spotify_token_expired', {});
-    
-    if (error) {
-      console.error('Error checking Spotify connection:', error);
-      return false;
-    }
-
-    // If token is not expired, user is connected
-    return data === false;
+    // If the token is not expired, the user is connected
+    return !(await isSpotifyTokenExpired());
   } catch (error) {
     console.error('Failed to check Spotify connection:', error);
     return false;
