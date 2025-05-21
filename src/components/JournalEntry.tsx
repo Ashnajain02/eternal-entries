@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -8,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import WeatherDisplay from './WeatherDisplay';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
-import { Pencil, Trash, MessageSquare, Loader2 } from 'lucide-react';
+import { Pencil, Trash, MessageSquare, Loader2, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -81,7 +80,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   // Function to generate an AI prompt for this entry
   const generateAIPrompt = async () => {
-    if (isGeneratingPrompt || entry.ai_prompt) return;
+    if (isGeneratingPrompt) return;
     
     setIsGeneratingPrompt(true);
     
@@ -102,15 +101,53 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         });
         
         toast({
-          title: "Reflection prompt created",
-          description: "We've added a thoughtful reflection question based on your entry."
+          title: "New reflection question created",
+          description: "We've added a fresh reflection question for your entry."
         });
       }
     } catch (error) {
       console.error('Error generating AI prompt:', error);
       toast({
-        title: "Couldn't create reflection prompt",
+        title: "Couldn't create reflection question",
         description: "We ran into an issue while creating your reflection question. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  };
+  
+  // Function to regenerate a new prompt to replace the current one
+  const handleRegeneratePrompt = async () => {
+    if (isGeneratingPrompt) return;
+    setIsGeneratingPrompt(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-prompt', {
+        body: { journalContent: entry.content }
+      });
+      
+      if (error) throw error;
+      
+      if (data && data.prompt) {
+        setAiPrompt(data.prompt);
+        
+        // Update the entry in the database with the new prompt
+        await updateEntry({
+          ...entry,
+          ai_prompt: data.prompt
+        });
+        
+        toast({
+          title: "New question generated",
+          description: "We've refreshed your reflection question."
+        });
+      }
+    } catch (error) {
+      console.error('Error regenerating AI prompt:', error);
+      toast({
+        title: "Couldn't create new question",
+        description: "We couldn't generate a new question. Please try again later.",
         variant: "destructive"
       });
     } finally {
@@ -256,6 +293,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             onSaveResponse={handleSaveResponse}
             onCancelResponse={handleCancelResponse}
             onDeleteResponse={handleDeleteResponse}
+            onRegeneratePrompt={!isPreview ? handleRegeneratePrompt : undefined}
             isReadOnly={isPreview}
           />
         </div>

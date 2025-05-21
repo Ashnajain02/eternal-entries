@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Trash, Pencil } from 'lucide-react';
+import { MessageSquare, Trash, Pencil, RefreshCcw } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,6 +22,7 @@ interface AIPromptProps {
   onSaveResponse?: () => void;
   onCancelResponse?: () => void;
   onDeleteResponse?: () => void;
+  onRegeneratePrompt?: () => void;
 }
 
 const AIPrompt: React.FC<AIPromptProps> = ({ 
@@ -31,7 +32,8 @@ const AIPrompt: React.FC<AIPromptProps> = ({
   isReadOnly = false,
   onSaveResponse,
   onCancelResponse,
-  onDeleteResponse
+  onDeleteResponse,
+  onRegeneratePrompt
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -74,7 +76,21 @@ const AIPrompt: React.FC<AIPromptProps> = ({
       <div className="flex items-start gap-3">
         <MessageSquare className="h-5 w-5 text-primary mt-0.5" />
         <div className="flex-1">
-          <h4 className="text-sm font-medium mb-2">Reflection Moment</h4>
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-sm font-medium">Reflection Moment</h4>
+            {!isReadOnly && onRegeneratePrompt && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onRegeneratePrompt}
+                className="h-7 px-2 flex items-center gap-1"
+              >
+                <RefreshCcw className="h-3 w-3" />
+                <span className="text-xs">New question</span>
+              </Button>
+            )}
+          </div>
+          
           <p className="text-sm mb-3">{prompt}</p>
           
           {!isReadOnly && (

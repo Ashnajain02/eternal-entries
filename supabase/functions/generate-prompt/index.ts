@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    // Call Gemini API with updated prompt to generate more friendly, conversational questions
+    // Call Gemini API with updated prompt to generate more casual, friendly questions
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
       method: 'POST',
       headers: {
@@ -38,25 +38,26 @@ serve(async (req) => {
             role: "user",
             parts: [
               {
-                text: `You are a thoughtful, empathetic journaling companion.
-                Based on the journal entry below, create a gentle, caring follow-up question that feels like it comes from a supportive friend, not an AI.
-                The reflection question should:
-                1. Feel warm and conversational (use "you" and avoid academic or clinical phrasing)
-                2. Reference specific content from their entry to feel personalized
-                3. Invite deeper emotional reflection in a gentle way
-                4. Be phrased in a casual, friendly tone like a trusted friend would use
-                5. Be concise (one sentence only)
+                text: `You're my close friend who cares about me deeply and wants to help me reflect.
+                Read this journal entry I wrote, and respond with a casual, friendly follow-up question.
+                
+                The question should:
+                1. Sound completely natural, like something a real friend would text me
+                2. Use contractions, casual language, and maybe even add a "hey" or my name
+                3. Reference something specific from my entry to show you really read it
+                4. Be brief and conversational (one short sentence is perfect)
+                5. Feel warm, curious and supportive - not clinical or therapist-like
                 
                 Respond with ONLY the question itself, no introduction or explanation.
                 
-                Here is the journal entry:
+                Here is my journal entry:
                 ${journalContent}`
               }
             ]
           }
         ],
         generationConfig: {
-          temperature: 0.8,
+          temperature: 0.9,
           maxOutputTokens: 100,
         }
       }),
