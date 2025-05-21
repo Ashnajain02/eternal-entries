@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -13,7 +12,7 @@ import EditorControls from './journal/EditorControls';
 import { useJournalDraft } from '@/hooks/useJournalDraft';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { isSpotifyConnected } from '@/services/spotify';
-import { Music } from 'lucide-react';
+import { Loader2, Music } from 'lucide-react';
 import SpotifyTrackSearch from './spotify/SpotifyTrackSearch';
 import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
 import AIPrompt from './journal/AIPrompt';
