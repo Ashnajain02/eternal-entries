@@ -2,52 +2,159 @@
 import React, { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Trash, Pencil, RefreshCcw } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AIPromptProps {
   prompt: string | null;
   response: string | null;
   onResponseChange: (response: string) => void;
   isReadOnly?: boolean;
+  onSaveResponse?: () => void;
+  onCancelResponse?: () => void;
+  onDeleteResponse?: () => void;
+  onRegeneratePrompt?: () => void;
 }
 
 const AIPrompt: React.FC<AIPromptProps> = ({ 
   prompt, 
   response, 
   onResponseChange,
-  isReadOnly = false
+  isReadOnly = false,
+  onSaveResponse,
+  onCancelResponse,
+  onDeleteResponse,
+  onRegeneratePrompt
 }) => {
-  const [isExpanded, setIsExpanded] = useState(!!response);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [localResponse, setLocalResponse] = useState(response || '');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   if (!prompt) return null;
+  
+  const handleSave = () => {
+    onResponseChange(localResponse);
+    if (onSaveResponse) {
+      onSaveResponse();
+    }
+    setIsEditing(false);
+    setIsExpanded(false);
+  };
+  
+  const handleCancel = () => {
+    setLocalResponse(response || ''); // Reset to the original response
+    if (onCancelResponse) {
+      onCancelResponse();
+    }
+    setIsEditing(false);
+    setIsExpanded(false);
+  };
+  
+  const handleDeleteRequest = () => {
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const handleDeleteConfirm = () => {
+    if (onDeleteResponse) {
+      onDeleteResponse();
+    }
+    setIsDeleteDialogOpen(false);
+  };
 
   return (
     <div className="border rounded-md p-4 bg-secondary/50 mt-4">
       <div className="flex items-start gap-3">
         <MessageSquare className="h-5 w-5 text-primary mt-0.5" />
         <div className="flex-1">
-          <h4 className="text-sm font-medium mb-2">Reflection Prompt</h4>
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-sm font-medium">Reflection Moment</h4>
+            {!isReadOnly && onRegeneratePrompt && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onRegeneratePrompt}
+                className="h-7 px-2 flex items-center gap-1"
+              >
+                <RefreshCcw className="h-3 w-3" />
+                <span className="text-xs">New question</span>
+              </Button>
+            )}
+          </div>
+          
           <p className="text-sm mb-3">{prompt}</p>
           
           {!isReadOnly && (
             <>
-              {!isExpanded ? (
+              {!response && !isExpanded && !isEditing ? (
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => setIsExpanded(true)}
+                  onClick={() => {
+                    setIsExpanded(true);
+                    setIsEditing(true);
+                  }}
                 >
-                  Respond to this prompt
+                  Share your thoughts
                 </Button>
-              ) : (
+              ) : null}
+              
+              {isEditing ? (
                 <div className="space-y-2">
                   <Textarea
-                    placeholder="Write your response here..."
-                    value={response || ''}
-                    onChange={(e) => onResponseChange(e.target.value)}
+                    placeholder="Write your thoughts here..."
+                    value={localResponse}
+                    onChange={(e) => setLocalResponse(e.target.value)}
                     rows={3}
                     className="resize-none w-full"
                   />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={handleCancel}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={handleSave}
+                      disabled={!localResponse.trim()}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              
+              {response && !isEditing && (
+                <div className="mt-2 border-t pt-2">
+                  <div className="flex justify-between items-start">
+                    <p className="text-sm italic">{response}</p>
+                    <div className="flex gap-1 ml-2 mt-0.5">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => setIsEditing(true)}
+                        className="h-7 w-7"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={handleDeleteRequest}
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </>
@@ -60,6 +167,23 @@ const AIPrompt: React.FC<AIPromptProps> = ({
           )}
         </div>
       </div>
+      
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your reflection?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove your response to this reflection prompt. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground">
+              Yes, delete it
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

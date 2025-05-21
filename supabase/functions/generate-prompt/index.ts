@@ -2,7 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const geminiApiKey = Deno.env.get('GEMINI_API_KEY') || 'AIzaSyB2eZn33QE1q1S5I_q2RVW4R8oIJO5Sq80';
+const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    // Call Gemini API instead of OpenAI
+    // Call Gemini API with updated prompt to generate more casual, friendly questions
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
       method: 'POST',
       headers: {
@@ -38,24 +38,26 @@ serve(async (req) => {
             role: "user",
             parts: [
               {
-                text: `You are a compassionate and emotionally intelligent journaling coach.
-                Based on the journal entry provided, write one warm and thoughtful follow-up question that encourages deeper reflection.
-                The question should be:
-                1. Specific to the content shared
-                2. Emotionally intelligent and empathetic
-                3. Open-ended to encourage reflection
-                4. Concise (one sentence only)
+                text: `You're my close friend who cares about me deeply and wants to help me reflect.
+                Read this journal entry I wrote, and respond with a casual, friendly follow-up question.
+                
+                The question should:
+                1. Sound completely natural, like something a real friend would text me
+                2. Use contractions, casual language, and maybe even add a "hey" or my name
+                3. Reference something specific from my entry to show you really read it
+                4. Be brief and conversational (one short sentence is perfect)
+                5. Feel warm, curious and supportive - not clinical or therapist-like
                 
                 Respond with ONLY the question itself, no introduction or explanation.
                 
-                Here is the journal entry:
+                Here is my journal entry:
                 ${journalContent}`
               }
             ]
           }
         ],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.9,
           maxOutputTokens: 100,
         }
       }),

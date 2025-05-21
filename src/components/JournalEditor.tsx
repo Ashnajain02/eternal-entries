@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -126,7 +125,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
       };
 
       console.log("Saving entry with track:", selectedTrack);
-      console.log("Saving entry with ai_prompt:", aiPrompt, "and ai_response:", aiResponse);
 
       if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
         await updateEntry(updatedEntry);

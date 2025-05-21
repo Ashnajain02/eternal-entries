@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -8,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import WeatherDisplay from './WeatherDisplay';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
-import { Pencil, Trash, MessageSquare, Loader2 } from 'lucide-react';
+import { Pencil, Trash, MessageSquare, Loader2, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -46,13 +45,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [aiResponse, setAiResponse] = useState<string | null>(entry.ai_response);
   
   console.log("Rendering entry with track:", entry.track);
-  console.log("Current AI prompt:", aiPrompt, "Current AI response:", aiResponse);
-  
-  // Sync state with props when they change
-  useEffect(() => {
-    setAiPrompt(entry.ai_prompt);
-    setAiResponse(entry.ai_response);
-  }, [entry.ai_prompt, entry.ai_response]);
   
   // Parse ISO date string properly to display in local timezone
   const parseDate = (dateValue: string | number) => {
@@ -88,7 +80,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   // Function to generate an AI prompt for this entry
   const generateAIPrompt = async () => {
-    if (isGeneratingPrompt || entry.ai_prompt) return;
+    if (isGeneratingPrompt) return;
     
     setIsGeneratingPrompt(true);
     
@@ -109,15 +101,53 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         });
         
         toast({
-          title: "Reflection prompt generated",
-          description: "A reflection prompt has been created based on your journal entry."
+          title: "New reflection question created",
+          description: "We've added a fresh reflection question for your entry."
         });
       }
     } catch (error) {
       console.error('Error generating AI prompt:', error);
       toast({
-        title: "Error generating prompt",
-        description: "Could not generate a reflection prompt. Please try again later.",
+        title: "Couldn't create reflection question",
+        description: "We ran into an issue while creating your reflection question. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  };
+  
+  // Function to regenerate a new prompt to replace the current one
+  const handleRegeneratePrompt = async () => {
+    if (isGeneratingPrompt) return;
+    setIsGeneratingPrompt(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-prompt', {
+        body: { journalContent: entry.content }
+      });
+      
+      if (error) throw error;
+      
+      if (data && data.prompt) {
+        setAiPrompt(data.prompt);
+        
+        // Update the entry in the database with the new prompt
+        await updateEntry({
+          ...entry,
+          ai_prompt: data.prompt
+        });
+        
+        toast({
+          title: "New question generated",
+          description: "We've refreshed your reflection question."
+        });
+      }
+    } catch (error) {
+      console.error('Error regenerating AI prompt:', error);
+      toast({
+        title: "Couldn't create new question",
+        description: "We couldn't generate a new question. Please try again later.",
         variant: "destructive"
       });
     } finally {
@@ -126,16 +156,54 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   };
   
   // Function to save the AI response to the entry
-  const handleResponseChange = async (response: string) => {
+  const handleResponseChange = (response: string) => {
     setAiResponse(response);
-    
+  };
+  
+  const handleSaveResponse = async () => {
     try {
       await updateEntry({
         ...entry,
-        ai_response: response
+        ai_response: aiResponse
+      });
+      
+      toast({
+        title: "Thoughts saved",
+        description: "Your reflection has been saved to your journal."
       });
     } catch (error) {
       console.error('Error saving AI response:', error);
+      toast({
+        title: "Couldn't save your thoughts",
+        description: "There was a problem saving your reflection. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const handleCancelResponse = () => {
+    setAiResponse(entry.ai_response); // Reset to the original saved response
+  };
+  
+  const handleDeleteResponse = async () => {
+    try {
+      await updateEntry({
+        ...entry,
+        ai_response: null
+      });
+      
+      setAiResponse(null);
+      toast({
+        title: "Reflection deleted",
+        description: "Your reflection has been removed from this entry."
+      });
+    } catch (error) {
+      console.error('Error deleting response:', error);
+      toast({
+        title: "Couldn't delete reflection",
+        description: "There was a problem removing your reflection. Please try again.",
+        variant: "destructive"
+      });
     }
   };
   
@@ -222,6 +290,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             prompt={aiPrompt}
             response={aiResponse}
             onResponseChange={handleResponseChange}
+            onSaveResponse={handleSaveResponse}
+            onCancelResponse={handleCancelResponse}
+            onDeleteResponse={handleDeleteResponse}
+            onRegeneratePrompt={!isPreview ? handleRegeneratePrompt : undefined}
             isReadOnly={isPreview}
           />
         </div>
@@ -237,12 +309,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             {isGeneratingPrompt ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Generating reflection prompt...</span>
+                <span>Creating a reflection question...</span>
               </>
             ) : (
               <>
                 <MessageSquare className="h-4 w-4" />
-                <span>Generate reflection prompt</span>
+                <span>Add a reflection question</span>
               </>
             )}
           </Button>
