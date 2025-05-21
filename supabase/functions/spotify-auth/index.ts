@@ -69,16 +69,12 @@ serve(async (req) => {
 
     // Handle different actions
     if (action === "is_token_expired") {
-      console.log("Checking if token is expired");
       return await isTokenExpired(supabase, userId);
     } else if (action === "authorize") {
-      console.log("Getting authorization URL");
       return await getAuthorizationUrl(redirect_uri);
     } else if (action === "callback" && code) {
-      console.log("Handling OAuth callback");
       return await handleCallback(code, redirect_uri, supabase, userId);
     } else if (action === "revoke") {
-      console.log("Revoking access");
       return await revokeAccess(supabase, userId);
     }
 
