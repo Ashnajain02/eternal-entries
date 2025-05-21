@@ -102,7 +102,9 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             createdAt: new Date(entry.created_at).getTime(),
             updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
             user_id: entry.user_id,
-            comments: [] // Initialize comments array (will be populated during decryption)
+            comments: [], // Initialize comments array (will be populated during decryption)
+            ai_prompt: entry.ai_prompt || null,
+            ai_response: entry.ai_response || null
           };
           
           // Decrypt the content
@@ -110,7 +112,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           transformedEntries.push(decryptedEntry);
         }
 
-        console.log("Loaded entries with tracks:", transformedEntries.filter(e => e.track).length);
+        console.log("Loaded entries with AI prompts:", transformedEntries.filter(e => e.ai_prompt).length);
         setEntries(transformedEntries);
       } catch (error: any) {
         console.error('Error loading journal entries:', error.message);
@@ -234,7 +236,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     }
 
     try {
-      console.log("Adding entry with track:", entry.track);
+      console.log("Adding entry with AI prompt:", entry.ai_prompt);
       
       // Encrypt the entry content before saving to database
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
@@ -254,7 +256,9 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           weather_description: entry.weather?.description,
           weather_icon: entry.weather?.icon,
           weather_location: entry.weather?.location,
-          timestamp_started: entry.timestamp
+          timestamp_started: entry.timestamp,
+          ai_prompt: entry.ai_prompt,
+          ai_response: entry.ai_response
         }])
         .select()
         .single();
@@ -266,6 +270,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         ...entry, // Use the original unencrypted entry for local state
         id: data.id,
         createdAt: new Date(data.created_at).getTime(),
+        ai_prompt: data.ai_prompt,
+        ai_response: data.ai_response
       };
 
       setEntries(prev => [newEntry, ...prev]);
@@ -296,7 +302,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     }
 
     try {
-      console.log("Updating entry with track:", updatedEntry.track);
+      console.log("Updating entry with AI prompt:", updatedEntry.ai_prompt, "and AI response:", updatedEntry.ai_response);
       
       // Add the current timestamp as updated_at
       const now = new Date();
@@ -318,7 +324,9 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           weather_description: updatedEntry.weather?.description,
           weather_icon: updatedEntry.weather?.icon,
           weather_location: updatedEntry.weather?.location,
-          updated_at: now.toISOString() // Add the updated_at timestamp
+          updated_at: now.toISOString(), // Add the updated_at timestamp
+          ai_prompt: updatedEntry.ai_prompt,
+          ai_response: updatedEntry.ai_response
         })
         .eq('id', updatedEntry.id);
 
