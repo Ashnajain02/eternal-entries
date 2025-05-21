@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -45,6 +46,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [aiResponse, setAiResponse] = useState<string | null>(entry.ai_response);
   
   console.log("Rendering entry with track:", entry.track);
+
+  // Make sure aiPrompt and aiResponse stay in sync with props
+  useEffect(() => {
+    setAiPrompt(entry.ai_prompt);
+    setAiResponse(entry.ai_response);
+  }, [entry.ai_prompt, entry.ai_response]);
   
   // Parse ISO date string properly to display in local timezone
   const parseDate = (dateValue: string | number) => {
@@ -85,11 +92,17 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     setIsGeneratingPrompt(true);
     
     try {
+      console.log("Calling generate-prompt function with content length:", entry.content.length);
       const { data, error } = await supabase.functions.invoke('generate-prompt', {
         body: { journalContent: entry.content }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw error;
+      }
+      
+      console.log("Response from generate-prompt function:", data);
       
       if (data && data.prompt) {
         setAiPrompt(data.prompt);
@@ -123,11 +136,17 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     setIsGeneratingPrompt(true);
     
     try {
+      console.log("Regenerating prompt with content length:", entry.content.length);
       const { data, error } = await supabase.functions.invoke('generate-prompt', {
         body: { journalContent: entry.content }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw error;
+      }
+      
+      console.log("Response from regenerate-prompt:", data);
       
       if (data && data.prompt) {
         setAiPrompt(data.prompt);
@@ -162,6 +181,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   const handleSaveResponse = async () => {
     try {
+      console.log("Saving AI response:", aiResponse);
       await updateEntry({
         ...entry,
         ai_response: aiResponse

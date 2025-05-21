@@ -25,6 +25,13 @@ serve(async (req) => {
       );
     }
 
+    if (!geminiApiKey) {
+      console.error('Missing GEMINI_API_KEY environment variable');
+      throw new Error('API configuration error');
+    }
+
+    console.log('Calling Gemini API with content length:', journalContent.length);
+    
     // Call Gemini API with updated prompt to generate more casual, friendly questions
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent', {
       method: 'POST',
@@ -66,11 +73,14 @@ serve(async (req) => {
     const data = await response.json();
     
     if (data.error) {
-      throw new Error(`Gemini API error: ${data.error.message}`);
+      console.error('Gemini API error:', JSON.stringify(data.error));
+      throw new Error(`Gemini API error: ${data.error.message || 'Unknown error'}`);
     }
     
     // Extract the prompt question from Gemini's response format
     const promptQuestion = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    
+    console.log('Generated prompt:', promptQuestion);
     
     if (!promptQuestion) {
       throw new Error('Failed to generate a prompt from Gemini API');
@@ -83,7 +93,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error generating AI prompt:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Could not generate a reflection prompt. Please try again later.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
