@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Trash, X, RefreshCcw } from 'lucide-react';
@@ -39,6 +39,11 @@ const AIPrompt: React.FC<AIPromptProps> = ({
 }) => {
   const [localResponse, setLocalResponse] = useState(response || '');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  
+  // Update local response when the response prop changes
+  useEffect(() => {
+    setLocalResponse(response || '');
+  }, [response]);
 
   if (!prompt) return null;
   
