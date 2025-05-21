@@ -41,17 +41,26 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!supabaseUrl || !supabaseKey) {
+      console.error("Missing Supabase URL or key:", { 
+        hasUrl: !!supabaseUrl, 
+        hasKey: !!supabaseKey 
+      });
       return new Response(
-        JSON.stringify({ error: "Server configuration error" }),
+        JSON.stringify({ 
+          error: "Server configuration error",
+          details: "Missing Supabase URL or service role key"
+        }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
+    console.log("Creating Supabase client");
     const supabase = createClient(supabaseUrl, supabaseKey);
     
     // Extract JWT token from Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("No Authorization header present");
       return new Response(
         JSON.stringify({ error: "Authorization header missing" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -61,12 +70,13 @@ serve(async (req) => {
     // Get user ID from JWT
     let userId = null;
     const token = authHeader.replace(/^Bearer\s/, "");
+    console.log("Getting user from token");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
     if (userError || !user) {
       console.error("Error getting user from token:", userError);
       return new Response(
-        JSON.stringify({ error: "Invalid authentication" }),
+        JSON.stringify({ error: "Invalid authentication", details: userError?.message }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -75,6 +85,7 @@ serve(async (req) => {
     console.log(`User authenticated: ${userId}`);
     
     // Get the user's Spotify token
+    console.log("Fetching user profile");
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .select("spotify_access_token, spotify_refresh_token, spotify_token_expires_at")
@@ -84,7 +95,10 @@ serve(async (req) => {
     if (profileError || !profileData) {
       console.error("Error getting user profile:", profileError);
       return new Response(
-        JSON.stringify({ error: "Failed to retrieve user profile" }),
+        JSON.stringify({ 
+          error: "Failed to retrieve user profile", 
+          details: profileError?.message 
+        }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -92,6 +106,7 @@ serve(async (req) => {
     const { spotify_access_token, spotify_refresh_token, spotify_token_expires_at } = profileData;
     
     if (!spotify_access_token || !spotify_refresh_token) {
+      console.error("Spotify not connected for user");
       return new Response(
         JSON.stringify({ error: "Spotify not connected" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -111,12 +126,20 @@ serve(async (req) => {
       const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
       
       if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+        console.error("Missing Spotify credentials:", {
+          hasClientId: !!SPOTIFY_CLIENT_ID,
+          hasClientSecret: !!SPOTIFY_CLIENT_SECRET
+        });
         return new Response(
-          JSON.stringify({ error: "Server configuration error" }),
+          JSON.stringify({ 
+            error: "Server configuration error",
+            details: "Missing Spotify API credentials"
+          }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
       
+      console.log("Refreshing Spotify token");
       const refreshResponse = await fetch("https://accounts.spotify.com/api/token", {
         method: "POST",
         headers: {
@@ -134,12 +157,16 @@ serve(async (req) => {
       if (refreshData.error) {
         console.error("Error refreshing token:", refreshData.error);
         return new Response(
-          JSON.stringify({ error: "Failed to refresh Spotify token" }),
+          JSON.stringify({ 
+            error: "Failed to refresh Spotify token",
+            details: refreshData.error
+          }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
       
       // Update token in database
+      console.log("Updating token in database");
       const newExpiresAt = new Date();
       newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshData.expires_in);
       
@@ -159,6 +186,7 @@ serve(async (req) => {
     }
     
     // Search Spotify API
+    console.log("Searching Spotify API");
     const searchParams = new URLSearchParams({
       q: query,
       type,
@@ -176,12 +204,27 @@ serve(async (req) => {
     if (searchData.error) {
       console.error("Spotify API error:", searchData.error);
       return new Response(
-        JSON.stringify({ error: "Spotify API error", details: searchData.error }),
+        JSON.stringify({ 
+          error: "Spotify API error", 
+          details: searchData.error 
+        }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
     
     // Format the response
+    if (!searchData.tracks || !searchData.tracks.items) {
+      console.error("Unexpected Spotify API response format:", searchData);
+      return new Response(
+        JSON.stringify({ 
+          error: "Unexpected response from Spotify API",
+          details: "Missing tracks data"
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    
+    console.log(`Found ${searchData.tracks.items.length} tracks`);
     const formattedTracks: SpotifyTrack[] = searchData.tracks.items.map((track: any) => ({
       id: track.id,
       name: track.name,
@@ -191,6 +234,7 @@ serve(async (req) => {
       uri: track.uri
     }));
     
+    console.log("Search completed successfully");
     return new Response(
       JSON.stringify({ tracks: formattedTracks }),
       { headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -198,7 +242,11 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in Spotify search function:", error);
     return new Response(
-      JSON.stringify({ error: "Server error", details: error.message }),
+      JSON.stringify({ 
+        error: "Server error", 
+        details: error.message,
+        stack: error.stack
+      }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }

@@ -22,6 +22,7 @@ const SpotifyTrackSearch: React.FC<SpotifyTrackSearchProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SpotifyTrack[]>([]);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const { toast } = useToast();
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -31,22 +32,40 @@ const SpotifyTrackSearch: React.FC<SpotifyTrackSearchProps> = ({
     
     setIsSearching(true);
     setSearchResults([]);
+    setDebugInfo('');
     
     try {
+      console.log("Starting Spotify search for:", searchQuery);
+      
+      // Get session to ensure we have a valid token
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        throw new Error("No active session found");
+      }
+      
+      console.log("Calling spotify-search edge function");
       const { data, error } = await supabase.functions.invoke('spotify-search', {
         body: { query: searchQuery, type: 'track', limit: 10 }
       });
       
       if (error) throw new Error(error.message);
+      console.log("Search response received:", data);
       
       if (data && data.tracks) {
         setSearchResults(data.tracks);
+      } else {
+        setDebugInfo(`Unexpected response format: ${JSON.stringify(data)}`);
       }
     } catch (error: any) {
       console.error('Error searching Spotify:', error);
+      
+      // Detailed error info for debugging
+      let errorMessage = error.message || "Failed to search Spotify";
+      setDebugInfo(`Error details: ${JSON.stringify(error, null, 2)}`);
+      
       toast({
         title: "Search failed",
-        description: error.message || "Failed to search Spotify",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -83,6 +102,12 @@ const SpotifyTrackSearch: React.FC<SpotifyTrackSearchProps> = ({
             <span className="sr-only">Search</span>
           </Button>
         </form>
+        
+        {debugInfo && (
+          <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+            <p className="text-xs font-mono overflow-auto max-h-24">{debugInfo}</p>
+          </div>
+        )}
         
         {isSearching ? (
           <div className="flex justify-center py-8">
