@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Loader2, MessageSquare } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 
 interface AIPromptProps {
   prompt: string | null;
@@ -26,7 +26,7 @@ const AIPrompt: React.FC<AIPromptProps> = ({
       <div className="flex items-start gap-3">
         <MessageSquare className="h-5 w-5 text-primary mt-0.5" />
         <div className="flex-1">
-          <h4 className="text-sm font-medium mb-2">AI Reflection Prompt</h4>
+          <h4 className="text-sm font-medium mb-2">Reflection Prompt</h4>
           <p className="text-sm mb-3">{prompt}</p>
           
           {!isReadOnly && (

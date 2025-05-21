@@ -1,6 +1,9 @@
 
 project_id = "veorhexddrwlwxtkuycb"
 
+[functions.generate-prompt]
+verify_jwt = false
+
 [functions.spotify-auth]
 verify_jwt = false
 
