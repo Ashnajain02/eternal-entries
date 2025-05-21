@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -46,6 +46,13 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [aiResponse, setAiResponse] = useState<string | null>(entry.ai_response);
   
   console.log("Rendering entry with track:", entry.track);
+  console.log("Current AI prompt:", aiPrompt, "Current AI response:", aiResponse);
+  
+  // Sync state with props when they change
+  useEffect(() => {
+    setAiPrompt(entry.ai_prompt);
+    setAiResponse(entry.ai_response);
+  }, [entry.ai_prompt, entry.ai_response]);
   
   // Parse ISO date string properly to display in local timezone
   const parseDate = (dateValue: string | number) => {
