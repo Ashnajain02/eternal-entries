@@ -23,10 +23,10 @@ export const isSpotifyConnected = async (): Promise<boolean> => {
       body: { action: 'is_token_expired' }
     });
     
-    console.log("Token expiration check response:", data, error);
+    console.log("Spotify Token expiration check response:", data, error);
     
     if (error) {
-      console.error('Error checking token expiration:', error);
+      console.error('Error checking Spotify token expiration:', error);
       return false; // Assume not connected on error
     }
     
