@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Trash, Pencil, X, RefreshCcw } from 'lucide-react';
+import { MessageSquare, Trash, X, RefreshCcw } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +23,7 @@ interface AIPromptProps {
   onCancelResponse?: () => void;
   onDeleteResponse?: () => void;
   onRegeneratePrompt?: () => void;
+  onDismissPrompt?: () => void;
 }
 
 const AIPrompt: React.FC<AIPromptProps> = ({ 
@@ -33,10 +34,9 @@ const AIPrompt: React.FC<AIPromptProps> = ({
   onSaveResponse,
   onCancelResponse,
   onDeleteResponse,
-  onRegeneratePrompt
+  onRegeneratePrompt,
+  onDismissPrompt
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [localResponse, setLocalResponse] = useState(response || '');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -47,8 +47,6 @@ const AIPrompt: React.FC<AIPromptProps> = ({
     if (onSaveResponse) {
       onSaveResponse();
     }
-    setIsEditing(false);
-    setIsExpanded(false);
   };
   
   const handleCancel = () => {
@@ -56,8 +54,6 @@ const AIPrompt: React.FC<AIPromptProps> = ({
     if (onCancelResponse) {
       onCancelResponse();
     }
-    setIsEditing(false);
-    setIsExpanded(false);
   };
   
   const handleDeleteRequest = () => {
@@ -78,37 +74,37 @@ const AIPrompt: React.FC<AIPromptProps> = ({
         <div className="flex-1">
           <div className="flex justify-between items-center mb-2">
             <h4 className="text-sm font-medium">Reflection Moment</h4>
-            {!isReadOnly && onRegeneratePrompt && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={onRegeneratePrompt}
-                className="h-7 px-2 flex items-center gap-1"
-              >
-                <RefreshCcw className="h-3 w-3" />
-                <span className="text-xs">New question</span>
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {!isReadOnly && onRegeneratePrompt && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={onRegeneratePrompt}
+                  className="h-7 px-2 flex items-center gap-1"
+                >
+                  <RefreshCcw className="h-3 w-3" />
+                  <span className="text-xs">New question</span>
+                </Button>
+              )}
+              
+              {!isReadOnly && onDismissPrompt && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDismissPrompt}
+                  className="h-7 w-7 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
           
           <p className="text-sm mb-3">{prompt}</p>
           
           {!isReadOnly && (
             <>
-              {!response && !isExpanded && !isEditing ? (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => {
-                    setIsExpanded(true);
-                    setIsEditing(true);
-                  }}
-                >
-                  Share your thoughts
-                </Button>
-              ) : null}
-              
-              {isEditing ? (
+              {!response ? (
                 <div className="space-y-2">
                   <Textarea
                     placeholder="Write your thoughts here..."
@@ -130,30 +126,18 @@ const AIPrompt: React.FC<AIPromptProps> = ({
                     </Button>
                   </div>
                 </div>
-              ) : null}
-              
-              {response && !isEditing && (
+              ) : (
                 <div className="mt-2 border-t pt-2">
                   <div className="flex justify-between items-start">
                     <p className="text-sm italic">{response}</p>
-                    <div className="flex gap-1 ml-2 mt-0.5">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => setIsEditing(true)}
-                        className="h-7 w-7"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={handleDeleteRequest}
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={handleDeleteRequest}
+                      className="h-7 w-7 ml-2 mt-0.5 text-destructive hover:text-destructive"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               )}

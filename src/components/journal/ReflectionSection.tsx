@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import AIPrompt from './AIPrompt';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Loader2, RefreshCcw } from 'lucide-react';
+import { MessageSquare, Loader2 } from 'lucide-react';
 
 interface ReflectionSectionProps {
   aiPrompt: string | null;
@@ -14,6 +14,7 @@ interface ReflectionSectionProps {
   onSaveResponse: () => void;
   onCancelResponse: () => void;
   onDeleteResponse: () => void;
+  onDismissPrompt?: () => void;
   isPreview?: boolean;
 }
 
@@ -27,6 +28,7 @@ const ReflectionSection: React.FC<ReflectionSectionProps> = ({
   onSaveResponse,
   onCancelResponse,
   onDeleteResponse,
+  onDismissPrompt,
   isPreview = false
 }) => {
   if (aiPrompt) {
@@ -40,6 +42,7 @@ const ReflectionSection: React.FC<ReflectionSectionProps> = ({
           onCancelResponse={onCancelResponse}
           onDeleteResponse={onDeleteResponse}
           onRegeneratePrompt={!isPreview ? onRegeneratePrompt : undefined}
+          onDismissPrompt={!isPreview && !aiResponse ? onDismissPrompt : undefined}
           isReadOnly={isPreview}
         />
       </div>

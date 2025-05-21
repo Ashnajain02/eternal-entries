@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -55,12 +54,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       if (data && data.prompt) {
         setAiPrompt(data.prompt);
         
-        // Update the entry in the database with the new prompt
-        await updateEntry({
-          ...entry,
-          ai_prompt: data.prompt
-        });
-        
+        // We don't save to database yet - only when user submits a response
         toast({
           title: "New reflection question created",
           description: "We've added a fresh reflection question for your entry."
@@ -93,11 +87,16 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       if (data && data.prompt) {
         setAiPrompt(data.prompt);
         
-        // Update the entry in the database with the new prompt
-        await updateEntry({
-          ...entry,
-          ai_prompt: data.prompt
-        });
+        // We only update the database if there was already a response saved
+        if (entry.ai_response) {
+          await updateEntry({
+            ...entry,
+            ai_prompt: data.prompt,
+            ai_response: null // Clear the response when regenerating
+          });
+          
+          setAiResponse(null);
+        }
         
         toast({
           title: "New question generated",
@@ -116,6 +115,11 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     }
   };
   
+  // Function to dismiss the prompt without saving
+  const handleDismissPrompt = () => {
+    setAiPrompt(null);
+  };
+  
   // Function to save the AI response to the entry
   const handleResponseChange = (response: string) => {
     setAiResponse(response);
@@ -123,8 +127,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   const handleSaveResponse = async () => {
     try {
+      // Only now do we save both the prompt and response to the database
       await updateEntry({
         ...entry,
+        ai_prompt: aiPrompt,
         ai_response: aiResponse
       });
       
@@ -143,17 +149,26 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   };
   
   const handleCancelResponse = () => {
-    setAiResponse(entry.ai_response); // Reset to the original saved response
+    // If there's no saved response yet, dismiss the prompt entirely
+    if (!entry.ai_response) {
+      setAiPrompt(null);
+    } else {
+      // Otherwise just reset to the saved response
+      setAiResponse(entry.ai_response);
+    }
   };
   
   const handleDeleteResponse = async () => {
     try {
       await updateEntry({
         ...entry,
+        ai_prompt: null,
         ai_response: null
       });
       
+      setAiPrompt(null);
       setAiResponse(null);
+      
       toast({
         title: "Reflection deleted",
         description: "Your reflection has been removed from this entry."
@@ -218,6 +233,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         onSaveResponse={handleSaveResponse}
         onCancelResponse={handleCancelResponse}
         onDeleteResponse={handleDeleteResponse}
+        onDismissPrompt={handleDismissPrompt}
         isPreview={isPreview}
       />
       
