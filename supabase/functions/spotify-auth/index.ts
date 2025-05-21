@@ -9,27 +9,35 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log("AJ: 1")
+  console.log("Spotify Auth Function - Request received");
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
+    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log("Parsing request body");
+    // Parse request body
+    const requestData = await req.json();
+    const { action, code, redirect_uri } = requestData;
+    console.log(`Action requested: ${action}`);
+    
     // Create a Supabase client with the provided auth token
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No authorization header" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
+    console.log(`Auth header present: ${Boolean(authHeader)}`);
+    
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    console.log(`Supabase URL available: ${Boolean(supabaseUrl)}`);
+    console.log(`Supabase Key available: ${Boolean(supabaseKey)}`);
 
     const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      supabaseUrl ?? "",
+      supabaseKey ?? "",
       {
-        global: { headers: { Authorization: authHeader } },
+        global: { headers: { Authorization: authHeader ?? "" } },
         auth: {
           autoRefreshToken: false,
           persistSession: false,
@@ -38,37 +46,42 @@ serve(async (req) => {
       }
     );
 
-    // Get the authenticated user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    // Get the authenticated user if the auth header is present
+    let userId = null;
+    if (authHeader) {
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "User not authenticated" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+        if (userError) {
+          console.error("Error getting user:", userError);
+        } else if (user) {
+          userId = user.id;
+          console.log(`User authenticated: ${userId}`);
+        }
+      } catch (error) {
+        console.error("Error in auth verification:", error);
+      }
     }
 
-    // Parse request body
-    const requestData = await req.json();
-    const { action, code, redirect_uri } = requestData;
-    console.log("AJ: requestData", action, code, redirect_uri)
-
     // Handle different actions
-    if (action === "get_recent_tracks") {
-      return await getRecentTracks(supabase, user.id);
-    } else if (action === "is_token_expired") {
-      return await isTokenExpired(supabase, user.id);
+    if (action === "is_token_expired") {
+      console.log("Checking if token is expired");
+      return await isTokenExpired(supabase, userId);
     } else if (action === "authorize") {
-      return await getAuthorizationUrl(supabase, user.id, redirect_uri);
+      console.log("Getting authorization URL");
+      return await getAuthorizationUrl(redirect_uri);
     } else if (action === "callback" && code) {
-      return await handleCallback(code, redirect_uri, supabase, user.id);
+      console.log("Handling OAuth callback");
+      return await handleCallback(code, redirect_uri, supabase, userId);
     } else if (action === "revoke") {
-      return await revokeAccess(supabase, user.id);
-  
+      console.log("Revoking access");
+      return await revokeAccess(supabase, userId);
+    }
 
+    console.log("Invalid request action");
     return new Response(
       JSON.stringify({ error: "Invalid request" }),
       { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -83,9 +96,16 @@ serve(async (req) => {
 });
 
 // Check if the Spotify token is expired
-async function isTokenExpired(supabase: any, user_id: string) {
-  console.log("AJ: isTokenExpired Function")
+async function isTokenExpired(supabase: any, user_id: string | null) {
+  console.log("Running isTokenExpired function");
   try {
+    if (!user_id) {
+      return new Response(
+        JSON.stringify({ error: "User not authenticated" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    
     console.log(`Checking token expiration for user: ${user_id}`);
     
     // Call the RPC function to check if the token is expired
@@ -116,10 +136,11 @@ async function isTokenExpired(supabase: any, user_id: string) {
 }
 
 // Get Spotify authorization URL
-async function getAuthorizationUrl(supabase: any, user_id: string, redirect_uri: string) {
-  console.log("AJ: getAuthorizationUrl Function")
+async function getAuthorizationUrl(redirect_uri: string) {
+  console.log("Running getAuthorizationUrl function");
   try {
     const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
+    console.log(`Spotify Client ID available: ${Boolean(SPOTIFY_CLIENT_ID)}`);
 
     if (!SPOTIFY_CLIENT_ID) {
       return new Response(
@@ -150,6 +171,7 @@ async function getAuthorizationUrl(supabase: any, user_id: string, redirect_uri:
     });
     
     const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
+    console.log(`Authorization URL created: ${authUrl}`);
     
     return new Response(
       JSON.stringify({ url: authUrl }),
@@ -165,12 +187,20 @@ async function getAuthorizationUrl(supabase: any, user_id: string, redirect_uri:
 }
 
 // Handle the OAuth callback
-async function handleCallback(code: string, redirect_uri: string, supabase: any, user_id: string) {
-  console.log("AJ: handleCallback function")
-  console.log("redirect_uri: ", redirect_uri)
+async function handleCallback(code: string, redirect_uri: string, supabase: any, user_id: string | null) {
+  console.log("Running handleCallback function");
+  
   try {
+    if (!user_id) {
+      return new Response(
+        JSON.stringify({ error: "User not authenticated" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    
     const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
     const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
+    console.log(`Spotify credentials available: ${Boolean(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET)}`);
     
     if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
       return new Response(
@@ -178,6 +208,8 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
+    
+    console.log(`Exchanging code for token with redirect URI: ${redirect_uri}`);
     
     // Exchange code for token
     const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
@@ -203,6 +235,8 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
       );
     }
     
+    console.log("Successfully obtained Spotify token");
+    
     // Get user profile from Spotify
     const profileResponse = await fetch("https://api.spotify.com/v1/me", {
       headers: {
@@ -211,6 +245,7 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
     });
     
     const profileData = await profileResponse.json();
+    console.log(`Got Spotify profile for: ${profileData.display_name || profileData.id}`);
     
     // Calculate token expiration time
     const expires_at = new Date();
@@ -233,13 +268,12 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
       );
     }
     
+    console.log("Successfully stored Spotify data in database");
+    
     return new Response(
       JSON.stringify({ 
         success: true,
         display_name: profileData.display_name,
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        expires_at: expires_at.toISOString()
       }),
       { headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
@@ -253,8 +287,16 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
 }
 
 // Revoke Spotify access
-async function revokeAccess(supabase: any, user_id: string) {
+async function revokeAccess(supabase: any, user_id: string | null) {
+  console.log("Running revokeAccess function");
   try {
+    if (!user_id) {
+      return new Response(
+        JSON.stringify({ error: "User not authenticated" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    
     // Update the profile to remove Spotify data
     const { error } = await supabase
       .from("profiles")
@@ -275,6 +317,8 @@ async function revokeAccess(supabase: any, user_id: string) {
       );
     }
     
+    console.log("Successfully revoked Spotify access");
+    
     return new Response(
       JSON.stringify({ success: true }),
       { headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -283,68 +327,6 @@ async function revokeAccess(supabase: any, user_id: string) {
     console.error("Error revoking access:", error);
     return new Response(
       JSON.stringify({ error: "Failed to revoke access", details: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  }
-}
-
-// Get user's recent tracks from Spotify
-async function getRecentTracks(supabase: any, user_id: string) {
-  try {
-    // Get the access token from the database
-    const { data: token, error: tokenError } = await supabase.rpc("get_user_spotify_token", {
-      user_id,
-    });
-
-    if (tokenError || !token) {
-      return new Response(
-        JSON.stringify({ error: "No Spotify token found" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Fetch recent tracks from Spotify API
-    const response = await fetch("https://api.spotify.com/v1/me/player/recently-played?limit=10", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-
-    if (data.error) {
-      // Handle token expired error
-      if (data.error.status === 401) {
-        return new Response(
-          JSON.stringify({ error: "EXPIRED_TOKEN" }),
-          { headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-      
-      return new Response(
-        JSON.stringify({ error: "Spotify API error", details: data.error }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Format the response
-    const tracks = data.items.map((item: any) => ({
-      id: item.track.id,
-      name: item.track.name,
-      artist: item.track.artists.map((artist: any) => artist.name).join(", "),
-      album: item.track.album.name,
-      albumArt: item.track.album.images[0]?.url || "",
-      uri: item.track.uri,
-    }));
-
-    return new Response(
-      JSON.stringify(tracks),
-      { headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  } catch (error) {
-    console.error("Error getting recent tracks:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to get tracks", details: error.message }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }

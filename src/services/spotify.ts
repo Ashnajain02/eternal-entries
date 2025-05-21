@@ -3,19 +3,21 @@ import { supabase } from '@/integrations/supabase/client';
 
 // Constants
 const REDIRECT_URI = `${window.location.origin}/spotify-callback`;
-const SCOPES = ['user-read-private', 'user-read-email', 'user-top-read', 'user-read-recently-played'];
 
 /**
  * Initiate the Spotify authorization process
  */
 export const initiateSpotifyAuth = async (): Promise<void> => {
   try {
+    console.log("Initiating Spotify auth process");
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { 
         action: 'authorize',
         redirect_uri: REDIRECT_URI
       }
     });
+
+    console.log("Spotify auth response:", data, error);
 
     if (error || !data?.url) {
       throw new Error(error?.message || 'Failed to get Spotify authorization URL');
@@ -37,6 +39,7 @@ export const handleSpotifyCallback = async (code: string): Promise<{
   error?: string;
 }> => {
   try {
+    console.log("Handling Spotify callback with code");
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { 
         action: 'callback',
@@ -44,6 +47,8 @@ export const handleSpotifyCallback = async (code: string): Promise<{
         redirect_uri: REDIRECT_URI 
       }
     });
+
+    console.log("Spotify callback response:", data, error);
 
     if (error) {
       return { success: false, error: error.message };
@@ -64,9 +69,12 @@ export const handleSpotifyCallback = async (code: string): Promise<{
  */
 export const isSpotifyTokenExpired = async (): Promise<boolean> => {
   try {
+    console.log("Checking if Spotify token is expired");
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { action: 'is_token_expired' }
     });
+    
+    console.log("Token expiration check response:", data, error);
     
     if (error) {
       console.error('Error checking token expiration:', error);
@@ -85,9 +93,12 @@ export const isSpotifyTokenExpired = async (): Promise<boolean> => {
  */
 export const disconnectSpotify = async (): Promise<boolean> => {
   try {
+    console.log("Disconnecting Spotify");
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { action: 'revoke' }
     });
+    
+    console.log("Disconnect response:", data, error);
     
     if (error) {
       console.error('Error disconnecting Spotify:', error);
@@ -106,6 +117,7 @@ export const disconnectSpotify = async (): Promise<boolean> => {
  */
 export const isSpotifyConnected = async (): Promise<boolean> => {
   try {
+    console.log("Checking if Spotify is connected");
     return !(await isSpotifyTokenExpired());
   } catch (error) {
     console.error('Failed to check Spotify connection:', error);
