@@ -91,9 +91,12 @@ const Index = () => {
             <JournalEditor onSave={handleFinishWriting} />
           ) : sortedEntries.length > 0 ? (
             <div className="space-y-6">
-              {sortedEntries.map(entry => (
-                <JournalEntryView key={entry.id} entry={entry} />
-              ))}
+              {sortedEntries.map(entry => {
+                console.log(`Entry ${entry.id} has track:`, !!entry.track);
+                return (
+                  <JournalEntryView key={entry.id} entry={entry} />
+                );
+              })}
             </div>
           ) : (
             <Card className="p-6 text-center space-y-4 animated-gradient">

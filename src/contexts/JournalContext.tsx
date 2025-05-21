@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { JournalEntry, Mood, SpotifyTrack, WeatherData, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
@@ -73,6 +72,19 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         const transformedEntries: JournalEntry[] = [];
         
         for (const entry of data) {
+          // Create Spotify track object if track data exists
+          let track: SpotifyTrack | undefined = undefined;
+          if (entry.spotify_track_uri) {
+            track = {
+              id: entry.spotify_track_uri.split(':').pop() || '',
+              name: entry.spotify_track_name || '',
+              artist: entry.spotify_track_artist || '',
+              album: entry.spotify_track_album || '',
+              albumArt: entry.spotify_track_image || '',
+              uri: entry.spotify_track_uri
+            };
+          }
+          
           // Create the basic entry object
           const journalEntry: JournalEntry = {
             id: entry.id,
@@ -86,6 +98,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
               icon: entry.weather_icon || '',
               location: entry.weather_location || ''
             } : undefined,
+            track: track,
             createdAt: new Date(entry.created_at).getTime(),
             updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
             user_id: entry.user_id,
@@ -97,6 +110,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           transformedEntries.push(decryptedEntry);
         }
 
+        console.log("Loaded entries with tracks:", transformedEntries.filter(e => e.track).length);
         setEntries(transformedEntries);
       } catch (error: any) {
         console.error('Error loading journal entries:', error.message);
@@ -220,6 +234,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     }
 
     try {
+      console.log("Adding entry with track:", entry.track);
+      
       // Encrypt the entry content before saving to database
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
       
@@ -280,6 +296,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     }
 
     try {
+      console.log("Updating entry with track:", updatedEntry.track);
+      
       // Add the current timestamp as updated_at
       const now = new Date();
       

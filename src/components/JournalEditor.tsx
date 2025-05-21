@@ -45,7 +45,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isSpotifySearchOpen, setIsSpotifySearchOpen] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
-  const [selectedTrack, setSelectedTrack] = useState(initialEntry?.track || entry.track);
+  const [selectedTrack, setSelectedTrack] = useState(initialEntry?.track || entry.track || null);
   
   // Check if Spotify is connected
   useEffect(() => {
@@ -115,6 +115,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         weather: weatherData || undefined,
         track: selectedTrack,
       };
+
+      console.log("Saving entry with track:", selectedTrack);
 
       if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
         await updateEntry(updatedEntry);

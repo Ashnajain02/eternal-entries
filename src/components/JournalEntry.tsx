@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -39,6 +38,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry } = useJournal();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  
+  console.log("Rendering entry with track:", entry.track);
   
   // Parse ISO date string properly to display in local timezone
   const parseDate = (dateValue: string | number) => {
