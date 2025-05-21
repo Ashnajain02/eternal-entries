@@ -84,6 +84,7 @@ serve(async (req) => {
 
 // Check if the Spotify token is expired
 async function isTokenExpired(supabase: any, user_id: string) {
+  console.log("AJ: isTokenExpired Function")
   try {
     console.log(`Checking token expiration for user: ${user_id}`);
     
@@ -116,6 +117,7 @@ async function isTokenExpired(supabase: any, user_id: string) {
 
 // Get Spotify authorization URL
 async function getAuthorizationUrl(supabase: any, user_id: string, redirect_uri: string) {
+  console.log("AJ: getAuthorizationUrl Function")
   try {
     const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
 
@@ -164,6 +166,7 @@ async function getAuthorizationUrl(supabase: any, user_id: string, redirect_uri:
 
 // Handle the OAuth callback
 async function handleCallback(code: string, redirect_uri: string, supabase: any, user_id: string) {
+  console.log("AJ: handleCallback function")
   console.log("redirect_uri: ", redirect_uri)
   try {
     const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
