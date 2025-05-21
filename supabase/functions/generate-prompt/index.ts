@@ -47,6 +47,7 @@ serve(async (req) => {
                 3. Reference something specific from my entry to show you really read it
                 4. Be brief and conversational (one short sentence is perfect)
                 5. Feel warm, curious and supportive - not clinical or therapist-like
+                6. ALWAYS end with a question mark - this is crucial
                 
                 Respond with ONLY the question itself, no introduction or explanation.
                 
@@ -70,10 +71,16 @@ serve(async (req) => {
     }
     
     // Extract the prompt question from Gemini's response format
-    const promptQuestion = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    let promptQuestion = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     
     if (!promptQuestion) {
-      throw new Error('Failed to generate a prompt from Gemini API');
+      // Fallback question if the API doesn't return a valid response
+      promptQuestion = "How did writing this make you feel?";
+    }
+    
+    // Ensure the prompt ends with a question mark
+    if (!promptQuestion.endsWith('?')) {
+      promptQuestion += '?';
     }
 
     return new Response(
@@ -82,9 +89,10 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error generating AI prompt:', error);
+    // Return a fallback question in case of any error
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ prompt: "How did writing this affect your day?" }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
