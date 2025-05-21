@@ -1,0 +1,67 @@
+
+import React, { useState } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Loader2, MessageSquare } from 'lucide-react';
+
+interface AIPromptProps {
+  prompt: string | null;
+  response: string | null;
+  onResponseChange: (response: string) => void;
+  isReadOnly?: boolean;
+}
+
+const AIPrompt: React.FC<AIPromptProps> = ({ 
+  prompt, 
+  response, 
+  onResponseChange,
+  isReadOnly = false
+}) => {
+  const [isExpanded, setIsExpanded] = useState(!!response);
+
+  if (!prompt) return null;
+
+  return (
+    <div className="border rounded-md p-4 bg-secondary/50 mt-4">
+      <div className="flex items-start gap-3">
+        <MessageSquare className="h-5 w-5 text-primary mt-0.5" />
+        <div className="flex-1">
+          <h4 className="text-sm font-medium mb-2">AI Reflection Prompt</h4>
+          <p className="text-sm mb-3">{prompt}</p>
+          
+          {!isReadOnly && (
+            <>
+              {!isExpanded ? (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setIsExpanded(true)}
+                >
+                  Respond to this prompt
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Write your response here..."
+                    value={response || ''}
+                    onChange={(e) => onResponseChange(e.target.value)}
+                    rows={3}
+                    className="resize-none w-full"
+                  />
+                </div>
+              )}
+            </>
+          )}
+
+          {isReadOnly && response && (
+            <div className="mt-2 border-t pt-2">
+              <p className="text-sm italic">{response}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AIPrompt;

@@ -150,4 +150,8 @@
   .transition-height {
     transition: height 0.2s ease-out;
   }
+  
+  .ai-prompt {
+    @apply bg-secondary/40 border border-border rounded-md p-4 mt-4;
+  }
 }

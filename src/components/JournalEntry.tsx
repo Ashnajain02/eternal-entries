@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import WeatherDisplay from './WeatherDisplay';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
-import { Pencil, Trash } from 'lucide-react';
+import { Pencil, Trash, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -22,6 +23,7 @@ import {
 import CommentSection from './CommentSection';
 import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
+import AIPrompt from './journal/AIPrompt';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -148,6 +150,18 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       <div className="mb-6">
         <div className="whitespace-pre-wrap text-left">{entry.content}</div>
       </div>
+      
+      {/* AI Prompt Section */}
+      {entry.ai_prompt && (
+        <div className="mb-6">
+          <AIPrompt
+            prompt={entry.ai_prompt}
+            response={entry.ai_response}
+            onResponseChange={() => {}} // No-op since this is read-only view
+            isReadOnly={true}
+          />
+        </div>
+      )}
       
       {!isPreview && (
         <>
