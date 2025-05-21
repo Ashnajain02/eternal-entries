@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // Constants
-const REDIRECT_URI = `${window.location.origin}/spotify-callback`;
+const REDIRECT_URI = `${window.location.origin}/callback`;
 
 /**
  * Initiate the Spotify authorization process
