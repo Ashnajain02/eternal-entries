@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Trash, Pencil, RefreshCcw } from 'lucide-react';
+import { MessageSquare, Trash, Pencil, X, RefreshCcw } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,

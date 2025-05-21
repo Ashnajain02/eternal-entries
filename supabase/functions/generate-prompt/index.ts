@@ -20,8 +20,8 @@ serve(async (req) => {
 
     if (!journalContent || journalContent.length < 50) {
       return new Response(
-        JSON.stringify({ error: 'Journal content is too short for analysis' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ prompt: "How did writing this entry make you feel?" }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
