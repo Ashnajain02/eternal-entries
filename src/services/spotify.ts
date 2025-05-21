@@ -10,6 +10,13 @@ const REDIRECT_URI = `${window.location.origin}/callback`;
 export const initiateSpotifyAuth = async (): Promise<void> => {
   try {
     console.log("Initiating Spotify auth process");
+    
+    // Get the current session to ensure we have a valid token
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      throw new Error('No active session. Please sign in first.');
+    }
+    
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { 
         action: 'authorize',
@@ -40,6 +47,16 @@ export const handleSpotifyCallback = async (code: string): Promise<{
 }> => {
   try {
     console.log("Handling Spotify callback with code");
+    
+    // Get the current session to ensure we have a valid token
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      return { 
+        success: false, 
+        error: 'No active session. Please sign in first.' 
+      };
+    }
+    
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { 
         action: 'callback',
@@ -70,6 +87,14 @@ export const handleSpotifyCallback = async (code: string): Promise<{
 export const isSpotifyTokenExpired = async (): Promise<boolean> => {
   try {
     console.log("Checking if Spotify token is expired");
+    
+    // Get the current session to ensure we have a valid token
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      console.warn('No active session. Assuming token is expired.');
+      return true;
+    }
+    
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { action: 'is_token_expired' }
     });
@@ -94,6 +119,14 @@ export const isSpotifyTokenExpired = async (): Promise<boolean> => {
 export const disconnectSpotify = async (): Promise<boolean> => {
   try {
     console.log("Disconnecting Spotify");
+    
+    // Get the current session to ensure we have a valid token
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      console.warn('No active session. Cannot disconnect Spotify.');
+      return false;
+    }
+    
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { action: 'revoke' }
     });
