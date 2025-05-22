@@ -5,13 +5,6 @@ import { getSpotifyAccessToken, loadSpotifyWebPlaybackSDK, createSpotifyTrackURI
 import { Play, Pause, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-declare global {
-  interface Window {
-    Spotify: any;
-    onSpotifyWebPlaybackSDKReady: () => void;
-  }
-}
-
 interface SpotifyPlayerSDKProps {
   track: SpotifyTrack;
   className?: string;
@@ -194,7 +187,7 @@ const SpotifyPlayerSDK: React.FC<SpotifyPlayerSDKProps> = ({
         {/* Track info */}
         <div className="flex-grow">
           <div className="font-medium">{track.name}</div>
-          <div className="text-sm text-muted-foreground">{track.artists?.map(a => a.name).join(', ')}</div>
+          <div className="text-sm text-muted-foreground">{track.artist}</div>
         </div>
         
         {/* Player controls */}
