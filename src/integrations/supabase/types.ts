@@ -15,6 +15,8 @@ export type Database = {
           entry_text: string
           id: string
           mood: string
+          reflection_answer: string | null
+          reflection_question: string | null
           spotify_track_album: string | null
           spotify_track_artist: string | null
           spotify_track_image: string | null
@@ -33,6 +35,8 @@ export type Database = {
           entry_text: string
           id?: string
           mood: string
+          reflection_answer?: string | null
+          reflection_question?: string | null
           spotify_track_album?: string | null
           spotify_track_artist?: string | null
           spotify_track_image?: string | null
@@ -51,6 +55,8 @@ export type Database = {
           entry_text?: string
           id?: string
           mood?: string
+          reflection_answer?: string | null
+          reflection_question?: string | null
           spotify_track_album?: string | null
           spotify_track_artist?: string | null
           spotify_track_image?: string | null

@@ -102,7 +102,9 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             createdAt: new Date(entry.created_at).getTime(),
             updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
             user_id: entry.user_id,
-            comments: [] // Initialize comments array (will be populated during decryption)
+            comments: [], // Initialize comments array (will be populated during decryption)
+            reflectionQuestion: entry.reflection_question || undefined,
+            reflectionAnswer: entry.reflection_answer || undefined
           };
           
           // Decrypt the content

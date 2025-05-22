@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -22,6 +23,7 @@ import {
 import CommentSection from './CommentSection';
 import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
+import ReflectionModule from './journal/ReflectionModule';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -35,7 +37,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   isPreview = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry } = useJournal();
+  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
@@ -98,6 +100,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       description: "Your note has been permanently deleted."
     });
   };
+
+  const handleReflectionUpdate = async () => {
+    // Refresh the entry data after reflection update
+    const updatedEntry = { ...entry };
+    await updateEntry(updatedEntry);
+  };
   
   if (isEditing) {
     return <JournalEditor entry={entry} onSave={() => setIsEditing(false)} />;
@@ -151,6 +159,16 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       
       {!isPreview && (
         <>
+          {/* Reflection Module */}
+          <ReflectionModule
+            entryId={entry.id}
+            entryContent={entry.content}
+            entryMood={entry.mood}
+            reflectionQuestion={entry.reflectionQuestion || null}
+            reflectionAnswer={entry.reflectionAnswer || null}
+            onReflectionUpdate={handleReflectionUpdate}
+          />
+
           <div className="border-t border-border my-4 pt-4">
             <CommentSection
               comments={entry.comments || []}
