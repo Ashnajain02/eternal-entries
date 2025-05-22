@@ -1,12 +1,12 @@
+
 import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { generateReflectionQuestion } from '@/services/api';
 import ReflectionQuestion from './reflection/ReflectionQuestion';
 import ReflectionEditor from './reflection/ReflectionEditor';
 import ReflectionDisplay from './reflection/ReflectionDisplay';
 import ReflectionTrigger from './reflection/ReflectionTrigger';
-import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { generateReflectionQuestion } from '@/services/api';
 
 interface ReflectionModuleProps {
   entryId: string;
@@ -14,9 +14,7 @@ interface ReflectionModuleProps {
   entryMood: string;
   reflectionQuestion: string | null;
   reflectionAnswer: string | null;
-  onReflectionUpdate: () => Promise<void>;
-  isTrackPlaying?: boolean;
-  hasTrack?: boolean;
+  onReflectionUpdate: () => void;
 }
 
 const ReflectionModule: React.FC<ReflectionModuleProps> = ({
@@ -25,132 +23,162 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   entryMood,
   reflectionQuestion,
   reflectionAnswer,
-  onReflectionUpdate,
-  isTrackPlaying = false,
-  hasTrack = false
+  onReflectionUpdate
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [question, setQuestion] = useState(reflectionQuestion || '');
   const [answer, setAnswer] = useState(reflectionAnswer || '');
-  
-  const queryClient = useQueryClient();
-  
-  const handleGenerate = async () => {
-    setIsGenerating(true);
-    setError(null);
-    
-    try {
-      // Use the API function to generate a reflection question
-      const question = await generateReflectionQuestion(entryContent, entryMood);
-      
-      // Update the entry with the generated reflection question
-      await updateReflection(question, null);
-      
-    } catch (err: any) {
-      console.error('Error generating reflection:', err);
-      setError(err.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-  
-  const updateReflection = async (question: string | null, answer: string | null) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [showModule, setShowModule] = useState(!!reflectionQuestion);
+
+  const generateQuestion = async () => {
     setIsLoading(true);
-    setError(null);
-    
     try {
-      const { data, error } = await supabase
-        .from('journal_entries')
-        .update({
-          reflection_question: question,
-          reflection_answer: answer
-        })
-        .eq('id', entryId);
+      // Use the API service to call the Supabase function
+      const generatedQuestion = await generateReflectionQuestion(entryContent, entryMood);
       
-      if (error) throw new Error(error.message);
-      
-      // Invalidate and refetch queries to update the UI
-      await onReflectionUpdate();
-      
-      // Exit editing mode if applicable
-      setIsEditing(false);
-      
-    } catch (err: any) {
-      console.error('Error updating reflection:', err);
-      setError(err.message);
+      setQuestion(generatedQuestion);
+      setShowModule(true);
+      setIsEditing(true);
+    } catch (error) {
+      console.error('Error generating reflection question:', error);
+      toast({
+        title: 'Error generating reflection',
+        description: 'Could not generate a reflection question. Please try again.',
+        variant: 'destructive'
+      });
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const handleSubmitAnswer = async (answer: string) => {
-    await updateReflection(reflectionQuestion, answer);
-  };
-  
-  const handleDeleteReflection = async () => {
-    await updateReflection(null, null);
+
+  const saveReflection = async () => {
+    if (!question || !answer.trim()) {
+      toast({
+        title: 'Cannot save empty reflection',
+        description: 'Please write your reflection before saving.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('journal_entries')
+        .update({
+          reflection_question: question,
+          reflection_answer: answer.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      setIsEditing(false);
+      onReflectionUpdate();
+      
+      toast({
+        title: 'Reflection saved',
+        description: 'Your reflection has been saved successfully.'
+      });
+    } catch (error) {
+      console.error('Error saving reflection:', error);
+      toast({
+        title: 'Error saving reflection',
+        description: 'Could not save your reflection. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEditCancel = () => {
-    setIsEditing(false);
+  const deleteReflection = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('journal_entries')
+        .update({
+          reflection_question: null,
+          reflection_answer: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', entryId);
+
+      if (error) throw error;
+      
+      setQuestion('');
+      setAnswer('');
+      setShowModule(false);
+      onReflectionUpdate();
+      
+      toast({
+        title: 'Reflection deleted',
+        description: 'Your reflection has been deleted successfully.'
+      });
+    } catch (error) {
+      console.error('Error deleting reflection:', error);
+      toast({
+        title: 'Error deleting reflection',
+        description: 'Could not delete your reflection. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
-  
-  // If we have a question but no answer, or we're in editing mode, show the editor
-  if ((reflectionQuestion && !reflectionAnswer) || isEditing) {
-    return (
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <ReflectionQuestion 
-            question={reflectionQuestion || ''} 
-            isEditing={true}
-            isLoading={isLoading}
-            onRefresh={handleGenerate}
-            onClose={() => setIsEditing(false)}
-          />
-          <ReflectionEditor 
-            answer={answer} 
-            onChange={setAnswer}
-            onSave={() => handleSubmitAnswer(answer)}
-            isLoading={isLoading}
-          />
-        </CardContent>
-      </Card>
-    );
+
+  const handleClose = () => {
+    if (isEditing && answer.trim()) {
+      const confirmed = window.confirm('You have an unsaved reflection. Are you sure you want to discard it?');
+      if (!confirmed) return;
+    }
+    
+    if (!reflectionQuestion && !reflectionAnswer) {
+      // If there's no saved reflection, hide the module completely
+      setShowModule(false);
+    } else {
+      // If there's a saved reflection, return to view mode
+      setIsEditing(false);
+      setQuestion(reflectionQuestion || '');
+      setAnswer(reflectionAnswer || '');
+    }
+  };
+
+  if (!showModule) {
+    return <ReflectionTrigger onClick={generateQuestion} isLoading={isLoading} />;
   }
-  
-  // If we have both question and answer, display them
-  if (reflectionQuestion && reflectionAnswer) {
-    return (
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <ReflectionQuestion 
-            question={reflectionQuestion}
-            isEditing={false}
-            isLoading={false}
-            onRefresh={() => {}}
-            onClose={() => {}}
-          />
-          <ReflectionDisplay 
-            answer={reflectionAnswer} 
-            onEdit={() => setIsEditing(true)} 
-            onDelete={handleDeleteReflection}
-            isLoading={isLoading}
-            isTrackPlaying={isTrackPlaying}
-            hasTrack={hasTrack}
-          />
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  // Otherwise, show the trigger to generate a reflection
+
   return (
-    <ReflectionTrigger 
-      onClick={handleGenerate} 
-      isLoading={isGenerating}
-    />
+    <div className="border border-border rounded-md p-4 mt-4 bg-muted/20">
+      <div className="flex flex-col space-y-4">
+        <ReflectionQuestion 
+          question={question}
+          isEditing={isEditing}
+          isLoading={isLoading}
+          onRefresh={generateQuestion}
+          onClose={handleClose}
+        />
+        
+        {isEditing ? (
+          <ReflectionEditor
+            answer={answer}
+            isLoading={isLoading}
+            onChange={setAnswer}
+            onSave={saveReflection}
+          />
+        ) : (
+          <ReflectionDisplay
+            answer={answer}
+            onEdit={() => setIsEditing(true)}
+            onDelete={deleteReflection}
+            isLoading={isLoading}
+          />
+        )}
+      </div>
+    </div>
   );
 };
 
