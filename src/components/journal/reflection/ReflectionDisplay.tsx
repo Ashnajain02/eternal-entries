@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Pencil, Trash2 } from 'lucide-react';
 
 interface ReflectionDisplayProps {
   answer: string;
@@ -17,20 +18,23 @@ const ReflectionDisplay: React.FC<ReflectionDisplayProps> = ({
 }) => {
   return (
     <>
-      <div className="text-left whitespace-pre-wrap">{answer}</div>
-      <div className="flex space-x-2">
+      <div className="text-left whitespace-pre-wrap mb-2">{answer}</div>
+      <div className="flex justify-end space-x-2">
         <Button 
           variant="outline" 
+          size="icon"
           onClick={onEdit}
         >
-          Edit
+          <Pencil className="h-4 w-4" />
         </Button>
         <Button 
-          variant="destructive" 
+          variant="outline" 
+          size="icon" 
           onClick={onDelete} 
           disabled={isLoading}
+          className="text-destructive hover:text-destructive"
         >
-          Delete Response
+          <Trash2 className="h-4 w-4" />
         </Button>
       </div>
     </>
