@@ -25,12 +25,15 @@ const ReflectionEditor: React.FC<ReflectionEditorProps> = ({
         className="min-h-[100px]"
         disabled={isLoading}
       />
-      <Button 
-        onClick={onSave} 
-        disabled={isLoading || !answer.trim()}
-      >
-        Save Reflection
-      </Button>
+      <div className="flex justify-end mt-2">
+        <Button 
+          onClick={onSave} 
+          disabled={isLoading || !answer.trim()}
+          size="sm"
+        >
+          Save
+        </Button>
+      </div>
     </>
   );
 };
