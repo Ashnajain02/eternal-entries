@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { SpotifyTrack } from '@/types';
 
 // Constants
 const REDIRECT_URI = `${window.location.origin}/callback`;
@@ -145,3 +146,63 @@ export const disconnectSpotify = async (): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * Get fresh access token for Spotify Web Playback SDK
+ */
+export const getSpotifyAccessToken = async (): Promise<string | null> => {
+  try {
+    // Get a fresh access token from our Supabase function
+    const { data, error } = await supabase.functions.invoke('spotify-auth', {
+      body: { action: 'get_access_token' }
+    });
+    
+    if (error || !data?.access_token) {
+      console.error('Error getting Spotify access token:', error || 'No token returned');
+      return null;
+    }
+    
+    return data.access_token;
+  } catch (error) {
+    console.error('Failed to get Spotify access token:', error);
+    return null;
+  }
+};
+
+/**
+ * Load Spotify Web Playback SDK script
+ */
+export const loadSpotifyWebPlaybackSDK = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    // Check if the script is already loaded
+    if (document.querySelector('script#spotify-player')) {
+      resolve();
+      return;
+    }
+    
+    const script = document.createElement('script');
+    script.id = 'spotify-player';
+    script.src = 'https://sdk.scdn.co/spotify-player.js';
+    script.async = true;
+    
+    script.onload = () => resolve();
+    script.onerror = (error) => reject(new Error('Failed to load Spotify Web Playback SDK'));
+    
+    document.body.appendChild(script);
+  });
+};
+
+/**
+ * Create a track URI from a Spotify track ID
+ */
+export const createSpotifyTrackURI = (trackId: string): string => {
+  return `spotify:track:${trackId}`;
+};
+
+/**
+ * Extract track ID from Spotify URI
+ */
+export const extractTrackIdFromURI = (uri: string): string => {
+  return uri.split(':').pop() || '';
+};
+

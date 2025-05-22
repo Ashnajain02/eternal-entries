@@ -37,11 +37,11 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     setIsContentBlurred(!isPreview && !!entry.track);
   }, [entry.track, isPreview]);
   
-  // Handle play state change
+  // Handle play state change - called from SpotifyPlayer
   const handlePlayStateChange = (isPlaying: boolean) => {
-    console.log(`Play state change detected: ${isPlaying ? 'playing' : 'paused'}`);
+    console.log(`Play state change detected in JournalEntry: ${isPlaying ? 'playing' : 'paused'}`);
     if (isPlaying) {
-      // Unblur immediately when song starts playing
+      // Unblur content when song starts playing
       setIsContentBlurred(false);
     }
   };
