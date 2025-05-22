@@ -1,10 +1,12 @@
+
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkles, RefreshCcw, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { generateReflectionQuestion } from '@/services/api';
+import ReflectionQuestion from './reflection/ReflectionQuestion';
+import ReflectionEditor from './reflection/ReflectionEditor';
+import ReflectionDisplay from './reflection/ReflectionDisplay';
+import ReflectionTrigger from './reflection/ReflectionTrigger';
 
 interface ReflectionModuleProps {
   entryId: string;
@@ -146,81 +148,34 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   };
 
   if (!showModule) {
-    return (
-      <Button
-        onClick={generateQuestion}
-        disabled={isLoading}
-        className="w-full mt-4"
-        variant="outline"
-      >
-        {isLoading ? (
-          <>Generating... <RefreshCcw className="animate-spin ml-2 h-4 w-4" /></>
-        ) : (
-          <>Generate Reflection Question <Sparkles className="ml-2 h-4 w-4" /></>
-        )}
-      </Button>
-    );
+    return <ReflectionTrigger onClick={generateQuestion} isLoading={isLoading} />;
   }
 
   return (
     <div className="border border-border rounded-md p-4 mt-4 bg-muted/20">
       <div className="flex flex-col space-y-4">
-        <div className="flex justify-between items-start">
-          <div className="flex-1 font-medium text-left">
-            {question}
-          </div>
-          <div className="flex space-x-2 ml-2">
-            {isEditing && (
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                onClick={generateQuestion} 
-                disabled={isLoading}
-              >
-                <RefreshCcw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </Button>
-            )}
-            <Button size="icon" variant="ghost" onClick={handleClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <ReflectionQuestion 
+          question={question}
+          isEditing={isEditing}
+          isLoading={isLoading}
+          onRefresh={generateQuestion}
+          onClose={handleClose}
+        />
         
         {isEditing ? (
-          <>
-            <Textarea
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder="Write your reflection..."
-              className="min-h-[100px]"
-              disabled={isLoading}
-            />
-            <Button 
-              onClick={saveReflection} 
-              disabled={isLoading || !answer.trim()}
-            >
-              Save Reflection
-            </Button>
-          </>
+          <ReflectionEditor
+            answer={answer}
+            isLoading={isLoading}
+            onChange={setAnswer}
+            onSave={saveReflection}
+          />
         ) : (
-          <>
-            <div className="text-left whitespace-pre-wrap">{answer}</div>
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsEditing(true)}
-              >
-                Edit
-              </Button>
-              <Button 
-                variant="destructive" 
-                onClick={deleteReflection} 
-                disabled={isLoading}
-              >
-                Delete Response
-              </Button>
-            </div>
-          </>
+          <ReflectionDisplay
+            answer={answer}
+            onEdit={() => setIsEditing(true)}
+            onDelete={deleteReflection}
+            isLoading={isLoading}
+          />
         )}
       </div>
     </div>
