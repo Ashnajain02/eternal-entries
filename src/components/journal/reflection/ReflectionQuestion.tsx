@@ -19,8 +19,8 @@ const ReflectionQuestion: React.FC<ReflectionQuestionProps> = ({
   onClose
 }) => {
   return (
-    <div className="flex justify-between items-start">
-      <div className={`flex-1 font-medium text-left ${!isEditing ? 'text-primary text-lg' : ''}`}>
+    <div className={`flex justify-between items-start p-2 rounded-md ${!isEditing ? 'bg-muted/60' : ''}`}>
+      <div className="flex-1 font-medium text-left">
         {question}
       </div>
       <div className="flex space-x-2 ml-2">
