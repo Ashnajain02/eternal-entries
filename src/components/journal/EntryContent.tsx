@@ -1,14 +1,25 @@
 
-import React from 'react';
+import React, { useState } from 'react';
+import BlurredContent from './BlurredContent';
 
 interface EntryContentProps {
   content: string;
+  isTrackPlaying?: boolean;
+  hasTrack?: boolean;
 }
 
-const EntryContent: React.FC<EntryContentProps> = ({ content }) => {
+const EntryContent: React.FC<EntryContentProps> = ({ 
+  content,
+  isTrackPlaying = false,
+  hasTrack = false
+}) => {
   return (
     <div className="mb-6">
-      <div className="whitespace-pre-wrap text-left">{content}</div>
+      <BlurredContent 
+        content={content} 
+        isTrackPlaying={isTrackPlaying}
+        hasTrack={hasTrack}
+      />
     </div>
   );
 };

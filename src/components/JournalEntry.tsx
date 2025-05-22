@@ -27,6 +27,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   isPreview = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [isTrackPlaying, setIsTrackPlaying] = useState(false);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
   const { toast } = useToast();
   
@@ -88,9 +89,15 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     await updateEntry(updatedEntry);
   };
   
+  const handleTrackPlayStateChange = (isPlaying: boolean) => {
+    setIsTrackPlaying(isPlaying);
+  };
+  
   if (isEditing) {
     return <JournalEditor entry={entry} onSave={() => setIsEditing(false)} />;
   }
+
+  const hasTrack = !!entry.track;
 
   return (
     <Card className={cn("journal-card", className)}>
@@ -116,11 +123,19 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         {/* Spotify Track Section */}
         {entry.track && (
           <div className="mb-6">
-            <SpotifyPlayer track={entry.track} className="mb-2" />
+            <SpotifyPlayer 
+              track={entry.track} 
+              className="mb-2"
+              onPlayStateChange={handleTrackPlayStateChange}
+            />
           </div>
         )}
         
-        <EntryContent content={entry.content} />
+        <EntryContent 
+          content={entry.content} 
+          isTrackPlaying={isTrackPlaying}
+          hasTrack={hasTrack}
+        />
         
         {!isPreview && (
           <>
@@ -132,6 +147,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
               reflectionQuestion={entry.reflectionQuestion || null}
               reflectionAnswer={entry.reflectionAnswer || null}
               onReflectionUpdate={handleReflectionUpdate}
+              isTrackPlaying={isTrackPlaying}
+              hasTrack={hasTrack}
             />
 
             <div className="border-t border-border my-4 pt-4">
