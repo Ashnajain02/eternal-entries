@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
-import { useJournal } from '@/contexts/JournalContext';
+import { useJournal } from '@/contexts/journal/JournalContext';
 import JournalEditor from './JournalEditor';
 import { useToast } from '@/hooks/use-toast';
 import CommentSection from './CommentSection';

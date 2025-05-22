@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, Mood } from '@/types';
-import { useJournal } from '@/contexts/JournalContext';
+import { useJournal } from '@/contexts/journal/JournalContext';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';

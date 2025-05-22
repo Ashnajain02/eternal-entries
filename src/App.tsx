@@ -1,72 +1,54 @@
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { JournalProvider } from './contexts/journal/JournalContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import './App.css';
+import Index from './pages/Index';
+import Settings from './pages/Settings';
+import Auth from './pages/Auth';
+import PasswordReset from './pages/PasswordReset';
+import PasswordUpdate from './pages/PasswordUpdate';
+import NotFound from './pages/NotFound';
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { JournalProvider } from "./contexts/JournalContext";
-import { AuthProvider } from "./contexts/AuthContext";
-import Index from "./pages/Index";
-import Archive from "./pages/Archive";
-import Stats from "./pages/Stats";
-import Auth from "./pages/Auth";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
-import ProtectedRoute from "./components/ProtectedRoute";
-import Callback from "./pages/Callback";
+const App: React.FC = () => {
+  useEffect(() => {
+    document.body.className = 'dark'; // force dark mode
+  }, []);
 
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+  return (
+    <ThemeProvider>
       <AuthProvider>
         <JournalProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+          <Router>
             <Routes>
               <Route path="/auth" element={<Auth />} />
-              <Route path="/callback" element={<Callback />} />
-              <Route 
-                path="/" 
+              <Route path="/password-reset" element={<PasswordReset />} />
+              <Route path="/password-update" element={<PasswordUpdate />} />
+              <Route
+                path="/"
                 element={
                   <ProtectedRoute>
                     <Index />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/archive" 
-                element={
-                  <ProtectedRoute>
-                    <Archive />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/stats" 
-                element={
-                  <ProtectedRoute>
-                    <Stats />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/settings" 
+              <Route
+                path="/settings"
                 element={
                   <ProtectedRoute>
                     <Settings />
                   </ProtectedRoute>
-                } 
+                }
               />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
+          </Router>
         </JournalProvider>
       </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </ThemeProvider>
+  );
+};
 
 export default App;
