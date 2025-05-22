@@ -1,14 +1,25 @@
 
 import React from 'react';
+import BlurredContent from './BlurredContent';
 
 interface EntryContentProps {
   content: string;
+  isBlurred?: boolean;
+  onPlayRequest?: () => void;
 }
 
-const EntryContent: React.FC<EntryContentProps> = ({ content }) => {
+const EntryContent: React.FC<EntryContentProps> = ({ 
+  content, 
+  isBlurred = false,
+  onPlayRequest
+}) => {
   return (
     <div className="mb-6">
-      <div className="whitespace-pre-wrap text-left">{content}</div>
+      <BlurredContent 
+        content={content} 
+        isBlurred={isBlurred} 
+        onPlayRequest={onPlayRequest}
+      />
     </div>
   );
 };
