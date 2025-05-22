@@ -44,6 +44,7 @@ serve(async (req) => {
     4. Is respectful and compassionate
     5. Is concise (one sentence only)
     6. Sounds natural and conversational (like something a friend might ask)
+    7. Focuses on one specific idea from their entry
     
     Provide only the reflection question with no additional text or explanation.
     `;
