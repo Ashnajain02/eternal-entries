@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -62,6 +61,7 @@ const Auth = () => {
   const [resetSuccess, setResetSuccess] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const [tokenError, setTokenError] = useState(false);
+  const [showUpdateTab, setShowUpdateTab] = useState(false);
   const { authState, signIn, signUp, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -122,6 +122,7 @@ const Auth = () => {
       setActiveTab('reset');
     } else if (tab === 'update-password') {
       setActiveTab('update-password');
+      setShowUpdateTab(true);
     } else if (tab === 'reset-success') {
       setResetSuccess(true);
       setActiveTab('signin');
@@ -191,11 +192,11 @@ const Auth = () => {
               onValueChange={setActiveTab} 
               defaultValue="signin"
             >
-              <TabsList className="grid w-full grid-cols-4 mb-6">
+              <TabsList className={`grid w-full ${showUpdateTab ? 'grid-cols-4' : 'grid-cols-3'} mb-6`}>
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
                 <TabsTrigger value="reset">Reset</TabsTrigger>
-                <TabsTrigger value="update-password">Update</TabsTrigger>
+                {showUpdateTab && <TabsTrigger value="update-password">Update</TabsTrigger>}
               </TabsList>
               
               {resetSuccess && (
