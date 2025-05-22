@@ -33,7 +33,10 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({
         
         // Check if this is a player state update
         if (data && data.type === "player_state_changed") {
-          const newIsPlaying = !!(data.payload && !data.payload.paused);
+          const newIsPlaying = !!(data.payload && data.payload.paused === false);
+          
+          console.log("Spotify player state changed:", data.payload);
+          console.log("Is playing:", newIsPlaying, "Previous state:", isPlaying);
           
           // Update state if it changed
           if (newIsPlaying !== isPlaying) {
@@ -67,7 +70,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({
     <div className={`spotify-player ${className}`}>
       <iframe
         ref={iframeRef}
-        src={`https://open.spotify.com/embed/track/${trackId}`}
+        src={`https://open.spotify.com/embed/track/${trackId}?utm_source=generator`}
         width="100%"
         height="80"
         frameBorder="0"

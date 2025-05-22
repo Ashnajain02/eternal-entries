@@ -39,6 +39,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   // Handle play state change
   const handlePlayStateChange = (isPlaying: boolean) => {
+    console.log(`Play state change detected: ${isPlaying ? 'playing' : 'paused'}`);
     if (isPlaying) {
       // Unblur immediately when song starts playing
       setIsContentBlurred(false);
