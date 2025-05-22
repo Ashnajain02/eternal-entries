@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { JournalEntry, Mood, SpotifyTrack, WeatherData, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
@@ -103,9 +102,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             createdAt: new Date(entry.created_at).getTime(),
             updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
             user_id: entry.user_id,
-            comments: [], // Initialize comments array (will be populated during decryption)
-            ai_prompt: entry.ai_prompt || undefined,
-            ai_response: entry.ai_response || undefined
+            comments: [] // Initialize comments array (will be populated during decryption)
           };
           
           // Decrypt the content
@@ -238,8 +235,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
 
     try {
       console.log("Adding entry with track:", entry.track);
-      console.log("Adding entry with AI prompt:", entry.ai_prompt);
-      console.log("Adding entry with AI response:", entry.ai_response);
       
       // Encrypt the entry content before saving to database
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
@@ -259,9 +254,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           weather_description: entry.weather?.description,
           weather_icon: entry.weather?.icon,
           weather_location: entry.weather?.location,
-          timestamp_started: entry.timestamp,
-          ai_prompt: entry.ai_prompt,
-          ai_response: entry.ai_response
+          timestamp_started: entry.timestamp
         }])
         .select()
         .single();
@@ -304,8 +297,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
 
     try {
       console.log("Updating entry with track:", updatedEntry.track);
-      console.log("Updating entry with AI prompt:", updatedEntry.ai_prompt);
-      console.log("Updating entry with AI response:", updatedEntry.ai_response);
       
       // Add the current timestamp as updated_at
       const now = new Date();
@@ -327,9 +318,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           weather_description: updatedEntry.weather?.description,
           weather_icon: updatedEntry.weather?.icon,
           weather_location: updatedEntry.weather?.location,
-          updated_at: now.toISOString(), // Add the updated_at timestamp
-          ai_prompt: updatedEntry.ai_prompt,
-          ai_response: updatedEntry.ai_response
+          updated_at: now.toISOString() // Add the updated_at timestamp
         })
         .eq('id', updatedEntry.id);
 
