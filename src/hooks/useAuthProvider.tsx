@@ -25,6 +25,14 @@ export const useAuthProvider = () => {
           user: session?.user ?? null,
           loading: false,
         });
+        
+        // Show toast for certain auth events
+        if (event === 'PASSWORD_RECOVERY') {
+          toast({
+            title: "Recovery link detected",
+            description: "You can now set a new password.",
+          });
+        }
       }
     );
 
@@ -40,7 +48,7 @@ export const useAuthProvider = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [toast]);
 
   const signUp = async (email: string, password: string, metadata?: SignUpMetadata) => {
     try {

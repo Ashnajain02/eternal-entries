@@ -22,9 +22,10 @@ type UpdatePasswordValues = z.infer<typeof updatePasswordSchema>;
 
 interface UpdatePasswordFormProps {
   onBackToSignIn: () => void;
+  recoveryToken?: string | null;
 }
 
-export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ onBackToSignIn }) => {
+export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ onBackToSignIn, recoveryToken }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const { updatePassword } = useAuth();
@@ -66,7 +67,10 @@ export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ onBackTo
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-2">
           <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
           <p className="text-sm text-blue-700">
-            Enter your new password below.
+            {recoveryToken ? 
+              "Please enter your new password below." : 
+              "Enter your new password below."
+            }
           </p>
         </div>
       )}

@@ -17,6 +17,7 @@ const Auth = () => {
   const [resetSuccess, setResetSuccess] = useState(false);
   const [tokenError, setTokenError] = useState(false);
   const [showUpdateTab, setShowUpdateTab] = useState(false);
+  const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
   const { authState } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -28,20 +29,23 @@ const Auth = () => {
     }
   }, [authState.user, authState.loading, navigate]);
 
-  // Check URL parameters and hash on component mount
+  // Process URL hash parameters (for recovery tokens)
   useEffect(() => {
-    // First handle hash parameters from recovery links
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const type = hashParams.get('type');
-    
-    if (accessToken && type === 'recovery') {
-      // We have a recovery token in the URL, show the update password tab
-      setActiveTab('update-password');
-      setShowUpdateTab(true);
+    // First check for hash parameters from recovery links
+    if (window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      const type = hashParams.get('type');
       
-      // Remove the hash from the URL to avoid exposing the token
-      window.history.replaceState({}, document.title, window.location.pathname);
+      if (accessToken && type === 'recovery') {
+        // We have a recovery token in the URL
+        setActiveTab('update-password');
+        setShowUpdateTab(true);
+        setRecoveryToken(accessToken);
+        
+        // Clean the URL to remove the token for security
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
     
     // Then check URL query parameters
@@ -129,7 +133,10 @@ const Auth = () => {
               </TabsContent>
               
               <TabsContent value="update-password">
-                <UpdatePasswordForm onBackToSignIn={handleBackToSignIn} />
+                <UpdatePasswordForm 
+                  onBackToSignIn={handleBackToSignIn} 
+                  recoveryToken={recoveryToken}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>
