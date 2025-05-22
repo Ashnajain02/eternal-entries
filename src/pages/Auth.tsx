@@ -47,9 +47,10 @@ const Auth = () => {
         setActiveTab('update-password');
         setShowUpdateTab(true);
         setRecoveryToken(accessToken);
+        console.log('Recovery token detected in hash:', accessToken.substring(0, 10) + '...');
         
         // Clean the URL to remove the token for security
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState({}, document.title, window.location.pathname + '?tab=update-password');
         return; // Exit early since we processed the token
       }
     }
@@ -98,6 +99,8 @@ const Auth = () => {
               <Info className="h-4 w-4 text-gray-600" />
               <AlertDescription className="text-gray-700 text-xs">
                 Current site: {window.location.origin}
+                <br />
+                Recovery token: {recoveryToken ? "Present" : "Not present"}
               </AlertDescription>
             </Alert>
           </CardHeader>

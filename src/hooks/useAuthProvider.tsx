@@ -148,7 +148,6 @@ export const useAuthProvider = () => {
       // Debug to see what URL is being generated
       console.log('Using reset URL:', resetUrl);
       
-      // Use the site URL directly from the config to ensure it matches what Supabase expects
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: resetUrl,
       });
@@ -170,11 +169,35 @@ export const useAuthProvider = () => {
     }
   };
   
-  const updatePassword = async (password: string) => {
+  const updatePassword = async (password: string, accessToken?: string | null) => {
     try {
-      const { error } = await supabase.auth.updateUser({
-        password,
-      });
+      console.log('Updating password, access token present:', !!accessToken);
+      
+      let error;
+      
+      // If we have an access token from a recovery flow, use it directly
+      if (accessToken) {
+        console.log('Using access token for password update');
+        // Set the access token in the session
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: '',
+        });
+        
+        if (sessionError) {
+          console.error('Error setting session:', sessionError);
+          throw sessionError;
+        }
+        
+        // Then update the password
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        error = updateError;
+      } else {
+        // Regular flow for logged-in users
+        console.log('Using regular session for password update');
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        error = updateError;
+      }
       
       if (error) throw error;
       
@@ -183,6 +206,7 @@ export const useAuthProvider = () => {
         description: "Your password has been updated successfully.",
       });
     } catch (error: any) {
+      console.error('Error updating password:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update password",

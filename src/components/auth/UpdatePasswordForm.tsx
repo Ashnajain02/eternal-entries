@@ -29,15 +29,6 @@ export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ onBackTo
   const [isLoading, setIsLoading] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const { updatePassword } = useAuth();
-  const [currentUrl, setCurrentUrl] = useState<string>("");
-
-  // Store the current URL for debugging purposes
-  useEffect(() => {
-    setCurrentUrl(window.location.href);
-    // Also log it for debugging
-    console.log('Update Password Form - Current URL:', window.location.href);
-    console.log('Update Password Form - Origin:', window.location.origin);
-  }, []);
 
   const form = useForm<UpdatePasswordValues>({
     resolver: zodResolver(updatePasswordSchema),
@@ -53,7 +44,8 @@ export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ onBackTo
     
     setIsLoading(true);
     try {
-      await updatePassword(values.password);
+      // Pass the recovery token to the updatePassword function
+      await updatePassword(values.password, recoveryToken);
       setUpdateSuccess(true);
       form.reset();
       
