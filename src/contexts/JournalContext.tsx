@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { JournalEntry, Mood, SpotifyTrack, WeatherData, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
@@ -318,6 +319,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           weather_description: updatedEntry.weather?.description,
           weather_icon: updatedEntry.weather?.icon,
           weather_location: updatedEntry.weather?.location,
+          ai_prompt: updatedEntry.ai_prompt, // Save AI prompt
+          ai_response: updatedEntry.ai_response, // Save AI response
           updated_at: now.toISOString() // Add the updated_at timestamp
         })
         .eq('id', updatedEntry.id);
