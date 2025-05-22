@@ -43,8 +43,8 @@ serve(async (req) => {
     4. Is respectful and compassionate
     5. Is concise (one sentence only)
     6. Sounds natural and conversational (like something a friend might ask - not professional like a therapist)
-    7. Focuses on one specific detail from their entry
-    8. Are phrased as: "who?", "what?", "when?", "where?" or "why?"
+    7. Focuses on one specific memory, detail, object, place, person from their entry
+    8. Are phrased a: "who?" or "what?" or "when?" or "where?" or "why?" question
     
     Provide only the reflection question with no additional text or explanation.
     `;
