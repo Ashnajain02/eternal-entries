@@ -23,11 +23,15 @@ const AuthContext = createContext<{
   signUp: (email: string, password: string, metadata?: SignUpMetadata) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string, redirectTo?: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
 }>({
   authState: initialState,
   signUp: async () => {},
   signIn: async () => {},
   signOut: async () => {},
+  resetPassword: async () => {},
+  updatePassword: async () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -147,9 +151,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
   };
+  
+  const resetPassword = async (email: string, redirectTo?: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectTo || `${window.location.origin}/auth`,
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Password reset email sent",
+        description: "Check your email for a link to reset your password.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send reset password email",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+  
+  const updatePassword = async (password: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password,
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "Your password has been updated successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update password",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
 
   return (
-    <AuthContext.Provider value={{ authState, signUp, signIn, signOut }}>
+    <AuthContext.Provider 
+      value={{ 
+        authState, 
+        signUp, 
+        signIn, 
+        signOut, 
+        resetPassword, 
+        updatePassword 
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

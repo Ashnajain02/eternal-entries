@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,14 +18,16 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { AlertTriangle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-// Validation schema for sign in
+// Validation schemas
 const signInSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-// Validation schema for sign up
 const signUpSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
@@ -36,14 +39,21 @@ const signUpSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const resetPasswordSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+});
+
 type SignInValues = z.infer<typeof signInSchema>;
 type SignUpValues = z.infer<typeof signUpSchema>;
+type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('signin');
   const { authState, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   
   const signInForm = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
@@ -61,6 +71,13 @@ const Auth = () => {
       email: '',
       password: '',
       confirmPassword: '',
+    },
+  });
+
+  const resetPasswordForm = useForm<ResetPasswordValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      email: '',
     },
   });
 
@@ -93,6 +110,48 @@ const Auth = () => {
     }
   };
 
+  const handleResetPassword = async (values: ResetPasswordValues) => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
+        redirectTo: `${window.location.origin}/auth?tab=reset-success`,
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      toast({
+        title: "Password reset email sent",
+        description: "Check your email for a link to reset your password.",
+      });
+      
+      resetPasswordForm.reset();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send reset password email",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Check if we need to show the reset success message
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tab = searchParams.get('tab');
+    
+    if (tab === 'reset-success') {
+      toast({
+        title: "Success",
+        description: "Your password has been reset. You can now sign in with your new password.",
+      });
+      navigate('/auth', { replace: true });
+    }
+  }, [location.search, navigate, toast]);
+
   return (
     <Layout>
       <div className="container mx-auto flex flex-col items-center justify-center max-w-md py-8">
@@ -103,10 +162,15 @@ const Auth = () => {
             <CardTitle className="text-center">Account Access</CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+            <Tabs 
+              value={activeTab} 
+              onValueChange={setActiveTab} 
+              defaultValue="signin"
+            >
+              <TabsList className="grid w-full grid-cols-3 mb-6">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                <TabsTrigger value="reset">Reset</TabsTrigger>
               </TabsList>
               
               <TabsContent value="signin">
@@ -140,13 +204,24 @@ const Auth = () => {
                       )}
                     />
                     
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Signing in..." : "Sign In"}
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button 
+                        type="submit" 
+                        className="w-full" 
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Signing in..." : "Sign In"}
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="text-sm text-blue-500 hover:text-blue-700"
+                        onClick={() => setActiveTab('reset')}
+                      >
+                        Forgot password?
+                      </Button>
+                    </div>
                   </form>
                 </Form>
               </TabsContent>
@@ -232,6 +307,50 @@ const Auth = () => {
                       disabled={isLoading}
                     >
                       {isLoading ? "Signing up..." : "Sign Up"}
+                    </Button>
+                  </form>
+                </Form>
+              </TabsContent>
+              
+              <TabsContent value="reset">
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-yellow-700">
+                    Enter your email address and we'll send you a link to reset your password.
+                  </p>
+                </div>
+                
+                <Form {...resetPasswordForm}>
+                  <form onSubmit={resetPasswordForm.handleSubmit(handleResetPassword)} className="space-y-4">
+                    <FormField
+                      control={resetPasswordForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="Your email address" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Sending..." : "Send Reset Link"}
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="w-full text-sm"
+                      onClick={() => setActiveTab('signin')}
+                    >
+                      Back to Sign In
                     </Button>
                   </form>
                 </Form>
