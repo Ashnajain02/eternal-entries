@@ -6,3 +6,4 @@ import { getWeatherForLocation } from "@/utils/weatherUtils";
 export const fetchWeatherData = async (lat: number, lon: number): Promise<WeatherData> => {
   return await getWeatherForLocation(lat, lon);
 };
+
