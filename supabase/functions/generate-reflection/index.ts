@@ -76,7 +76,7 @@ serve(async (req) => {
 
     const data = await response.json();
     const reflectionQuestion = data.candidates[0].content.parts[0].text.trim();
-    
+    console.log(reflectionQuestion)
     // Return the reflection question
     return new Response(JSON.stringify({ reflectionQuestion }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
