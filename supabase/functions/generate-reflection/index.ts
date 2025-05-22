@@ -48,6 +48,8 @@ serve(async (req) => {
     Provide only the reflection question with no additional text or explanation.
     `;
 
+    console.log("Ashna 1")
+
     // Call Gemini API
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",
@@ -68,6 +70,7 @@ serve(async (req) => {
         }
       }),
     });
+    console.log("Ashna 2")
 
     if (!response.ok) {
       const error = await response.json();
@@ -76,7 +79,7 @@ serve(async (req) => {
 
     const data = await response.json();
     const reflectionQuestion = data.candidates[0].content.parts[0].text.trim();
-    console.log(reflectionQuestion)
+    
     // Return the reflection question
     return new Response(JSON.stringify({ reflectionQuestion }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
