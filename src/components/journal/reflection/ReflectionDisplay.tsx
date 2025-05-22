@@ -2,23 +2,30 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Pencil, Trash2 } from 'lucide-react';
+import BlurredContent from '../BlurredContent';
 
 interface ReflectionDisplayProps {
   answer: string;
   onEdit: () => void;
   onDelete: () => void;
   isLoading: boolean;
+  isBlurred?: boolean;
 }
 
 const ReflectionDisplay: React.FC<ReflectionDisplayProps> = ({
   answer,
   onEdit,
   onDelete,
-  isLoading
+  isLoading,
+  isBlurred = false
 }) => {
   return (
     <>
-      <div className="text-left whitespace-pre-wrap mb-2">{answer}</div>
+      <BlurredContent 
+        content={answer} 
+        isBlurred={isBlurred} 
+        className="mb-2"
+      />
       <div className="flex justify-end space-x-2">
         <Button 
           variant="ghost" 
