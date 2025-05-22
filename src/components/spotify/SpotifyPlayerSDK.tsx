@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { SpotifyTrack } from '@/types';
 import { getSpotifyAccessToken, loadSpotifyWebPlaybackSDK, createSpotifyTrackURI, extractTrackIdFromURI } from '@/services/spotify';
@@ -52,7 +51,6 @@ const SpotifyPlayerSDK: React.FC<SpotifyPlayerSDKProps> = ({
             volume: 0.5
           });
           
-          // Setup event listeners
           player.addListener('ready', ({ device_id }: { device_id: string }) => {
             console.log('Spotify Web Playback SDK ready with device ID:', device_id);
             setDeviceId(device_id);
