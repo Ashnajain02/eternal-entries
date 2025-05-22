@@ -32,19 +32,20 @@ const EntryActions: React.FC<EntryActionsProps> = ({ onEdit, onDelete }) => {
 
   return (
     <>
-      <div className="flex justify-end gap-2">
+      <div className="flex gap-2">
         <Button 
-          variant="outline" 
+          variant="ghost" 
           size="icon"
           onClick={onEdit}
+          className="h-8 w-8 p-0"
         >
           <Pencil className="h-4 w-4" />
         </Button>
         <Button 
-          variant="outline" 
+          variant="ghost" 
           size="icon" 
           onClick={handleDelete}
-          className="text-destructive hover:text-destructive"
+          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           <Trash className="h-4 w-4" />
         </Button>
