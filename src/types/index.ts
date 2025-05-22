@@ -44,4 +44,6 @@ export interface JournalEntry {
   updatedAt?: number;
   user_id?: string;
   comments?: JournalComment[];
+  ai_prompt?: string;
+  ai_response?: string;
 }
