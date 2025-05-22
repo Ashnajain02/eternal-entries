@@ -1,26 +1,30 @@
 
 import React from 'react';
 import { SpotifyTrack } from '@/types';
-import SpotifyPlayerSDK from './SpotifyPlayerSDK';
 
 interface SpotifyPlayerProps {
   track: SpotifyTrack;
   className?: string;
-  onPlayStateChange?: (isPlaying: boolean) => void;
 }
 
-const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ 
-  track, 
-  className = '',
-  onPlayStateChange 
-}) => {
-  // Use our SDK-based player for better control and accurate state detection
+const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({ track, className = '' }) => {
+  // Extract track ID from URI (format: spotify:track:1234567890)
+  const trackId = track.uri ? track.uri.split(':').pop() : '';
+  
+  if (!trackId) return null;
+  
   return (
-    <SpotifyPlayerSDK
-      track={track}
-      className={className}
-      onPlayStateChange={onPlayStateChange}
-    />
+    <div className={`spotify-player ${className}`}>
+      <iframe
+        src={`https://open.spotify.com/embed/track/${trackId}`}
+        width="100%"
+        height="80"
+        frameBorder="0"
+        allow="encrypted-media"
+        loading="lazy"
+        className="rounded-md"
+      />
+    </div>
   );
 };
 

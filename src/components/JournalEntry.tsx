@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
-import { useJournal } from '@/contexts/journal/JournalContext';
+import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
 import { useToast } from '@/hooks/use-toast';
 import CommentSection from './CommentSection';
@@ -27,24 +27,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   isPreview = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [isContentBlurred, setIsContentBlurred] = useState(false);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
   const { toast } = useToast();
-  
-  // Determine if content should be blurred on mount
-  useEffect(() => {
-    // Only blur content if there's a track attached and we're not in preview mode
-    setIsContentBlurred(!isPreview && !!entry.track);
-  }, [entry.track, isPreview]);
-  
-  // Handle play state change - called from SpotifyPlayer
-  const handlePlayStateChange = (isPlaying: boolean) => {
-    console.log(`Play state change detected in JournalEntry: ${isPlaying ? 'playing' : 'paused'}`);
-    if (isPlaying) {
-      // Unblur content when song starts playing
-      setIsContentBlurred(false);
-    }
-  };
   
   // Parse ISO date string properly to display in local timezone
   const parseDate = (dateValue: string | number) => {
@@ -132,18 +116,11 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         {/* Spotify Track Section */}
         {entry.track && (
           <div className="mb-6">
-            <SpotifyPlayer 
-              track={entry.track} 
-              className="mb-2" 
-              onPlayStateChange={handlePlayStateChange}
-            />
+            <SpotifyPlayer track={entry.track} className="mb-2" />
           </div>
         )}
         
-        <EntryContent 
-          content={entry.content} 
-          isBlurred={isContentBlurred}
-        />
+        <EntryContent content={entry.content} />
         
         {!isPreview && (
           <>
@@ -155,7 +132,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
               reflectionQuestion={entry.reflectionQuestion || null}
               reflectionAnswer={entry.reflectionAnswer || null}
               onReflectionUpdate={handleReflectionUpdate}
-              isBlurred={isContentBlurred}
             />
 
             <div className="border-t border-border my-4 pt-4">

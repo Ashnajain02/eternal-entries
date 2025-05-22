@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { useJournal } from '@/contexts/journal/JournalContext';
+import { useJournal } from '@/contexts/JournalContext';
 import Layout from '@/components/Layout';
 import JournalEditor from '@/components/JournalEditor';
 import JournalEntryView from '@/components/JournalEntry';

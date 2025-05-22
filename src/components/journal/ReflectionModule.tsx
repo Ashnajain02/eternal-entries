@@ -15,7 +15,6 @@ interface ReflectionModuleProps {
   reflectionQuestion: string | null;
   reflectionAnswer: string | null;
   onReflectionUpdate: () => void;
-  isBlurred?: boolean;
 }
 
 const ReflectionModule: React.FC<ReflectionModuleProps> = ({
@@ -24,8 +23,7 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   entryMood,
   reflectionQuestion,
   reflectionAnswer,
-  onReflectionUpdate,
-  isBlurred = false
+  onReflectionUpdate
 }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -177,7 +175,6 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
             onEdit={() => setIsEditing(true)}
             onDelete={deleteReflection}
             isLoading={isLoading}
-            isBlurred={isBlurred}
           />
         )}
       </div>

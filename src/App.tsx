@@ -1,76 +1,72 @@
 
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { JournalProvider } from './contexts/journal/JournalContext';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { QueryProvider } from './contexts/QueryProvider';
-import ProtectedRoute from './components/ProtectedRoute';
-import './App.css';
-import Index from './pages/Index';
-import Settings from './pages/Settings';
-import Auth from './pages/Auth';
-import PasswordReset from './pages/PasswordReset';
-import PasswordUpdate from './pages/PasswordUpdate';
-import NotFound from './pages/NotFound';
-import Stats from './pages/Stats';
-import Archive from './pages/Archive';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { JournalProvider } from "./contexts/JournalContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import Index from "./pages/Index";
+import Archive from "./pages/Archive";
+import Stats from "./pages/Stats";
+import Auth from "./pages/Auth";
+import Settings from "./pages/Settings";
+import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Callback from "./pages/Callback";
 
-const App: React.FC = () => {
-  useEffect(() => {
-    document.body.className = 'dark'; // force dark mode
-  }, []);
+const queryClient = new QueryClient();
 
-  return (
-    <QueryProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <JournalProvider>
-            <Router>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/password-reset" element={<PasswordReset />} />
-                <Route path="/password-update" element={<PasswordUpdate />} />
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <Index />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/settings"
-                  element={
-                    <ProtectedRoute>
-                      <Settings />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/stats"
-                  element={
-                    <ProtectedRoute>
-                      <Stats />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/archive"
-                  element={
-                    <ProtectedRoute>
-                      <Archive />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Router>
-          </JournalProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryProvider>
-  );
-};
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <AuthProvider>
+        <JournalProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/callback" element={<Callback />} />
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute>
+                    <Index />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/archive" 
+                element={
+                  <ProtectedRoute>
+                    <Archive />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/stats" 
+                element={
+                  <ProtectedRoute>
+                    <Stats />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </JournalProvider>
+      </AuthProvider>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;
