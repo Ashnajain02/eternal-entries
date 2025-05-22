@@ -5,7 +5,8 @@ import ReflectionEditor from './reflection/ReflectionEditor';
 import ReflectionDisplay from './reflection/ReflectionDisplay';
 import ReflectionTrigger from './reflection/ReflectionTrigger';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSupabaseRPC } from '@/services/api';
+import { supabase } from '@/integrations/supabase/client';
+import { generateReflectionQuestion } from '@/services/api';
 
 interface ReflectionModuleProps {
   entryId: string;
@@ -32,24 +33,20 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [answer, setAnswer] = useState(reflectionAnswer || '');
   
   const queryClient = useQueryClient();
-  const supabaseRPC = useSupabaseRPC();
   
   const handleGenerate = async () => {
     setIsGenerating(true);
     setError(null);
     
     try {
-      const { error, data } = await supabaseRPC('generate-reflection', {
-        entry_content: entryContent,
-        mood: entryMood
-      });
-      
-      if (error) throw new Error(error.message);
+      // Use the API function to generate a reflection question
+      const question = await generateReflectionQuestion(entryContent, entryMood);
       
       // Update the entry with the generated reflection question
-      await updateReflection(data.question, null);
+      await updateReflection(question, null);
       
     } catch (err: any) {
       console.error('Error generating reflection:', err);
@@ -64,11 +61,13 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
     setError(null);
     
     try {
-      const { data, error } = await supabaseRPC('update-reflection', {
-        entry_id: entryId,
-        question,
-        answer
-      });
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .update({
+          reflection_question: question,
+          reflection_answer: answer
+        })
+        .eq('id', entryId);
       
       if (error) throw new Error(error.message);
       
@@ -93,17 +92,27 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   const handleDeleteReflection = async () => {
     await updateReflection(null, null);
   };
+
+  const handleEditCancel = () => {
+    setIsEditing(false);
+  };
   
   // If we have a question but no answer, or we're in editing mode, show the editor
   if ((reflectionQuestion && !reflectionAnswer) || isEditing) {
     return (
       <Card className="mb-6">
         <CardContent className="pt-6">
-          <ReflectionQuestion question={reflectionQuestion || ''} />
+          <ReflectionQuestion 
+            question={reflectionQuestion || ''} 
+            isEditing={true}
+            isLoading={isLoading}
+            onRefresh={handleGenerate}
+            onClose={() => setIsEditing(false)}
+          />
           <ReflectionEditor 
-            initialValue={reflectionAnswer || ''} 
-            onSubmit={handleSubmitAnswer}
-            onCancel={() => setIsEditing(false)}
+            answer={answer} 
+            onChange={setAnswer}
+            onSave={() => handleSubmitAnswer(answer)}
             isLoading={isLoading}
           />
         </CardContent>
@@ -116,7 +125,13 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
     return (
       <Card className="mb-6">
         <CardContent className="pt-6">
-          <ReflectionQuestion question={reflectionQuestion} />
+          <ReflectionQuestion 
+            question={reflectionQuestion}
+            isEditing={false}
+            isLoading={false}
+            onRefresh={() => {}}
+            onClose={() => {}}
+          />
           <ReflectionDisplay 
             answer={reflectionAnswer} 
             onEdit={() => setIsEditing(true)} 
@@ -134,8 +149,7 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   return (
     <ReflectionTrigger 
       onClick={handleGenerate} 
-      isLoading={isGenerating} 
-      error={error}
+      isLoading={isGenerating}
     />
   );
 };

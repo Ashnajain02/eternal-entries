@@ -1,3 +1,4 @@
+
 import { WeatherData } from "@/types";
 import { getWeatherForLocation } from "@/utils/weatherUtils";
 import { supabase } from "@/integrations/supabase/client";
