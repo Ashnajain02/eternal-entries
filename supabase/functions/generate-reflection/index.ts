@@ -43,7 +43,7 @@ serve(async (req) => {
     3. Encourages deeper thinking or self-awareness
     4. Is respectful and compassionate
     5. Is concise (one sentence only)
-    6. Sounds natural and conversational (like something a friend might ask)
+    6. Sounds natural and conversational (like something a friend might ask - not professional like a therapist)
     7. Focuses on one specific idea from their entry
     
     Provide only the reflection question with no additional text or explanation.
