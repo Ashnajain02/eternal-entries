@@ -43,8 +43,10 @@ const AIPrompt: React.FC<AIPromptProps> = ({
   if (!prompt) return null;
   
   const handleSave = () => {
+    console.log("AIPrompt handleSave called with response:", localResponse);
     onResponseChange(localResponse);
     if (onSaveResponse) {
+      console.log("Calling parent onSaveResponse function");
       onSaveResponse();
     }
     setIsEditing(false);

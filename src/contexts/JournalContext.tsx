@@ -298,6 +298,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
 
     try {
       console.log("Updating entry with track:", updatedEntry.track);
+      console.log("Updating entry with AI response:", updatedEntry.ai_response);
       
       // Add the current timestamp as updated_at
       const now = new Date();
@@ -325,7 +326,12 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         })
         .eq('id', updatedEntry.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase update error:", error);
+        throw error;
+      }
+
+      console.log("Database update successful for entry:", updatedEntry.id);
 
       // Update the entry with the new updated_at timestamp
       // Use the unencrypted entry for local state
