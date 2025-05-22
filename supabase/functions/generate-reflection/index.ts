@@ -40,7 +40,6 @@ serve(async (req) => {
     Generate a single, thought-provoking reflection question that:
     1. Is directly related to the content and emotion in the entry
     2. Is phrased as a question (always ends with a question mark)
-    3. Encourages deeper thinking or self-awareness
     4. Is respectful and compassionate
     5. Is concise (one sentence only)
     6. Sounds natural and conversational (like something a friend might ask - not professional like a therapist)
