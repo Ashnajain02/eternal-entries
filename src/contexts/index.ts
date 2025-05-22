@@ -3,3 +3,4 @@
 export * from './AuthContext';
 export * from './journal/JournalContext';
 export * from './ThemeContext';
+export * from './QueryProvider';
