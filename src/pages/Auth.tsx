@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Layout from '@/components/Layout';
-import { CheckCircle, AlertTriangle, Info } from 'lucide-react';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SignInForm } from '@/components/auth/SignInForm';
 import { SignUpForm } from '@/components/auth/SignUpForm';
@@ -31,23 +31,17 @@ const Auth = () => {
 
   // Process URL hash parameters (for recovery tokens)
   useEffect(() => {
-    console.log('Current URL:', window.location.href);
-    console.log('Current Origin:', window.location.origin);
-    
     // First check for hash parameters from recovery links
     if (window.location.hash) {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const accessToken = hashParams.get('access_token');
       const type = hashParams.get('type');
       
-      console.log('Hash params detected:', { type, hasToken: !!accessToken });
-      
       if (accessToken && type === 'recovery') {
         // We have a recovery token in the URL
         setActiveTab('update-password');
         setShowUpdateTab(true);
         setRecoveryToken(accessToken);
-        console.log('Recovery token detected in hash:', accessToken.substring(0, 10) + '...');
         
         // Clean the URL to remove the token for security
         window.history.replaceState({}, document.title, window.location.pathname + '?tab=update-password');
@@ -59,8 +53,6 @@ const Auth = () => {
     const tab = searchParams.get('tab');
     const error = searchParams.get('error');
     const errorCode = searchParams.get('error_code');
-    
-    console.log('URL params:', { tab, error, errorCode });
     
     if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
       setTokenError(true);
@@ -94,15 +86,6 @@ const Auth = () => {
         <Card className="w-full">
           <CardHeader>
             <CardTitle className="text-center">Account Access</CardTitle>
-            {/* Debug info */}
-            <Alert className="mt-2 bg-gray-50 border-gray-200">
-              <Info className="h-4 w-4 text-gray-600" />
-              <AlertDescription className="text-gray-700 text-xs">
-                Current site: {window.location.origin}
-                <br />
-                Recovery token: {recoveryToken ? "Present" : "Not present"}
-              </AlertDescription>
-            </Alert>
           </CardHeader>
           <CardContent>
             <Tabs 

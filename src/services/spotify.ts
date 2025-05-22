@@ -10,12 +10,9 @@ const REDIRECT_URI = `${window.location.origin}/callback`;
  */
 export const isSpotifyConnected = async (): Promise<boolean> => {
   try {
-    console.log("Checking if Spotify is connected");
-    
     // Get the current session to ensure we have a valid token
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) {
-      console.warn('No active session. Assuming Spotify is not connected.');
       return false;
     }
     
@@ -23,16 +20,12 @@ export const isSpotifyConnected = async (): Promise<boolean> => {
       body: { action: 'is_token_expired' }
     });
     
-    console.log("Spotify Token expiration check response:", data, error);
-    
     if (error) {
-      console.error('Error checking Spotify token expiration:', error);
       return false; // Assume not connected on error
     }
     
     return !(data?.expired || false);
   } catch (error) {
-    console.error('Failed to check Spotify connection:', error);
     return false;
   }
 };
@@ -42,8 +35,6 @@ export const isSpotifyConnected = async (): Promise<boolean> => {
  */
 export const initiateSpotifyAuth = async (): Promise<void> => {
   try {
-    console.log("Initiating Spotify auth process");
-    
     // Get the current session to ensure we have a valid token
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) {
@@ -57,15 +48,12 @@ export const initiateSpotifyAuth = async (): Promise<void> => {
       }
     });
 
-    console.log("Spotify auth response:", data, error);
-
     if (error || !data?.url) {
       throw new Error(error?.message || 'Failed to get Spotify authorization URL');
     }
 
     window.open(data.url, '_blank');
   } catch (error) {
-    console.error('Error initiating Spotify auth:', error);
     throw error;
   }
 };
@@ -79,8 +67,6 @@ export const handleSpotifyCallback = async (code: string): Promise<{
   error?: string;
 }> => {
   try {
-    console.log("Handling Spotify callback with code");
-    
     // Get the current session to ensure we have a valid token
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) {
@@ -98,8 +84,6 @@ export const handleSpotifyCallback = async (code: string): Promise<{
       }
     });
 
-    console.log("Spotify callback response:", data, error);
-
     if (error) {
       return { success: false, error: error.message };
     }
@@ -109,7 +93,6 @@ export const handleSpotifyCallback = async (code: string): Promise<{
       display_name: data.display_name
     };
   } catch (error: any) {
-    console.error('Failed to handle Spotify callback:', error);
     return { success: false, error: error.message };
   }
 };
@@ -119,12 +102,9 @@ export const handleSpotifyCallback = async (code: string): Promise<{
  */
 export const disconnectSpotify = async (): Promise<boolean> => {
   try {
-    console.log("Disconnecting Spotify");
-    
     // Get the current session to ensure we have a valid token
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) {
-      console.warn('No active session. Cannot disconnect Spotify.');
       return false;
     }
     
@@ -132,16 +112,12 @@ export const disconnectSpotify = async (): Promise<boolean> => {
       body: { action: 'revoke' }
     });
     
-    console.log("Disconnect response:", data, error);
-    
     if (error) {
-      console.error('Error disconnecting Spotify:', error);
       return false;
     }
     
     return data?.success || false;
   } catch (error) {
-    console.error('Failed to disconnect Spotify:', error);
     return false;
   }
 };

@@ -19,7 +19,6 @@ export const useAuthProvider = () => {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth state change event:', event);
         setAuthState({
           session,
           user: session?.user ?? null,
@@ -120,7 +119,6 @@ export const useAuthProvider = () => {
         description: "You've been signed out successfully.",
       });
     } catch (error: any) {
-      console.error('Sign out error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to sign out",
@@ -138,15 +136,11 @@ export const useAuthProvider = () => {
   
   const resetPassword = async (email: string, redirectTo?: string) => {
     try {
-      // Get the current base URL - this should be the deployed URL when on Vercel
+      // Get the current base URL
       const baseUrl = window.location.origin;
-      console.log('Reset password using base URL:', baseUrl);
       
       // Create the full reset URL with the current origin
       const resetUrl = redirectTo || `${baseUrl}/auth?tab=update-password`;
-      
-      // Debug to see what URL is being generated
-      console.log('Using reset URL:', resetUrl);
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: resetUrl,
@@ -159,7 +153,6 @@ export const useAuthProvider = () => {
         description: "Check your email for a link to reset your password.",
       });
     } catch (error: any) {
-      console.error('Reset password error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to send reset password email",
@@ -171,13 +164,10 @@ export const useAuthProvider = () => {
   
   const updatePassword = async (password: string, accessToken?: string | null) => {
     try {
-      console.log('Updating password, access token present:', !!accessToken);
-      
       let error;
       
       // If we have an access token from a recovery flow, use it directly
       if (accessToken) {
-        console.log('Using access token for password update');
         // Set the access token in the session
         const { error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
@@ -185,7 +175,6 @@ export const useAuthProvider = () => {
         });
         
         if (sessionError) {
-          console.error('Error setting session:', sessionError);
           throw sessionError;
         }
         
@@ -194,7 +183,6 @@ export const useAuthProvider = () => {
         error = updateError;
       } else {
         // Regular flow for logged-in users
-        console.log('Using regular session for password update');
         const { error: updateError } = await supabase.auth.updateUser({ password });
         error = updateError;
       }
@@ -206,7 +194,6 @@ export const useAuthProvider = () => {
         description: "Your password has been updated successfully.",
       });
     } catch (error: any) {
-      console.error('Error updating password:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update password",
