@@ -11,8 +11,6 @@ export type Database = {
     Tables: {
       journal_entries: {
         Row: {
-          ai_prompt: string | null
-          ai_response: string | null
           created_at: string
           entry_text: string
           id: string
@@ -31,8 +29,6 @@ export type Database = {
           weather_temperature: number | null
         }
         Insert: {
-          ai_prompt?: string | null
-          ai_response?: string | null
           created_at?: string
           entry_text: string
           id?: string
@@ -51,8 +47,6 @@ export type Database = {
           weather_temperature?: number | null
         }
         Update: {
-          ai_prompt?: string | null
-          ai_response?: string | null
           created_at?: string
           entry_text?: string
           id?: string

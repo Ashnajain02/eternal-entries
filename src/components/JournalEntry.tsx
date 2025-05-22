@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import WeatherDisplay from './WeatherDisplay';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
-import { Pencil, Trash, MessageSquare, Loader2, RefreshCcw } from 'lucide-react';
+import { Pencil, Trash } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -22,8 +22,6 @@ import {
 import CommentSection from './CommentSection';
 import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
-import AIPrompt from './journal/AIPrompt';
-import { supabase } from '@/integrations/supabase/client';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -37,20 +35,11 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   isPreview = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
+  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry } = useJournal();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState<string | null>(entry.ai_prompt);
-  const [aiResponse, setAiResponse] = useState<string | null>(entry.ai_response);
   
   console.log("Rendering entry with track:", entry.track);
-
-  // Make sure aiPrompt and aiResponse stay in sync with props
-  useEffect(() => {
-    setAiPrompt(entry.ai_prompt);
-    setAiResponse(entry.ai_response);
-  }, [entry.ai_prompt, entry.ai_response]);
   
   // Parse ISO date string properly to display in local timezone
   const parseDate = (dateValue: string | number) => {
@@ -83,162 +72,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const formattedTime = entry.timestamp 
     ? format(parseDate(entry.timestamp), 'h:mm a')
     : '';
-  
-  // Function to generate an AI prompt for this entry
-  const generateAIPrompt = async () => {
-    if (isGeneratingPrompt) return;
-    
-    setIsGeneratingPrompt(true);
-    
-    try {
-      console.log("Calling generate-prompt function with content length:", entry.content.length);
-      const { data, error } = await supabase.functions.invoke('generate-prompt', {
-        body: { journalContent: entry.content }
-      });
-      
-      if (error) {
-        console.error("Supabase function error:", error);
-        throw error;
-      }
-      
-      console.log("Response from generate-prompt function:", data);
-      
-      if (data && data.prompt) {
-        setAiPrompt(data.prompt);
-        
-        // Update the entry in the database with the new prompt
-        await updateEntry({
-          ...entry,
-          ai_prompt: data.prompt
-        });
-        
-        toast({
-          title: "New reflection question created",
-          description: "We've added a fresh reflection question for your entry."
-        });
-      }
-    } catch (error) {
-      console.error('Error generating AI prompt:', error);
-      toast({
-        title: "Couldn't create reflection question",
-        description: "We ran into an issue while creating your reflection question. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsGeneratingPrompt(false);
-    }
-  };
-  
-  // Function to regenerate a new prompt to replace the current one
-  const handleRegeneratePrompt = async () => {
-    if (isGeneratingPrompt) return;
-    setIsGeneratingPrompt(true);
-    
-    try {
-      console.log("Regenerating prompt with content length:", entry.content.length);
-      const { data, error } = await supabase.functions.invoke('generate-prompt', {
-        body: { journalContent: entry.content }
-      });
-      
-      if (error) {
-        console.error("Supabase function error:", error);
-        throw error;
-      }
-      
-      console.log("Response from regenerate-prompt:", data);
-      
-      if (data && data.prompt) {
-        setAiPrompt(data.prompt);
-        
-        // Update the entry in the database with the new prompt
-        await updateEntry({
-          ...entry,
-          ai_prompt: data.prompt
-        });
-        
-        toast({
-          title: "New question generated",
-          description: "We've refreshed your reflection question."
-        });
-      }
-    } catch (error) {
-      console.error('Error regenerating AI prompt:', error);
-      toast({
-        title: "Couldn't create new question",
-        description: "We couldn't generate a new question. Please try again later.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsGeneratingPrompt(false);
-    }
-  };
-  
-  // Function to handle response change
-  const handleResponseChange = (response: string) => {
-    console.log("Response changed to:", response);
-    setAiResponse(response);
-  };
-  
-  // Function to save the response
-  const handleSaveResponse = async () => {
-    try {
-      console.log("Saving AI response:", aiResponse);
-      
-      // Create a complete updated entry object with all fields that need to be preserved
-      const updatedEntryWithResponse = {
-        ...entry,
-        ai_prompt: aiPrompt,
-        ai_response: aiResponse
-      };
-      
-      console.log("Full updated entry being sent to updateEntry:", updatedEntryWithResponse);
-      
-      // Call the updateEntry function from the journal context
-      await updateEntry(updatedEntryWithResponse);
-      
-      toast({
-        title: "Thoughts saved",
-        description: "Your reflection has been saved to your journal."
-      });
-    } catch (error) {
-      console.error('Error saving AI response:', error);
-      toast({
-        title: "Couldn't save your thoughts",
-        description: "There was a problem saving your reflection. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  // Function to cancel the response input
-  const handleCancelResponse = () => {
-    setAiResponse(entry.ai_response); // Reset to the original saved response
-  };
-  
-  // Function to delete the response
-  const handleDeleteResponse = async () => {
-    try {
-      await updateEntry({
-        ...entry,
-        ai_prompt: null,
-        ai_response: null
-      });
-      
-      setAiPrompt(null);
-      setAiResponse(null);
-      toast({
-        title: "Reflection deleted",
-        description: "Your reflection has been removed from this entry."
-      });
-    } catch (error) {
-      console.error('Error deleting response:', error);
-      toast({
-        title: "Couldn't delete reflection",
-        description: "There was a problem removing your reflection. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
   
   const handleDelete = () => {
     // Now we just open the confirmation dialog
@@ -315,44 +148,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       <div className="mb-6">
         <div className="whitespace-pre-wrap text-left">{entry.content}</div>
       </div>
-      
-      {/* AI Prompt Section */}
-      {aiPrompt ? (
-        <div className="mb-6">
-          <AIPrompt
-            prompt={aiPrompt}
-            response={aiResponse}
-            onResponseChange={handleResponseChange}
-            onSaveResponse={handleSaveResponse}
-            onCancelResponse={handleCancelResponse}
-            onDeleteResponse={handleDeleteResponse}
-            onRegeneratePrompt={!isPreview ? handleRegeneratePrompt : undefined}
-            isReadOnly={isPreview}
-          />
-        </div>
-      ) : !isPreview && (
-        <div className="mb-6">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generateAIPrompt}
-            disabled={isGeneratingPrompt}
-            className="flex items-center gap-2"
-          >
-            {isGeneratingPrompt ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Creating a reflection question...</span>
-              </>
-            ) : (
-              <>
-                <MessageSquare className="h-4 w-4" />
-                <span>Add a reflection question</span>
-              </>
-            )}
-          </Button>
-        </div>
-      )}
       
       {!isPreview && (
         <>

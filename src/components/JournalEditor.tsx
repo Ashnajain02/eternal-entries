@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -12,10 +13,9 @@ import EditorControls from './journal/EditorControls';
 import { useJournalDraft } from '@/hooks/useJournalDraft';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { isSpotifyConnected } from '@/services/spotify';
-import { Loader2, Music } from 'lucide-react';
+import { Music } from 'lucide-react';
 import SpotifyTrackSearch from './spotify/SpotifyTrackSearch';
 import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
-import AIPrompt from './journal/AIPrompt';
 
 interface JournalEditorProps {
   entry?: JournalEntry;
@@ -47,10 +47,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState(initialEntry?.track || entry.track || null);
   
-  // AI prompt states - keeping the states but removing auto-generation
-  const [aiPrompt, setAiPrompt] = useState<string | null>(initialEntry?.ai_prompt || null);
-  const [aiResponse, setAiResponse] = useState<string | null>(initialEntry?.ai_response || null);
-  
   // Check if Spotify is connected
   useEffect(() => {
     const checkSpotify = async () => {
@@ -71,15 +67,13 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           mood: selectedMood,
           weather: weatherData || undefined,
           track: selectedTrack,
-          ai_prompt: aiPrompt,
-          ai_response: aiResponse,
           timestamp: entry.timestamp || new Date().toISOString(), // Preserve original timestamp
         });
       }
     }, 5000); // Auto-save 5 seconds after typing stops
     
     return () => clearTimeout(autoSaveTimer);
-  }, [content, selectedMood, weatherData, selectedTrack, aiPrompt, aiResponse, entry, saveDraft]);
+  }, [content, selectedMood, weatherData, selectedTrack, entry, saveDraft]);
   
   // Ensure entry has date and timestamp - only set these once when creating a new entry
   useEffect(() => {
@@ -120,8 +114,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
         mood: selectedMood,
         weather: weatherData || undefined,
         track: selectedTrack,
-        ai_prompt: aiPrompt,
-        ai_response: aiResponse,
       };
 
       console.log("Saving entry with track:", selectedTrack);
@@ -222,17 +214,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
             minHeight="200px"
           />
         </div>
-        
-        {/* AI Prompt Section - Only showing if there's an existing prompt */}
-        {aiPrompt && (
-          <div className="mb-6">
-            <AIPrompt 
-              prompt={aiPrompt} 
-              response={aiResponse} 
-              onResponseChange={setAiResponse} 
-            />
-          </div>
-        )}
         
         {/* Spotify Track Section */}
         <div className="mb-6">
