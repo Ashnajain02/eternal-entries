@@ -138,13 +138,17 @@ export const useAuthProvider = () => {
   
   const resetPassword = async (email: string, redirectTo?: string) => {
     try {
-      // Always use the current origin, not hardcoded localhost
+      // Get the current base URL - this should be the deployed URL when on Vercel
       const baseUrl = window.location.origin;
       console.log('Reset password using base URL:', baseUrl);
       
-      // If redirectTo is provided, use it; otherwise, create the default reset URL
+      // Create the full reset URL with the current origin
       const resetUrl = redirectTo || `${baseUrl}/auth?tab=update-password`;
       
+      // Debug to see what URL is being generated
+      console.log('Using reset URL:', resetUrl);
+      
+      // Use the site URL directly from the config to ensure it matches what Supabase expects
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: resetUrl,
       });

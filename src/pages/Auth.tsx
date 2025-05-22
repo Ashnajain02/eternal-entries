@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Layout from '@/components/Layout';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SignInForm } from '@/components/auth/SignInForm';
 import { SignUpForm } from '@/components/auth/SignUpForm';
@@ -32,6 +32,7 @@ const Auth = () => {
   // Process URL hash parameters (for recovery tokens)
   useEffect(() => {
     console.log('Current URL:', window.location.href);
+    console.log('Current Origin:', window.location.origin);
     
     // First check for hash parameters from recovery links
     if (window.location.hash) {
@@ -49,6 +50,7 @@ const Auth = () => {
         
         // Clean the URL to remove the token for security
         window.history.replaceState({}, document.title, window.location.pathname);
+        return; // Exit early since we processed the token
       }
     }
     
@@ -91,6 +93,13 @@ const Auth = () => {
         <Card className="w-full">
           <CardHeader>
             <CardTitle className="text-center">Account Access</CardTitle>
+            {/* Debug info */}
+            <Alert className="mt-2 bg-gray-50 border-gray-200">
+              <Info className="h-4 w-4 text-gray-600" />
+              <AlertDescription className="text-gray-700 text-xs">
+                Current site: {window.location.origin}
+              </AlertDescription>
+            </Alert>
           </CardHeader>
           <CardContent>
             <Tabs 
