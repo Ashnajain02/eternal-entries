@@ -22,11 +22,8 @@ const BlurredContent: React.FC<BlurredContentProps> = ({
   
   // Effect to handle track playback state changes
   useEffect(() => {
-    console.log("BlurredContent: Track playing state changed to", isTrackPlaying);
-    
     // If a track is playing, unblur the content
     if (isTrackPlaying && isBlurred) {
-      console.log("Removing blur as track is now playing");
       setIsBlurred(false);
       
       // Clear any existing timer
@@ -36,7 +33,6 @@ const BlurredContent: React.FC<BlurredContentProps> = ({
       
       // Start a new timer to reblur after timeout
       timerRef.current = setTimeout(() => {
-        console.log("Re-applying blur after timeout");
         setIsBlurred(true);
       }, REBLUR_TIMEOUT);
     }
