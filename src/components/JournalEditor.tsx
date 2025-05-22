@@ -16,6 +16,10 @@ import { isSpotifyConnected } from '@/services/spotify';
 import { Music } from 'lucide-react';
 import SpotifyTrackSearch from './spotify/SpotifyTrackSearch';
 import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
+import { useNavigate } from 'react-router-dom';
+
+// Key for storing Spotify redirect information
+const SPOTIFY_REDIRECT_KEY = 'spotify_redirect_from_journal';
 
 interface JournalEditorProps {
   entry?: JournalEntry;
@@ -28,8 +32,9 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
 }) => {
   const { addEntry, updateEntry, createNewEntry } = useJournal();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
-  // Use our new custom hooks
+  // Use our custom hooks
   const { entry, setEntry, saveDraft, clearDraft, lastAutoSave } = useJournalDraft(initialEntry, createNewEntry);
   const { 
     weatherData, 
@@ -74,6 +79,24 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     
     return () => clearTimeout(autoSaveTimer);
   }, [content, selectedMood, weatherData, selectedTrack, entry, saveDraft]);
+  
+  // Check if we're returning from Spotify auth flow
+  useEffect(() => {
+    // Check if we have redirect info stored
+    const redirectInfo = localStorage.getItem(SPOTIFY_REDIRECT_KEY);
+    if (redirectInfo) {
+      // We're returning from Spotify auth flow
+      // Draft was already saved before redirect, so it should be loaded automatically
+      
+      // Remove the redirect info as we've now handled the return
+      localStorage.removeItem(SPOTIFY_REDIRECT_KEY);
+      
+      toast({
+        title: "Spotify connected",
+        description: "You can now add songs to your journal entries."
+      });
+    }
+  }, [toast]);
   
   // Ensure entry has date and timestamp - only set these once when creating a new entry
   useEffect(() => {
@@ -159,8 +182,23 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   };
 
   const handleSpotifyConnect = () => {
-    // Use the existing Spotify auth flow
-    window.location.href = '/settings?tab=integrations';
+    // Save draft before redirecting
+    if (content.trim()) {
+      saveDraft({
+        ...entry,
+        content,
+        mood: selectedMood,
+        weather: weatherData || undefined,
+        track: selectedTrack,
+        timestamp: entry.timestamp || new Date().toISOString(),
+      });
+      
+      // Store information about where we're coming from
+      localStorage.setItem(SPOTIFY_REDIRECT_KEY, 'journal_editor');
+    }
+    
+    // Navigate to settings page with integrations tab selected
+    navigate('/settings?tab=integrations');
   };
 
   const handleAddSong = () => {

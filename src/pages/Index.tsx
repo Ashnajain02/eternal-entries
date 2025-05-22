@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useJournal } from '@/contexts/JournalContext';
 import Layout from '@/components/Layout';
@@ -9,14 +8,17 @@ import { Card } from '@/components/ui/card';
 import { Plus, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from 'react-router-dom';
 
-// Key used for checking if we have a draft
+// Keys for storage
 const DRAFT_STORAGE_KEY = 'journal_draft_entry';
+const SPOTIFY_REDIRECT_KEY = 'spotify_redirect_from_journal';
 
 const Index = () => {
   const { entries, isLoading, createNewEntry } = useJournal();
   const { authState } = useAuth();
   const [isWriting, setIsWriting] = useState(false);
+  const location = useLocation();
   
   // Check for existing draft on component mount
   useEffect(() => {
@@ -24,6 +26,15 @@ const Index = () => {
       // Only check for drafts if authenticated and not already in writing mode
       if (authState.user && !isWriting) {
         try {
+          // Check if we're returning from Spotify auth
+          const redirectSource = localStorage.getItem(SPOTIFY_REDIRECT_KEY);
+          if (redirectSource === 'journal_editor') {
+            // Automatically return to writing mode
+            setIsWriting(true);
+            return;
+          }
+          
+          // Otherwise, check for regular drafts
           const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
           if (savedDraft) {
             const parsedDraft = JSON.parse(savedDraft);
@@ -43,7 +54,7 @@ const Index = () => {
     };
     
     checkForDraft();
-  }, [authState.user]);
+  }, [authState.user, location]);
   
   const handleCreateNewEntry = () => {
     setIsWriting(true);
