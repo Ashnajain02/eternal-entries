@@ -110,9 +110,23 @@ const Auth = () => {
     }
   }, [authState.user, authState.loading, navigate]);
 
-  // Check URL parameters on component mount
+  // Check URL parameters and hash on component mount
   useEffect(() => {
-    // Check for tab parameter in the URL
+    // First handle hash parameters from recovery links
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+    
+    if (accessToken && type === 'recovery') {
+      // We have a recovery token in the URL, show the update password tab
+      setActiveTab('update-password');
+      setShowUpdateTab(true);
+      
+      // Remove the hash from the URL to avoid exposing the token
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    // Then check URL query parameters
     const tab = searchParams.get('tab');
     const error = searchParams.get('error');
     const errorCode = searchParams.get('error_code');
