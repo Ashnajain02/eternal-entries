@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -174,11 +173,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     }
   };
   
-  // Function to save the AI response to the entry
+  // Function to handle response change
   const handleResponseChange = (response: string) => {
     setAiResponse(response);
   };
   
+  // Function to save the response
   const handleSaveResponse = async () => {
     try {
       console.log("Saving AI response:", aiResponse);
@@ -201,17 +201,21 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     }
   };
   
+  // Function to cancel the response input
   const handleCancelResponse = () => {
     setAiResponse(entry.ai_response); // Reset to the original saved response
   };
   
+  // Function to delete the response
   const handleDeleteResponse = async () => {
     try {
       await updateEntry({
         ...entry,
+        ai_prompt: null,
         ai_response: null
       });
       
+      setAiPrompt(null);
       setAiResponse(null);
       toast({
         title: "Reflection deleted",

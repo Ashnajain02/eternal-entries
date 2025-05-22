@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Trash, Pencil, RefreshCcw } from 'lucide-react';
+import { MessageSquare, Trash, Pencil, X, RefreshCw, Save } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +71,15 @@ const AIPrompt: React.FC<AIPromptProps> = ({
     setIsDeleteDialogOpen(false);
   };
 
+  const handleDismiss = () => {
+    setIsEditing(false);
+    setIsExpanded(false);
+    setLocalResponse('');
+    if (onCancelResponse) {
+      onCancelResponse();
+    }
+  };
+
   return (
     <div className="border rounded-md p-4 bg-secondary/50 mt-4">
       <div className="flex items-start gap-3">
@@ -78,20 +87,34 @@ const AIPrompt: React.FC<AIPromptProps> = ({
         <div className="flex-1">
           <div className="flex justify-between items-center mb-2">
             <h4 className="text-sm font-medium">Reflection Moment</h4>
-            {!isReadOnly && onRegeneratePrompt && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={onRegeneratePrompt}
-                className="h-7 px-2 flex items-center gap-1"
-              >
-                <RefreshCcw className="h-3 w-3" />
-                <span className="text-xs">New question</span>
-              </Button>
-            )}
+            <div className="flex gap-1">
+              {!isReadOnly && onRegeneratePrompt && prompt && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={onRegeneratePrompt}
+                  className="h-7 px-2 flex items-center gap-1"
+                  title="Get a new reflection question"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  <span className="text-xs sr-only sm:not-sr-only">New question</span>
+                </Button>
+              )}
+              {!isReadOnly && !response && prompt && !isEditing && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleDismiss}
+                  className="h-7 w-7 p-0"
+                  title="Dismiss"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
           </div>
           
-          <p className="text-sm mb-3">{prompt}</p>
+          {prompt && <p className="text-sm mb-3">{prompt}</p>}
           
           {!isReadOnly && (
             <>
@@ -116,6 +139,7 @@ const AIPrompt: React.FC<AIPromptProps> = ({
                     onChange={(e) => setLocalResponse(e.target.value)}
                     rows={3}
                     className="resize-none w-full"
+                    autoFocus
                   />
                   <div className="flex justify-end gap-2">
                     <Button variant="outline" size="sm" onClick={handleCancel}>
@@ -125,7 +149,9 @@ const AIPrompt: React.FC<AIPromptProps> = ({
                       size="sm" 
                       onClick={handleSave}
                       disabled={!localResponse.trim()}
+                      className="flex items-center gap-1"
                     >
+                      <Save className="h-4 w-4" />
                       Save
                     </Button>
                   </div>
@@ -142,6 +168,7 @@ const AIPrompt: React.FC<AIPromptProps> = ({
                         size="icon"
                         onClick={() => setIsEditing(true)}
                         className="h-7 w-7"
+                        title="Edit your response"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -150,6 +177,7 @@ const AIPrompt: React.FC<AIPromptProps> = ({
                         size="icon"
                         onClick={handleDeleteRequest}
                         className="h-7 w-7 text-destructive hover:text-destructive"
+                        title="Delete your response"
                       >
                         <Trash className="h-4 w-4" />
                       </Button>
