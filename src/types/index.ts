@@ -46,4 +46,6 @@ export interface JournalEntry {
   comments?: JournalComment[];
   ai_prompt?: string;
   ai_response?: string;
+  reflection_question?: string;
+  reflection_answer?: string;
 }

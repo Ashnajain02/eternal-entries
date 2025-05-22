@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -22,6 +23,7 @@ import {
 import CommentSection from './CommentSection';
 import SpotifyTrackDisplay from './spotify/SpotifyTrackDisplay';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
+import ReflectionModule from './journal/ReflectionModule';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -151,6 +153,9 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       
       {!isPreview && (
         <>
+          {/* Reflection Module */}
+          <ReflectionModule entry={entry} />
+          
           <div className="border-t border-border my-4 pt-4">
             <CommentSection
               comments={entry.comments || []}
