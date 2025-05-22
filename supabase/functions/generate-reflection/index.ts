@@ -37,13 +37,14 @@ serve(async (req) => {
     Content: "${content}"
     Mood: "${mood || 'neutral'}"
     
-    Generate a single, thought-provoking reflection question that:
+    Generate a single question that:
     1. Is directly related to the content and emotion in the entry
     2. Is phrased as a question (always ends with a question mark)
     4. Is respectful and compassionate
     5. Is concise (one sentence only)
     6. Sounds natural and conversational (like something a friend might ask - not professional like a therapist)
-    7. Focuses on one specific idea from their entry
+    7. Focuses on one specific detail from their entry
+    8. Are phrased as: "who?", "what?", "when?", "where?" or "why?"
     
     Provide only the reflection question with no additional text or explanation.
     `;
