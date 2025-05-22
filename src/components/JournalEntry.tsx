@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -176,7 +175,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   // Function to handle response change
   const handleResponseChange = (response: string) => {
-    console.log("Response changed to:", response); // Add debug log
+    console.log("Response changed to:", response);
     setAiResponse(response);
   };
   
@@ -185,9 +184,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     try {
       console.log("Saving AI response:", aiResponse);
       
-      // Create a complete updated entry object with all fields
+      // Create a complete updated entry object with all fields that need to be preserved
       const updatedEntryWithResponse = {
         ...entry,
+        ai_prompt: aiPrompt,
         ai_response: aiResponse
       };
       

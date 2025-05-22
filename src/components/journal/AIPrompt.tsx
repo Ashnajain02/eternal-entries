@@ -44,6 +44,7 @@ const AIPrompt: React.FC<AIPromptProps> = ({
   
   const handleSave = () => {
     console.log("AIPrompt handleSave called with response:", localResponse);
+    // Pass the response to the parent component
     onResponseChange(localResponse);
     if (onSaveResponse) {
       console.log("Calling parent onSaveResponse function");

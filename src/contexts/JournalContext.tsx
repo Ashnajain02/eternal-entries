@@ -306,24 +306,32 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       // Encrypt content before saving to database
       const encryptedEntry = await encryptJournalEntry(updatedEntry, authState.user.id);
       
+      // Create the update object with all fields we want to update
+      const updateData = {
+        entry_text: encryptedEntry.content, // Save encrypted content
+        mood: updatedEntry.mood,
+        spotify_track_uri: updatedEntry.track?.uri,
+        spotify_track_name: updatedEntry.track?.name,
+        spotify_track_artist: updatedEntry.track?.artist,
+        spotify_track_album: updatedEntry.track?.album,
+        spotify_track_image: updatedEntry.track?.albumArt,
+        weather_temperature: updatedEntry.weather?.temperature,
+        weather_description: updatedEntry.weather?.description,
+        weather_icon: updatedEntry.weather?.icon,
+        weather_location: updatedEntry.weather?.location,
+        updated_at: now.toISOString(), // Add the updated_at timestamp
+      };
+      
+      // Explicitly add ai_prompt and ai_response fields to the update object
+      // This ensures they're always included in the database update
+      updateData.ai_prompt = updatedEntry.ai_prompt;
+      updateData.ai_response = updatedEntry.ai_response;
+      
+      console.log("Full Supabase update payload:", updateData);
+
       const { error } = await supabase
         .from('journal_entries')
-        .update({
-          entry_text: encryptedEntry.content, // Save encrypted content
-          mood: updatedEntry.mood,
-          spotify_track_uri: updatedEntry.track?.uri,
-          spotify_track_name: updatedEntry.track?.name,
-          spotify_track_artist: updatedEntry.track?.artist,
-          spotify_track_album: updatedEntry.track?.album,
-          spotify_track_image: updatedEntry.track?.albumArt,
-          weather_temperature: updatedEntry.weather?.temperature,
-          weather_description: updatedEntry.weather?.description,
-          weather_icon: updatedEntry.weather?.icon,
-          weather_location: updatedEntry.weather?.location,
-          ai_prompt: updatedEntry.ai_prompt, // Save AI prompt
-          ai_response: updatedEntry.ai_response, // Save AI response
-          updated_at: now.toISOString() // Add the updated_at timestamp
-        })
+        .update(updateData)
         .eq('id', updatedEntry.id);
 
       if (error) {
