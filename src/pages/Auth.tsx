@@ -31,11 +31,15 @@ const Auth = () => {
 
   // Process URL hash parameters (for recovery tokens)
   useEffect(() => {
+    console.log('Current URL:', window.location.href);
+    
     // First check for hash parameters from recovery links
     if (window.location.hash) {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const accessToken = hashParams.get('access_token');
       const type = hashParams.get('type');
+      
+      console.log('Hash params detected:', { type, hasToken: !!accessToken });
       
       if (accessToken && type === 'recovery') {
         // We have a recovery token in the URL
@@ -52,6 +56,8 @@ const Auth = () => {
     const tab = searchParams.get('tab');
     const error = searchParams.get('error');
     const errorCode = searchParams.get('error_code');
+    
+    console.log('URL params:', { tab, error, errorCode });
     
     if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
       setTokenError(true);

@@ -39,6 +39,7 @@ export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ onBackTo
   });
 
   const handleUpdatePassword = async (values: UpdatePasswordValues) => {
+    console.log('Updating password with recovery token present:', !!recoveryToken);
     setIsLoading(true);
     try {
       await updatePassword(values.password);

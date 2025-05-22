@@ -138,8 +138,11 @@ export const useAuthProvider = () => {
   
   const resetPassword = async (email: string, redirectTo?: string) => {
     try {
-      // Use full URL, not relative path
+      // Always use the current origin, not hardcoded localhost
       const baseUrl = window.location.origin;
+      console.log('Reset password using base URL:', baseUrl);
+      
+      // If redirectTo is provided, use it; otherwise, create the default reset URL
       const resetUrl = redirectTo || `${baseUrl}/auth?tab=update-password`;
       
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -153,6 +156,7 @@ export const useAuthProvider = () => {
         description: "Check your email for a link to reset your password.",
       });
     } catch (error: any) {
+      console.error('Reset password error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to send reset password email",
