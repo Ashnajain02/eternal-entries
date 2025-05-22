@@ -30,6 +30,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({
         // Check if this is a player event
         if (data && data.type === 'playerStateChanged') {
           const isPlaying = !!(data.payload && data.payload.isPlaying);
+          console.log("Spotify player state changed. isPlaying:", isPlaying);
           setIsTrackPlaying(isPlaying);
           
           // Notify parent component about playback state change
