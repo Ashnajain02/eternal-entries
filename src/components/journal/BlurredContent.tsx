@@ -22,28 +22,43 @@ const BlurredContent: React.FC<BlurredContentProps> = ({
   
   // Effect to handle track playback state changes
   useEffect(() => {
-    // If a track is playing, unblur the content
-    if (isTrackPlaying && isBlurred) {
+    console.log('BlurredContent: Track playing state changed to', isTrackPlaying);
+    
+    // If a track is playing, unblur the content immediately
+    if (isTrackPlaying) {
+      console.log('BlurredContent: Removing blur because track is playing');
       setIsBlurred(false);
       
       // Clear any existing timer
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+        console.log('BlurredContent: Cleared existing re-blur timer');
       }
       
       // Start a new timer to reblur after timeout
       timerRef.current = setTimeout(() => {
+        console.log('BlurredContent: Re-applying blur after timeout');
         setIsBlurred(true);
       }, REBLUR_TIMEOUT);
+    } else if (!isTrackPlaying && hasTrack) {
+      // Only re-blur if track exists and is not playing
+      // We delay this slightly to avoid flicker during track changes
+      const blurDelay = setTimeout(() => {
+        console.log('BlurredContent: Re-applying blur because track stopped playing');
+        setIsBlurred(true);
+      }, 300);
+      
+      return () => clearTimeout(blurDelay);
     }
     
-    // Cleanup timer on component unmount
+    // Cleanup timer on component unmount or when dependencies change
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+        console.log('BlurredContent: Cleanup - cleared re-blur timer');
       }
     };
-  }, [isTrackPlaying, isBlurred]);
+  }, [isTrackPlaying, hasTrack]);
   
   // If there's no track associated, just show the content without blur
   if (!hasTrack) {

@@ -27,27 +27,34 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({
       try {
         const data = JSON.parse(event.data);
         
+        // Log all received data for debugging
+        console.log('Spotify event received:', data);
+        
         // Check if this is a player event
         if (data && data.type === 'playerStateChanged') {
           const isPlaying = !!(data.payload && data.payload.isPlaying);
+          console.log('Spotify play state changed:', isPlaying);
           setIsTrackPlaying(isPlaying);
           
           // Notify parent component about playback state change
           if (onPlayStateChange) {
+            console.log('Notifying parent about play state change:', isPlaying);
             onPlayStateChange(isPlaying);
           }
         }
       } catch (error) {
-        // Silently fail if the message can't be parsed
+        console.error('Error processing Spotify message:', error);
       }
     };
     
     // Add event listener
     window.addEventListener('message', handleSpotifyEvents);
+    console.log('Spotify event listener added');
     
     // Remove event listener on cleanup
     return () => {
       window.removeEventListener('message', handleSpotifyEvents);
+      console.log('Spotify event listener removed');
     };
   }, [onPlayStateChange]);
   
@@ -61,7 +68,7 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({
         width="100%"
         height="80"
         frameBorder="0"
-        allow="encrypted-media"
+        allow="encrypted-media; autoplay"
         loading="lazy"
         className="rounded-md"
       />
