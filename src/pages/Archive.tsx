@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
-import { useJournal } from '@/contexts/JournalContext';
+import { useJournal } from '@/contexts/journal/JournalContext';
 import Layout from '@/components/Layout';
 import JournalEntryView from '@/components/JournalEntry';
 import { Input } from '@/components/ui/input';
@@ -279,7 +279,7 @@ const Archive = () => {
         
         {sortedYears.length > 0 ? (
           sortedYears.map(year => (
-            <div key={year} className="mb-12">
+            <div key={year.toString()} className="mb-12">
               <h3 className="text-xl font-semibold mb-4">{year}</h3>
               <div className="space-y-6">
                 {entriesByYear[year].map(entry => (

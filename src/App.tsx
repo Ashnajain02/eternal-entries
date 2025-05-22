@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -11,6 +12,8 @@ import Auth from './pages/Auth';
 import PasswordReset from './pages/PasswordReset';
 import PasswordUpdate from './pages/PasswordUpdate';
 import NotFound from './pages/NotFound';
+import Stats from './pages/Stats';
+import Archive from './pages/Archive';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -39,6 +42,22 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/stats"
+                element={
+                  <ProtectedRoute>
+                    <Stats />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/archive"
+                element={
+                  <ProtectedRoute>
+                    <Archive />
                   </ProtectedRoute>
                 }
               />

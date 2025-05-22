@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useJournal } from '@/contexts/JournalContext';
+import { useJournal } from '@/contexts/journal/JournalContext';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
