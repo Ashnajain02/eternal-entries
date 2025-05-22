@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,9 +18,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { AlertTriangle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Validation schemas
 const signInSchema = z.object({
@@ -43,18 +43,32 @@ const resetPasswordSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
 });
 
+const updatePasswordSchema = z.object({
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  confirmPassword: z.string().min(6, 'Password must be at least 6 characters'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
 type SignInValues = z.infer<typeof signInSchema>;
 type SignUpValues = z.infer<typeof signUpSchema>;
 type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+type UpdatePasswordValues = z.infer<typeof updatePasswordSchema>;
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
-  const { authState, signIn, signUp } = useAuth();
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [tokenError, setTokenError] = useState(false);
+  const { authState, signIn, signUp, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   
+  // Form hooks
   const signInForm = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
     defaultValues: {
@@ -81,12 +95,38 @@ const Auth = () => {
     },
   });
 
+  const updatePasswordForm = useForm<UpdatePasswordValues>({
+    resolver: zodResolver(updatePasswordSchema),
+    defaultValues: {
+      password: '',
+      confirmPassword: '',
+    },
+  });
+
   // Redirect if already authenticated
   useEffect(() => {
     if (authState.user && !authState.loading) {
       navigate('/');
     }
   }, [authState.user, authState.loading, navigate]);
+
+  // Check URL parameters on component mount
+  useEffect(() => {
+    // Check for tab parameter in the URL
+    const tab = searchParams.get('tab');
+    const error = searchParams.get('error');
+    const errorCode = searchParams.get('error_code');
+    
+    if (error && (errorCode === 'otp_expired' || error === 'access_denied')) {
+      setTokenError(true);
+      setActiveTab('reset');
+    } else if (tab === 'update-password') {
+      setActiveTab('update-password');
+    } else if (tab === 'reset-success') {
+      setResetSuccess(true);
+      setActiveTab('signin');
+    }
+  }, [searchParams]);
 
   const handleSignIn = async (values: SignInValues) => {
     setIsLoading(true);
@@ -100,7 +140,6 @@ const Auth = () => {
   const handleSignUp = async (values: SignUpValues) => {
     setIsLoading(true);
     try {
-      // Pass first and last name as metadata
       await signUp(values.email, values.password, {
         first_name: values.firstName,
         last_name: values.lastName,
@@ -113,44 +152,29 @@ const Auth = () => {
   const handleResetPassword = async (values: ResetPasswordValues) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        redirectTo: `${window.location.origin}/auth?tab=reset-success`,
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
-      toast({
-        title: "Password reset email sent",
-        description: "Check your email for a link to reset your password.",
-      });
-      
+      await resetPassword(values.email);
+      setResetSuccess(true);
       resetPasswordForm.reset();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send reset password email",
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Check if we need to show the reset success message
-  useEffect(() => {
-    const searchParams = new URLSearchParams(location.search);
-    const tab = searchParams.get('tab');
-    
-    if (tab === 'reset-success') {
-      toast({
-        title: "Success",
-        description: "Your password has been reset. You can now sign in with your new password.",
-      });
-      navigate('/auth', { replace: true });
+  const handleUpdatePassword = async (values: UpdatePasswordValues) => {
+    setIsLoading(true);
+    try {
+      await updatePassword(values.password);
+      setUpdateSuccess(true);
+      updatePasswordForm.reset();
+      
+      // Redirect to login after 3 seconds
+      setTimeout(() => {
+        setActiveTab('signin');
+      }, 3000);
+    } finally {
+      setIsLoading(false);
     }
-  }, [location.search, navigate, toast]);
+  };
 
   return (
     <Layout>
@@ -167,11 +191,30 @@ const Auth = () => {
               onValueChange={setActiveTab} 
               defaultValue="signin"
             >
-              <TabsList className="grid w-full grid-cols-3 mb-6">
+              <TabsList className="grid w-full grid-cols-4 mb-6">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
                 <TabsTrigger value="reset">Reset</TabsTrigger>
+                <TabsTrigger value="update-password">Update</TabsTrigger>
               </TabsList>
+              
+              {resetSuccess && (
+                <Alert className="mb-4 bg-green-50 border-green-200">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-700">
+                    Password reset email sent! Check your inbox for a link to reset your password.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {tokenError && (
+                <Alert className="mb-4 bg-amber-50 border-amber-200">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-700">
+                    Your password reset link has expired. Please request a new one.
+                  </AlertDescription>
+                </Alert>
+              )}
               
               <TabsContent value="signin">
                 <Form {...signInForm}>
@@ -349,6 +392,74 @@ const Auth = () => {
                       variant="link"
                       className="w-full text-sm"
                       onClick={() => setActiveTab('signin')}
+                    >
+                      Back to Sign In
+                    </Button>
+                  </form>
+                </Form>
+              </TabsContent>
+              
+              <TabsContent value="update-password">
+                {updateSuccess ? (
+                  <Alert className="mb-4 bg-green-50 border-green-200">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-700">
+                      Your password has been updated successfully! You will be redirected to sign in.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-blue-700">
+                      Enter your new password below.
+                    </p>
+                  </div>
+                )}
+                
+                <Form {...updatePasswordForm}>
+                  <form onSubmit={updatePasswordForm.handleSubmit(handleUpdatePassword)} className="space-y-4">
+                    <FormField
+                      control={updatePasswordForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>New Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="New password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={updatePasswordForm.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm New Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="Confirm new password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={isLoading || updateSuccess}
+                    >
+                      {isLoading ? "Updating..." : "Update Password"}
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="w-full text-sm"
+                      onClick={() => setActiveTab('signin')}
+                      disabled={isLoading}
                     >
                       Back to Sign In
                     </Button>
