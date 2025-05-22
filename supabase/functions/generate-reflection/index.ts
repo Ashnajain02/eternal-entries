@@ -48,7 +48,7 @@ serve(async (req) => {
     Provide only the reflection question with no additional text or explanation.
     `;
 
-    console.log("Ashna 1")
+    console.log("Calling Gemini API...")
 
     // Call Gemini API
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
@@ -70,7 +70,7 @@ serve(async (req) => {
         }
       }),
     });
-    console.log("Ashna 2")
+    console.log("Received response from Gemini API")
 
     if (!response.ok) {
       const error = await response.json();

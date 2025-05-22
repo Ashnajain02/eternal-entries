@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Sparkles, RefreshCcw, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { generateReflectionQuestion } from '@/services/api';
 
 interface ReflectionModuleProps {
   entryId: string;
@@ -33,23 +33,10 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   const generateQuestion = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/generate-reflection', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          content: entryContent,
-          mood: entryMood
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setQuestion(data.reflectionQuestion);
+      // Use the API service to call the Supabase function
+      const generatedQuestion = await generateReflectionQuestion(entryContent, entryMood);
+      
+      setQuestion(generatedQuestion);
       setShowModule(true);
       setIsEditing(true);
     } catch (error) {
