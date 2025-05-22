@@ -8,7 +8,7 @@ import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
 import { useToast } from '@/hooks/use-toast';
 import CommentSection from './CommentSection';
-import SpotifyPlayerSDK from './spotify/SpotifyPlayerSDK';
+import SpotifyPlayer from './spotify/SpotifyPlayer';
 import ReflectionModule from './journal/ReflectionModule';
 import EntryHeader from './journal/EntryHeader';
 import EntryMood from './journal/EntryMood';
@@ -27,7 +27,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   isPreview = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [isContentBlurred, setIsContentBlurred] = useState(!!entry.track);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
   const { toast } = useToast();
   
@@ -89,13 +88,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     await updateEntry(updatedEntry);
   };
   
-  const handlePlaybackStateChange = (isPlaying: boolean) => {
-    console.log("Spotify playback state changed:", isPlaying);
-    if (isPlaying) {
-      setIsContentBlurred(false);
-    }
-  };
-  
   if (isEditing) {
     return <JournalEditor entry={entry} onSave={() => setIsEditing(false)} />;
   }
@@ -124,25 +116,11 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         {/* Spotify Track Section */}
         {entry.track && (
           <div className="mb-6">
-            <SpotifyPlayerSDK 
-              track={entry.track} 
-              onPlaybackStateChange={handlePlaybackStateChange}
-              className="mb-2"
-            />
+            <SpotifyPlayer track={entry.track} className="mb-2" />
           </div>
         )}
         
-        <EntryContent 
-          content={entry.content} 
-          isBlurred={isContentBlurred}
-          onPlayRequest={() => {
-            // This will trigger the Spotify UI to ask the user to play
-            const spotifySection = document.querySelector('.spotify-player button');
-            if (spotifySection) {
-              (spotifySection as HTMLButtonElement).click();
-            }
-          }}
-        />
+        <EntryContent content={entry.content} />
         
         {!isPreview && (
           <>

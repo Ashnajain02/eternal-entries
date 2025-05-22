@@ -38,28 +38,6 @@ export const isSpotifyConnected = async (): Promise<boolean> => {
 };
 
 /**
- * Get a valid Spotify access token
- */
-export const getSpotifyAccessToken = async (): Promise<string> => {
-  try {
-    const { data, error } = await supabase.functions.invoke('spotify-auth', {
-      body: { action: 'get_access_token' }
-    });
-    
-    console.log("Spotify access token response:", data, error);
-    
-    if (error || !data?.access_token) {
-      throw new Error(error?.message || 'Failed to get Spotify access token');
-    }
-    
-    return data.access_token;
-  } catch (error: any) {
-    console.error('Failed to get Spotify access token:', error);
-    throw error;
-  }
-};
-
-/**
  * Initiate the Spotify authorization process
  */
 export const initiateSpotifyAuth = async (): Promise<void> => {
