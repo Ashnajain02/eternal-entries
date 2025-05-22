@@ -7,6 +7,12 @@ export interface AuthState {
   loading: boolean;
 }
 
+export interface SignUpMetadata {
+  first_name?: string;
+  last_name?: string;
+  [key: string]: any;
+}
+
 export interface UserProfile {
   id: string;
   username: string | null;

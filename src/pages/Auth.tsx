@@ -1,108 +1,26 @@
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Layout from '@/components/Layout';
-import { z } from 'zod';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
-// Validation schemas
-const signInSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-});
-
-const signUpSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string().min(6, 'Password must be at least 6 characters'),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-const resetPasswordSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-});
-
-const updatePasswordSchema = z.object({
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-  confirmPassword: z.string().min(6, 'Password must be at least 6 characters'),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-type SignInValues = z.infer<typeof signInSchema>;
-type SignUpValues = z.infer<typeof signUpSchema>;
-type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
-type UpdatePasswordValues = z.infer<typeof updatePasswordSchema>;
+import { SignInForm } from '@/components/auth/SignInForm';
+import { SignUpForm } from '@/components/auth/SignUpForm';
+import { ResetPasswordForm } from '@/components/auth/ResetPasswordForm';
+import { UpdatePasswordForm } from '@/components/auth/UpdatePasswordForm';
 
 const Auth = () => {
-  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [resetSuccess, setResetSuccess] = useState(false);
-  const [updateSuccess, setUpdateSuccess] = useState(false);
   const [tokenError, setTokenError] = useState(false);
   const [showUpdateTab, setShowUpdateTab] = useState(false);
-  const { authState, signIn, signUp, resetPassword, updatePassword } = useAuth();
+  const { authState } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   
-  // Form hooks
-  const signInForm = useForm<SignInValues>({
-    resolver: zodResolver(signInSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  });
-
-  const signUpForm = useForm<SignUpValues>({
-    resolver: zodResolver(signUpSchema),
-    defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-    },
-  });
-
-  const resetPasswordForm = useForm<ResetPasswordValues>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: {
-      email: '',
-    },
-  });
-
-  const updatePasswordForm = useForm<UpdatePasswordValues>({
-    resolver: zodResolver(updatePasswordSchema),
-    defaultValues: {
-      password: '',
-      confirmPassword: '',
-    },
-  });
-
   // Redirect if already authenticated
   useEffect(() => {
     if (authState.user && !authState.loading) {
@@ -143,52 +61,16 @@ const Auth = () => {
     }
   }, [searchParams]);
 
-  const handleSignIn = async (values: SignInValues) => {
-    setIsLoading(true);
-    try {
-      await signIn(values.email, values.password);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
   };
-
-  const handleSignUp = async (values: SignUpValues) => {
-    setIsLoading(true);
-    try {
-      await signUp(values.email, values.password, {
-        first_name: values.firstName,
-        last_name: values.lastName,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  
+  const handleForgotPassword = () => {
+    setActiveTab('reset');
   };
-
-  const handleResetPassword = async (values: ResetPasswordValues) => {
-    setIsLoading(true);
-    try {
-      await resetPassword(values.email);
-      setResetSuccess(true);
-      resetPasswordForm.reset();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpdatePassword = async (values: UpdatePasswordValues) => {
-    setIsLoading(true);
-    try {
-      await updatePassword(values.password);
-      setUpdateSuccess(true);
-      updatePasswordForm.reset();
-      
-      // Redirect to login after 3 seconds
-      setTimeout(() => {
-        setActiveTab('signin');
-      }, 3000);
-    } finally {
-      setIsLoading(false);
-    }
+  
+  const handleBackToSignIn = () => {
+    setActiveTab('signin');
   };
 
   return (
@@ -203,7 +85,7 @@ const Auth = () => {
           <CardContent>
             <Tabs 
               value={activeTab} 
-              onValueChange={setActiveTab} 
+              onValueChange={handleTabChange} 
               defaultValue="signin"
             >
               <TabsList className={`grid w-full ${showUpdateTab ? 'grid-cols-4' : 'grid-cols-3'} mb-6`}>
@@ -232,254 +114,22 @@ const Auth = () => {
               )}
               
               <TabsContent value="signin">
-                <Form {...signInForm}>
-                  <form onSubmit={signInForm.handleSubmit(handleSignIn)} className="space-y-4">
-                    <FormField
-                      control={signInForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" placeholder="Email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={signInForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="Password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <div className="flex flex-col gap-2">
-                      <Button 
-                        type="submit" 
-                        className="w-full" 
-                        disabled={isLoading}
-                      >
-                        {isLoading ? "Signing in..." : "Sign In"}
-                      </Button>
-                      
-                      <Button
-                        type="button"
-                        variant="link"
-                        className="text-sm text-blue-500 hover:text-blue-700"
-                        onClick={() => setActiveTab('reset')}
-                      >
-                        Forgot password?
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
+                <SignInForm onForgotPassword={handleForgotPassword} />
               </TabsContent>
               
               <TabsContent value="signup">
-                <Form {...signUpForm}>
-                  <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={signUpForm.control}
-                        name="firstName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>First Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="First Name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={signUpForm.control}
-                        name="lastName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Last Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Last Name" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <FormField
-                      control={signUpForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" placeholder="Email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={signUpForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="Password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={signUpForm.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirm Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="Confirm Password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Signing up..." : "Sign Up"}
-                    </Button>
-                  </form>
-                </Form>
+                <SignUpForm />
               </TabsContent>
               
               <TabsContent value="reset">
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md flex items-start gap-2">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-yellow-700">
-                    Enter your email address and we'll send you a link to reset your password.
-                  </p>
-                </div>
-                
-                <Form {...resetPasswordForm}>
-                  <form onSubmit={resetPasswordForm.handleSubmit(handleResetPassword)} className="space-y-4">
-                    <FormField
-                      control={resetPasswordForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" placeholder="Your email address" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Sending..." : "Send Reset Link"}
-                    </Button>
-                    
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="w-full text-sm"
-                      onClick={() => setActiveTab('signin')}
-                    >
-                      Back to Sign In
-                    </Button>
-                  </form>
-                </Form>
+                <ResetPasswordForm 
+                  onBackToSignIn={handleBackToSignIn}
+                  tokenError={tokenError} 
+                />
               </TabsContent>
               
               <TabsContent value="update-password">
-                {updateSuccess ? (
-                  <Alert className="mb-4 bg-green-50 border-green-200">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-700">
-                      Your password has been updated successfully! You will be redirected to sign in.
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-blue-700">
-                      Enter your new password below.
-                    </p>
-                  </div>
-                )}
-                
-                <Form {...updatePasswordForm}>
-                  <form onSubmit={updatePasswordForm.handleSubmit(handleUpdatePassword)} className="space-y-4">
-                    <FormField
-                      control={updatePasswordForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>New Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="New password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={updatePasswordForm.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirm New Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="Confirm new password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <Button 
-                      type="submit" 
-                      className="w-full" 
-                      disabled={isLoading || updateSuccess}
-                    >
-                      {isLoading ? "Updating..." : "Update Password"}
-                    </Button>
-                    
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="w-full text-sm"
-                      onClick={() => setActiveTab('signin')}
-                      disabled={isLoading}
-                    >
-                      Back to Sign In
-                    </Button>
-                  </form>
-                </Form>
+                <UpdatePasswordForm onBackToSignIn={handleBackToSignIn} />
               </TabsContent>
             </Tabs>
           </CardContent>
