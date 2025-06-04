@@ -11,10 +11,15 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasBeenSavedRef = useRef(false);
+  const isNewEntryRef = useRef(false);
   
   // Make sure we use the correct current date when creating a new entry
   const [entry, setEntry] = useState<JournalEntry>(() => {
-    if (initialEntry) return initialEntry;
+    if (initialEntry) {
+      // This is an existing entry being edited
+      isNewEntryRef.current = false;
+      return initialEntry;
+    }
     
     // Check if there's a saved draft in localStorage
     const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
@@ -28,6 +33,7 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
           
           if (parsedDraft.date === today) {
             console.log("Draft restored from localStorage");
+            isNewEntryRef.current = true;
             toast({
               title: "Draft restored",
               description: "Your unsaved journal entry has been restored."
@@ -43,12 +49,13 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     }
     
     // Create a new entry with the current date
+    isNewEntryRef.current = true;
     return createNewEntry ? createNewEntry() : initialEntry as JournalEntry;
   });
   
   const saveDraft = useCallback((updatedEntry: JournalEntry) => {
-    // Don't auto-save if this is an existing entry that's being edited
-    if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
+    // Only save drafts for new entries, not existing ones being edited
+    if (!isNewEntryRef.current) {
       return;
     }
     
@@ -64,7 +71,7 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     } catch (e) {
       console.error("Error saving draft to localStorage:", e);
     }
-  }, [initialEntry]);
+  }, []);
 
   // Debounced auto-save function
   const debouncedSaveDraft = useCallback((updatedEntry: JournalEntry) => {
@@ -88,20 +95,19 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
       }
       
       // Only clear the draft if:
-      // 1. The entry has no content, OR
-      // 2. This is an existing entry (not a new draft), OR
-      // 3. The entry has been properly saved (hasBeenSavedRef is true)
-      const isExistingEntry = initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-');
-      const hasNoContent = !entry.content.trim();
+      // 1. The entry has been properly saved (hasBeenSavedRef is true), OR
+      // 2. The entry has no content AND it's a new entry
+      const currentContent = entry.content?.trim() || '';
+      const shouldClearDraft = hasBeenSavedRef.current || (!currentContent && isNewEntryRef.current);
       
-      if (hasNoContent || isExistingEntry || hasBeenSavedRef.current) {
+      if (shouldClearDraft) {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
         console.log("Cleared draft entry on component unmount");
       } else {
-        console.log("Preserving draft entry on component unmount");
+        console.log("Preserving draft entry on component unmount - content exists");
       }
     };
-  }, [entry.content, initialEntry]);
+  }, []); // Empty dependency array - we want this to run with the latest values
 
   const clearDraft = useCallback(() => {
     // Clear timeout
