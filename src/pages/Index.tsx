@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useJournal } from '@/contexts/JournalContext';
 import Layout from '@/components/Layout';
@@ -16,10 +17,13 @@ const DRAFT_STORAGE_KEY = 'journal_draft_entry';
 const SPOTIFY_REDIRECT_KEY = 'spotify_redirect_from_journal';
 
 const Index = () => {
-  const { entries, isLoading, createNewEntry } = useJournal();
   const { authState } = useAuth();
   const [isWriting, setIsWriting] = useState(false);
   const location = useLocation();
+  
+  // Only access journal context if user is authenticated
+  const journalContext = authState.user ? useJournal() : null;
+  const { entries = [], isLoading = false, createNewEntry } = journalContext || {};
   
   // Check for existing draft on component mount
   useEffect(() => {
@@ -58,7 +62,7 @@ const Index = () => {
     // Small delay to ensure auth state is properly loaded
     const timer = setTimeout(checkForDraft, 100);
     return () => clearTimeout(timer);
-  }, [authState.user, location]);
+  }, [authState.user, location, isWriting]);
   
   const handleCreateNewEntry = () => {
     setIsWriting(true);
@@ -68,15 +72,26 @@ const Index = () => {
     setIsWriting(false);
   };
 
-  // Sort entries by timestamp, most recent first
-  const sortedEntries = [...entries].sort((a, b) => 
-    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
-
   // Show landing page for non-authenticated users
   if (!authState.user) {
     return <LandingPage />;
   }
+
+  // Show loading if auth is still loading
+  if (authState.loading) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </Layout>
+    );
+  }
+
+  // Sort entries by timestamp, most recent first
+  const sortedEntries = [...entries].sort((a, b) => 
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
 
   return (
     <Layout>

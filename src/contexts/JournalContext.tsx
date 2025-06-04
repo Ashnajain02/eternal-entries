@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { JournalEntry, Mood, SpotifyTrack, WeatherData, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
@@ -45,7 +46,7 @@ interface JournalProviderProps {
 export const JournalProvider = ({ children }: JournalProviderProps) => {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState<JournalEntry | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const { authState } = useAuth();
   const { toast } = useToast();
   const hasLoadedEntriesRef = useRef(false);
@@ -144,7 +145,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     };
 
     fetchEntries();
-  }, [authState.user?.id]); // Removed authState.loading from dependency array
+  }, [authState.user?.id, toast]);
   
   // Generate stats data
   const statsData = React.useMemo(() => {

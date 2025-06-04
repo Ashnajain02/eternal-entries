@@ -19,6 +19,7 @@ export const useAuthProvider = () => {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('Auth state change:', event, !!session);
         setAuthState({
           session,
           user: session?.user ?? null,
@@ -37,6 +38,7 @@ export const useAuthProvider = () => {
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', !!session);
       setAuthState({
         session,
         user: session?.user ?? null,
@@ -93,44 +95,53 @@ export const useAuthProvider = () => {
 
   const signOut = async () => {
     try {
-      // Check if there's a valid session
-      const { data } = await supabase.auth.getSession();
+      console.log('Starting sign out process...');
       
-      if (!data.session) {
-        // If no session, just update the local state
-        setAuthState({
-          session: null,
-          user: null,
-          loading: false,
-        });
-        toast({
-          title: "Signed out",
-          description: "You've been signed out successfully.",
-        });
-        return;
-      }
-      
-      // Proceed with signout if we have a session
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
-      toast({
-        title: "Signed out",
-        description: "You've been signed out successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to sign out",
-        variant: "destructive",
-      });
-      
-      // Even if there's an error, we should still reset the local auth state
+      // First clear the local auth state immediately
       setAuthState({
         session: null,
         user: null,
         loading: false,
       });
+      
+      // Then attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      // If there's an error but it's related to session not found, that's okay
+      if (error && !error.message.includes('session_not_found') && !error.message.includes('Session not found')) {
+        console.error('Sign out error:', error);
+        throw error;
+      }
+      
+      console.log('Sign out completed successfully');
+      toast({
+        title: "Signed out",
+        description: "You've been signed out successfully.",
+      });
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      
+      // Even if there's an error, we should still clear local state
+      setAuthState({
+        session: null,
+        user: null,
+        loading: false,
+      });
+      
+      // Only show error toast for non-session related errors
+      if (!error.message.includes('session') && !error.message.includes('Session')) {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to sign out",
+          variant: "destructive",
+        });
+      } else {
+        // For session errors, still show success message since we cleared local state
+        toast({
+          title: "Signed out",
+          description: "You've been signed out successfully.",
+        });
+      }
     }
   };
   
