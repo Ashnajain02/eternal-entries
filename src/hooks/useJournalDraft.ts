@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -9,6 +9,7 @@ const DRAFT_STORAGE_KEY = 'journal_draft_entry';
 export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: () => JournalEntry) {
   const { toast } = useToast();
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Make sure we use the correct current date when creating a new entry
   const [entry, setEntry] = useState<JournalEntry>(() => {
@@ -25,6 +26,7 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
           const today = new Date().toLocaleDateString('en-CA'); // en-CA produces YYYY-MM-DD format
           
           if (parsedDraft.date === today) {
+            console.log("Draft restored from localStorage");
             toast({
               title: "Draft restored",
               description: "Your unsaved journal entry has been restored."
@@ -57,15 +59,33 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     try {
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(updatedEntry));
       setLastAutoSave(new Date());
-      console.log("Auto-saved draft entry");
+      console.log("Auto-saved draft entry to localStorage");
     } catch (e) {
-      console.error("Error saving draft:", e);
+      console.error("Error saving draft to localStorage:", e);
     }
   }, [initialEntry]);
+
+  // Debounced auto-save function
+  const debouncedSaveDraft = useCallback((updatedEntry: JournalEntry) => {
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    // Set new timeout for 2.5 seconds after last change
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      saveDraft(updatedEntry);
+    }, 2500);
+  }, [saveDraft]);
   
   // Clear draft when unmounting if needed
   useEffect(() => {
     return () => {
+      // Clear any pending auto-save timeout
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      
       // We only want to clear the draft when navigating away if we've properly saved the entry
       const shouldClearDraft = !entry.content.trim() || (initialEntry && !initialEntry.id?.startsWith('temp-'));
       
@@ -77,14 +97,30 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
   }, [entry.content, initialEntry]);
 
   const clearDraft = useCallback(() => {
+    // Clear timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
     localStorage.removeItem(DRAFT_STORAGE_KEY);
     console.log("Cleared draft entry manually");
   }, []);
+
+  // Immediate save function for critical changes
+  const saveImmediately = useCallback((updatedEntry: JournalEntry) => {
+    // Clear any pending debounced save
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    saveDraft(updatedEntry);
+  }, [saveDraft]);
   
   return { 
     entry, 
     setEntry, 
-    saveDraft, 
+    saveDraft: debouncedSaveDraft,
+    saveImmediately,
     clearDraft,
     lastAutoSave
   };

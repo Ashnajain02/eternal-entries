@@ -35,7 +35,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const navigate = useNavigate();
   
   // Use our custom hooks
-  const { entry, setEntry, saveDraft, clearDraft, lastAutoSave } = useJournalDraft(initialEntry, createNewEntry);
+  const { entry, setEntry, saveDraft, saveImmediately, clearDraft, lastAutoSave } = useJournalDraft(initialEntry, createNewEntry);
   const { 
     weatherData, 
     setWeatherData, 
@@ -62,23 +62,53 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
     checkSpotify();
   }, []);
   
-  // Auto-save on content changes (debounced to avoid too many saves)
+  // Auto-save on content changes with debouncing
   useEffect(() => {
-    const autoSaveTimer = setTimeout(() => {
-      if (content.trim()) {
-        saveDraft({
-          ...entry,
-          content,
-          mood: selectedMood,
-          weather: weatherData || undefined,
-          track: selectedTrack,
-          timestamp: entry.timestamp || new Date().toISOString(), // Preserve original timestamp
-        });
-      }
-    }, 5000); // Auto-save 5 seconds after typing stops
-    
-    return () => clearTimeout(autoSaveTimer);
+    if (content.trim() || selectedMood !== 'neutral' || selectedTrack || weatherData) {
+      const updatedEntry = {
+        ...entry,
+        content,
+        mood: selectedMood,
+        weather: weatherData || undefined,
+        track: selectedTrack,
+        timestamp: entry.timestamp || new Date().toISOString(),
+      };
+      
+      saveDraft(updatedEntry);
+    }
   }, [content, selectedMood, weatherData, selectedTrack, entry, saveDraft]);
+
+  // Immediate save for critical changes (mood, track selection)
+  useEffect(() => {
+    if (selectedTrack) {
+      const updatedEntry = {
+        ...entry,
+        content,
+        mood: selectedMood,
+        weather: weatherData || undefined,
+        track: selectedTrack,
+        timestamp: entry.timestamp || new Date().toISOString(),
+      };
+      
+      saveImmediately(updatedEntry);
+    }
+  }, [selectedTrack, entry, content, selectedMood, weatherData, saveImmediately]);
+
+  // Immediate save for mood changes
+  useEffect(() => {
+    if (selectedMood !== 'neutral') {
+      const updatedEntry = {
+        ...entry,
+        content,
+        mood: selectedMood,
+        weather: weatherData || undefined,
+        track: selectedTrack,
+        timestamp: entry.timestamp || new Date().toISOString(),
+      };
+      
+      saveImmediately(updatedEntry);
+    }
+  }, [selectedMood, entry, content, weatherData, selectedTrack, saveImmediately]);
   
   // Check if we're returning from Spotify auth flow
   useEffect(() => {
@@ -182,16 +212,18 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   };
 
   const handleSpotifyConnect = () => {
-    // Save draft before redirecting
-    if (content.trim()) {
-      saveDraft({
+    // Save draft immediately before redirecting
+    if (content.trim() || selectedMood !== 'neutral' || selectedTrack || weatherData) {
+      const updatedEntry = {
         ...entry,
         content,
         mood: selectedMood,
         weather: weatherData || undefined,
         track: selectedTrack,
         timestamp: entry.timestamp || new Date().toISOString(),
-      });
+      };
+      
+      saveImmediately(updatedEntry);
       
       // Store information about where we're coming from
       localStorage.setItem(SPOTIFY_REDIRECT_KEY, 'journal_editor');
@@ -207,16 +239,6 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
 
   const handleRemoveTrack = () => {
     setSelectedTrack(undefined);
-    
-    // Also update the draft
-    saveDraft({
-      ...entry,
-      content,
-      mood: selectedMood,
-      weather: weatherData || undefined,
-      track: undefined,
-      timestamp: entry.timestamp || new Date().toISOString(),
-    });
   };
 
   return (

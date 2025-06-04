@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useJournal } from '@/contexts/JournalContext';
 import Layout from '@/components/Layout';
@@ -43,6 +44,7 @@ const Index = () => {
             // Using en-CA locale to get YYYY-MM-DD format
             const today = new Date().toLocaleDateString('en-CA');
             if (parsedDraft && parsedDraft.date === today && parsedDraft.content?.trim()) {
+              console.log("Found valid draft from today, entering writing mode");
               setIsWriting(true);
             }
           }
@@ -53,7 +55,9 @@ const Index = () => {
       }
     };
     
-    checkForDraft();
+    // Small delay to ensure auth state is properly loaded
+    const timer = setTimeout(checkForDraft, 100);
+    return () => clearTimeout(timer);
   }, [authState.user, location]);
   
   const handleCreateNewEntry = () => {
