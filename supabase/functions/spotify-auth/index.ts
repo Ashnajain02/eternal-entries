@@ -63,8 +63,6 @@ serve(async (req) => {
     // Handle different actions
     if (action === "is_token_expired") {
       return await isTokenExpired(supabase, userId);
-    } else if (action === "get_token") {
-      return await getAccessToken(supabase, userId);
     } else if (action === "authorize") {
       return await getAuthorizationUrl(redirect_uri);
     } else if (action === "callback" && code) {
@@ -86,122 +84,6 @@ serve(async (req) => {
     );
   }
 });
-
-// Get current access token
-async function getAccessToken(supabase: any, user_id: string | null) {
-  console.log("Running getAccessToken function");
-  try {
-    if (!user_id) {
-      return new Response(
-        JSON.stringify({ error: "User not authenticated" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    console.log(`Getting access token for user: ${user_id}`);
-    
-    // Get user's Spotify credentials from profile
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("spotify_access_token, spotify_refresh_token, spotify_token_expires_at")
-      .eq("id", user_id)
-      .single();
-
-    if (error) {
-      console.error("Error fetching user profile:", error);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch user profile", details: error.message }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    if (!profile.spotify_access_token) {
-      return new Response(
-        JSON.stringify({ error: "No Spotify token found" }),
-        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Check if token is expired
-    const expiresAt = new Date(profile.spotify_token_expires_at);
-    const now = new Date();
-    
-    if (expiresAt <= now && profile.spotify_refresh_token) {
-      // Token is expired, refresh it
-      console.log("Token expired, refreshing...");
-      
-      const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
-      const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
-      
-      if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-        return new Response(
-          JSON.stringify({ error: "Missing Spotify credentials" }),
-          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-      
-      const refreshResponse = await fetch("https://accounts.spotify.com/api/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Authorization": `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
-        },
-        body: new URLSearchParams({
-          grant_type: "refresh_token",
-          refresh_token: profile.spotify_refresh_token,
-        }),
-      });
-      
-      const refreshData = await refreshResponse.json();
-      
-      if (refreshData.error) {
-        console.error("Refresh token error:", refreshData.error);
-        return new Response(
-          JSON.stringify({ error: "Failed to refresh token", details: refreshData.error }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-      
-      // Update the profile with new token
-      const newExpiresAt = new Date();
-      newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshData.expires_in);
-      
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          spotify_access_token: refreshData.access_token,
-          spotify_token_expires_at: newExpiresAt.toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", user_id);
-      
-      if (updateError) {
-        console.error("Error updating refreshed token:", updateError);
-        return new Response(
-          JSON.stringify({ error: "Failed to update token", details: updateError.message }),
-          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-      
-      return new Response(
-        JSON.stringify({ access_token: refreshData.access_token }),
-        { headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Return current valid token
-    return new Response(
-      JSON.stringify({ access_token: profile.spotify_access_token }),
-      { headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  } catch (error) {
-    console.error("Error getting access token:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to get access token", details: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  }
-}
 
 // Check if the Spotify token is expired
 async function isTokenExpired(supabase: any, user_id: string | null) {
