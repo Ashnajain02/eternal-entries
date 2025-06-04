@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -131,16 +132,16 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         {/* Journal Content with conditional blur and message overlay */}
         <div className="relative mb-6">
           <div className={cn(
-            "transition-all duration-500 ease-in-out",
-            entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : ""
+            "transition-all duration-700 ease-in-out",
+            entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : "blur-none opacity-100"
           )}>
             <EntryContent content={entry.content} />
           </div>
           
-          {/* Message overlay when content is blurred - centered in the content area */}
+          {/* Message overlay when content is blurred - centered within the content area */}
           {entry.track && !hasClickedToPlay && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="bg-white bg-opacity-90 px-6 py-3 rounded-full text-sm text-gray-800 shadow-md text-center">
+              <div className="bg-white bg-opacity-90 px-6 py-3 rounded-full text-sm text-gray-800 shadow-md text-center animate-fade-in">
                 Play the song to begin reading
               </div>
             </div>
@@ -151,8 +152,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           <>
             {/* Reflection Module */}
             <div className={cn(
-              "transition-all duration-500 ease-in-out",
-              entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : ""
+              "transition-all duration-700 ease-in-out",
+              entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : "blur-none opacity-100"
             )}>
               <ReflectionModule
                 entryId={entry.id}
@@ -165,8 +166,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             </div>
 
             <div className={cn(
-              "border-t border-border my-4 pt-4 transition-all duration-500 ease-in-out",
-              entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : ""
+              "border-t border-border my-4 pt-4 transition-all duration-700 ease-in-out",
+              entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : "blur-none opacity-100"
             )}>
               <CommentSection
                 comments={entry.comments || []}
