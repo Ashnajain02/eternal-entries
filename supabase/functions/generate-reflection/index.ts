@@ -24,10 +24,16 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { content, mood } = await req.json();
+    const { content, mood, track } = await req.json();
     
     if (!content) {
       throw new Error("Journal content is required");
+    }
+    
+    // Build the track context if provided
+    let trackContext = "";
+    if (track && track.name && track.artist) {
+      trackContext = `\nSong: "${track.name}" by ${track.artist}`;
     }
     
     // Prepare the prompt for Gemini
@@ -35,7 +41,7 @@ serve(async (req) => {
     You are an emotionally intelligent journaling assistant. Based on the following journal entry:
     
     Content: "${content}"
-    Mood: "${mood || 'neutral'}"
+    Mood: "${mood || 'neutral'}"${trackContext}
     
     Generate a single question that:
     1. Is directly related to the content and emotion in the entry
@@ -43,7 +49,7 @@ serve(async (req) => {
     4. Is respectful and compassionate
     5. Is concise (one sentence only)
     6. Sounds natural and conversational (like something a friend might ask - not professional like a therapist)
-    7. Focuses on one specific memory, detail, object, place, person from their entry
+    7. Focuses on one specific memory, detail, object, place, person from their entry${track ? " or about the song they chose" : ""}
     8. Are phrased a: "who?" or "what?" or "when?" or "where?" or "why?" question
     
     Provide only the reflection question with no additional text or explanation.

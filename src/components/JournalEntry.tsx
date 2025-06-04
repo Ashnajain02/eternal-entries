@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -165,6 +164,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
                 entryId={entry.id}
                 entryContent={entry.content}
                 entryMood={entry.mood}
+                entryTrack={entry.track}
                 reflectionQuestion={entry.reflectionQuestion || null}
                 reflectionAnswer={entry.reflectionAnswer || null}
                 onReflectionUpdate={handleReflectionUpdate}

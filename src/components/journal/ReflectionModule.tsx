@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,11 +6,13 @@ import ReflectionQuestion from './reflection/ReflectionQuestion';
 import ReflectionEditor from './reflection/ReflectionEditor';
 import ReflectionDisplay from './reflection/ReflectionDisplay';
 import ReflectionTrigger from './reflection/ReflectionTrigger';
+import { SpotifyTrack } from '@/types';
 
 interface ReflectionModuleProps {
   entryId: string;
   entryContent: string;
   entryMood: string;
+  entryTrack?: SpotifyTrack;
   reflectionQuestion: string | null;
   reflectionAnswer: string | null;
   onReflectionUpdate: () => void;
@@ -21,6 +22,7 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   entryId,
   entryContent,
   entryMood,
+  entryTrack,
   reflectionQuestion,
   reflectionAnswer,
   onReflectionUpdate
@@ -35,8 +37,14 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   const generateQuestion = async () => {
     setIsLoading(true);
     try {
+      // Include track information if available
+      const trackInfo = entryTrack ? {
+        name: entryTrack.name,
+        artist: entryTrack.artist
+      } : undefined;
+      
       // Use the API service to call the Supabase function
-      const generatedQuestion = await generateReflectionQuestion(entryContent, entryMood);
+      const generatedQuestion = await generateReflectionQuestion(entryContent, entryMood, trackInfo);
       
       setQuestion(generatedQuestion);
       setShowModule(true);

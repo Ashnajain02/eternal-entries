@@ -1,3 +1,4 @@
+
 import { WeatherData } from "@/types";
 import { getWeatherForLocation } from "@/utils/weatherUtils";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,11 +11,11 @@ export const fetchWeatherData = async (lat: number, lon: number): Promise<Weathe
 /**
  * Generate a reflection question for a journal entry using the Gemini AI
  */
-export const generateReflectionQuestion = async (content: string, mood: string): Promise<string> => {
+export const generateReflectionQuestion = async (content: string, mood: string, track?: { name: string; artist: string }): Promise<string> => {
    console.log("inside generateReflectionQuestion function")
   try {
     const { data, error } = await supabase.functions.invoke('generate-reflection', {
-      body: { content, mood }
+      body: { content, mood, track }
     });
 
     if (error) {
