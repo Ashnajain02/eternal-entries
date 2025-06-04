@@ -19,9 +19,10 @@ const Auth = () => {
   const [showUpdateTab, setShowUpdateTab] = useState(false);
   const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const { authState } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Redirect if already authenticated
   useEffect(() => {
@@ -30,8 +31,10 @@ const Auth = () => {
     }
   }, [authState.user, authState.loading, navigate]);
 
-  // Process URL hash parameters (for recovery tokens)
+  // Process URL hash parameters and query parameters only on initial load
   useEffect(() => {
+    if (initialLoadComplete) return;
+
     // First check for hash parameters from recovery links
     if (window.location.hash) {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -48,6 +51,7 @@ const Auth = () => {
         
         // Clean the URL to remove the token for security
         window.history.replaceState({}, document.title, window.location.pathname + '?tab=update-password');
+        setInitialLoadComplete(true);
         return; // Exit early since we processed the token
       }
     }
@@ -69,18 +73,34 @@ const Auth = () => {
     } else if (tab === 'signup') {
       setActiveTab('signup');
     }
-  }, [searchParams]);
+    
+    setInitialLoadComplete(true);
+  }, [searchParams, initialLoadComplete]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
+    // Update URL without causing a page refresh
+    const newSearchParams = new URLSearchParams(searchParams);
+    if (value === 'signin') {
+      newSearchParams.delete('tab');
+    } else {
+      newSearchParams.set('tab', value);
+    }
+    setSearchParams(newSearchParams, { replace: true });
   };
   
   const handleForgotPassword = () => {
     setActiveTab('reset');
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('tab', 'reset');
+    setSearchParams(newSearchParams, { replace: true });
   };
   
   const handleBackToSignIn = () => {
     setActiveTab('signin');
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.delete('tab');
+    setSearchParams(newSearchParams, { replace: true });
   };
 
   return (
