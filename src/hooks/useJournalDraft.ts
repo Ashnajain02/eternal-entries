@@ -81,17 +81,17 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     }
   }, []);
 
-  // Debounced auto-save function
+  // Debounced auto-save function with 0.5 second delay
   const debouncedSaveDraft = useCallback((updatedEntry: JournalEntry) => {
     // Clear existing timeout
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
     
-    // Set new timeout for 2.5 seconds after last change
+    // Set new timeout for 0.5 seconds after last change
     autoSaveTimeoutRef.current = setTimeout(() => {
       saveDraft(updatedEntry);
-    }, 2500);
+    }, 500);
   }, [saveDraft]);
   
   // Clear draft when unmounting only in specific cases
