@@ -66,6 +66,8 @@ const Auth = () => {
     } else if (tab === 'reset-success') {
       setResetSuccess(true);
       setActiveTab('signin');
+    } else if (tab === 'signup') {
+      setActiveTab('signup');
     }
   }, [searchParams]);
 

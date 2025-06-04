@@ -24,7 +24,7 @@ const LandingPage = () => {
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12 animate-fade-in">
             <Button asChild size="lg" className="bg-journal-purple hover:bg-journal-purple/90 text-white px-8 py-3 text-lg">
-              <Link to="/auth">Start Your Journey</Link>
+              <Link to="/auth?tab=signup">Start Your Journey</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="border-journal-purple text-journal-purple hover:bg-journal-purple/10 px-8 py-3 text-lg">
               <Link to="/auth">Sign In</Link>
@@ -208,7 +208,7 @@ const LandingPage = () => {
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button asChild size="lg" className="bg-journal-purple hover:bg-journal-purple/90 text-white px-8 py-3 text-lg">
-              <Link to="/auth">Begin Journaling Free</Link>
+              <Link to="/auth?tab=signup">Begin Journaling Free</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="border-journal-purple text-journal-purple hover:bg-journal-purple/10 px-8 py-3 text-lg">
               <Link to="/auth">I Already Have an Account</Link>
