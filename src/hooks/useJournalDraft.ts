@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +11,7 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasBeenSavedRef = useRef(false);
   const isNewEntryRef = useRef(false);
+  const latestEntryRef = useRef<JournalEntry | null>(null);
   
   // Make sure we use the correct current date when creating a new entry
   const [entry, setEntry] = useState<JournalEntry>(() => {
@@ -53,7 +53,15 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     return createNewEntry ? createNewEntry() : initialEntry as JournalEntry;
   });
   
+  // Keep ref updated with latest entry
+  useEffect(() => {
+    latestEntryRef.current = entry;
+  }, [entry]);
+  
   const saveDraft = useCallback((updatedEntry: JournalEntry) => {
+    // Update ref with latest data
+    latestEntryRef.current = updatedEntry;
+    
     // Only save drafts for new entries, not existing ones being edited
     if (!isNewEntryRef.current) {
       return;
@@ -67,7 +75,7 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     try {
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(updatedEntry));
       setLastAutoSave(new Date());
-      console.log("Auto-saved draft entry to localStorage");
+      console.log("Auto-saved draft entry to localStorage", updatedEntry.content.substring(0, 50) + "...");
     } catch (e) {
       console.error("Error saving draft to localStorage:", e);
     }
@@ -94,20 +102,29 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
         clearTimeout(autoSaveTimeoutRef.current);
       }
       
+      console.log("Cleanup function running...");
+      
+      // Get the latest content from ref instead of stale closure
+      const latestEntry = latestEntryRef.current;
+      const currentContent = latestEntry?.content?.trim() || '';
+      
+      console.log("Latest content length:", currentContent.length);
+      console.log("Has been saved:", hasBeenSavedRef.current);
+      console.log("Is new entry:", isNewEntryRef.current);
+      
       // Only clear the draft if:
       // 1. The entry has been properly saved (hasBeenSavedRef is true), OR
       // 2. The entry has no content AND it's a new entry
-      const currentContent = entry.content?.trim() || '';
       const shouldClearDraft = hasBeenSavedRef.current || (!currentContent && isNewEntryRef.current);
       
       if (shouldClearDraft) {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
         console.log("Cleared draft entry on component unmount");
       } else {
-        console.log("Preserving draft entry on component unmount - content exists");
+        console.log("Preserving draft entry on component unmount - content exists:", currentContent.length, "characters");
       }
     };
-  }, []); // Empty dependency array - we want this to run with the latest values
+  }, []); // Empty dependency array is now safe because we use refs
 
   const clearDraft = useCallback(() => {
     // Clear timeout
