@@ -106,6 +106,12 @@ export default {
           },
         },
       },
+      transitionDuration: {
+        '3000': '3000ms',
+      },
+      transitionProperty: {
+        'all': 'all',
+      },
     }
   },
   plugins: [require("tailwindcss-animate")],
