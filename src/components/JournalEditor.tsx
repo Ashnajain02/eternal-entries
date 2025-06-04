@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { JournalEntry, Mood } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -35,7 +34,7 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
   const navigate = useNavigate();
   
   // Use our custom hooks
-  const { entry, setEntry, saveDraft, saveImmediately, clearDraft, lastAutoSave } = useJournalDraft(initialEntry, createNewEntry);
+  const { entry, setEntry, saveDraft, saveImmediately, clearDraft, markAsSaved, lastAutoSave } = useJournalDraft(initialEntry, createNewEntry);
   const { 
     weatherData, 
     setWeatherData, 
@@ -183,7 +182,8 @@ const JournalEditor: React.FC<JournalEditorProps> = ({
           title: "Journal saved",
           description: "Your journal entry has been saved successfully."
         });
-        // Clear the draft since we've properly saved it
+        // Mark as saved and clear the draft since we've properly saved it
+        markAsSaved();
         clearDraft();
       }
 

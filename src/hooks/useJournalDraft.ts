@@ -10,6 +10,7 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
   const { toast } = useToast();
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasBeenSavedRef = useRef(false);
   
   // Make sure we use the correct current date when creating a new entry
   const [entry, setEntry] = useState<JournalEntry>(() => {
@@ -78,7 +79,7 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     }, 2500);
   }, [saveDraft]);
   
-  // Clear draft when unmounting if needed
+  // Clear draft when unmounting only in specific cases
   useEffect(() => {
     return () => {
       // Clear any pending auto-save timeout
@@ -86,12 +87,18 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
         clearTimeout(autoSaveTimeoutRef.current);
       }
       
-      // We only want to clear the draft when navigating away if we've properly saved the entry
-      const shouldClearDraft = !entry.content.trim() || (initialEntry && !initialEntry.id?.startsWith('temp-'));
+      // Only clear the draft if:
+      // 1. The entry has no content, OR
+      // 2. This is an existing entry (not a new draft), OR
+      // 3. The entry has been properly saved (hasBeenSavedRef is true)
+      const isExistingEntry = initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-');
+      const hasNoContent = !entry.content.trim();
       
-      if (shouldClearDraft) {
+      if (hasNoContent || isExistingEntry || hasBeenSavedRef.current) {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
         console.log("Cleared draft entry on component unmount");
+      } else {
+        console.log("Preserving draft entry on component unmount");
       }
     };
   }, [entry.content, initialEntry]);
@@ -101,6 +108,9 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
+    
+    // Mark as saved so cleanup doesn't preserve it
+    hasBeenSavedRef.current = true;
     
     localStorage.removeItem(DRAFT_STORAGE_KEY);
     console.log("Cleared draft entry manually");
@@ -115,6 +125,11 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     
     saveDraft(updatedEntry);
   }, [saveDraft]);
+
+  // Mark draft as saved when entry is successfully saved
+  const markAsSaved = useCallback(() => {
+    hasBeenSavedRef.current = true;
+  }, []);
   
   return { 
     entry, 
@@ -122,6 +137,7 @@ export function useJournalDraft(initialEntry?: JournalEntry, createNewEntry?: ()
     saveDraft: debouncedSaveDraft,
     saveImmediately,
     clearDraft,
+    markAsSaved,
     lastAutoSave
   };
 }
