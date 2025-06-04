@@ -63,6 +63,8 @@ serve(async (req) => {
     // Handle different actions
     if (action === "is_token_expired") {
       return await isTokenExpired(supabase, userId);
+    } else if (action === "get_token") {
+      return await getAccessToken(supabase, userId);
     } else if (action === "authorize") {
       return await getAuthorizationUrl(redirect_uri);
     } else if (action === "callback" && code) {
@@ -84,6 +86,53 @@ serve(async (req) => {
     );
   }
 });
+
+// Get Spotify access token for Web Playback SDK
+async function getAccessToken(supabase: any, user_id: string | null) {
+  console.log("Running getAccessToken function");
+  try {
+    if (!user_id) {
+      return new Response(
+        JSON.stringify({ error: "User not authenticated" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    
+    console.log(`Getting access token for user: ${user_id}`);
+    
+    // Get the access token from the database
+    const { data, error } = await supabase.rpc("get_user_spotify_token", {
+      user_id,
+    });
+
+    if (error) {
+      console.error("Error getting access token:", error);
+      return new Response(
+        JSON.stringify({ error: "Failed to get access token", details: error.message }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (!data) {
+      return new Response(
+        JSON.stringify({ error: "No Spotify token found" }),
+        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Return the access token
+    return new Response(
+      JSON.stringify({ access_token: data }),
+      { headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  } catch (error) {
+    console.error("Error getting access token:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to get access token", details: error.message }),
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  }
+}
 
 // Check if the Spotify token is expired
 async function isTokenExpired(supabase: any, user_id: string | null) {
@@ -142,12 +191,15 @@ async function getAuthorizationUrl(redirect_uri: string) {
     // Generate a random state value for security
     const state = Math.random().toString(36).substring(2, 15);
     
-    // Required scopes for Spotify API
+    // Required scopes for Spotify API including streaming for Web Playback SDK
     const scopes = [
       'user-read-private',
       'user-read-email',
       'user-top-read',
-      'user-read-recently-played'
+      'user-read-recently-played',
+      'streaming',
+      'user-read-playback-state',
+      'user-modify-playback-state'
     ];
     
     // Create the authorization URL
