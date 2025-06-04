@@ -42,13 +42,9 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({
       {/* Transparent overlay that disappears after first click */}
       {showOverlay && (
         <div 
-          className="absolute inset-0 cursor-pointer rounded-md flex items-center justify-center bg-black bg-opacity-20 transition-opacity hover:bg-opacity-30"
+          className="absolute inset-0 cursor-pointer rounded-md"
           onClick={handleOverlayClick}
-        >
-          <div className="bg-white bg-opacity-90 px-3 py-1 rounded-full text-sm text-gray-800 shadow-md">
-            Click to begin reading
-          </div>
-        </div>
+        />
       )}
     </div>
   );

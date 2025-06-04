@@ -134,7 +134,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           "transition-all duration-500 ease-in-out",
           entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : ""
         )}>
-          <EntryContent content={entry.content} />
+          <EntryContent 
+            content={entry.content} 
+            showPlayMessage={entry.track && !hasClickedToPlay}
+          />
         </div>
         
         {!isPreview && (
