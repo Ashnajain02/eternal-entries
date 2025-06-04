@@ -197,10 +197,10 @@ const SpotifyWebPlayer: React.FC<SpotifyWebPlayerProps> = ({
       <div className="flex items-center space-x-4">
         {/* Album Art */}
         <div className="flex-shrink-0">
-          {track.album?.images?.[0]?.url ? (
+          {track.albumArt ? (
             <img 
-              src={track.album.images[0].url} 
-              alt={track.album?.name || 'Album art'}
+              src={track.albumArt} 
+              alt={track.album || 'Album art'}
               className="w-16 h-16 rounded-md object-cover"
             />
           ) : (
@@ -238,9 +238,9 @@ const SpotifyWebPlayer: React.FC<SpotifyWebPlayerProps> = ({
               <p className="text-xs text-gray-500 truncate">
                 {track.artist}
               </p>
-              {track.album?.name && (
+              {track.album && (
                 <p className="text-xs text-gray-400 truncate">
-                  {track.album.name}
+                  {track.album}
                 </p>
               )}
             </div>
