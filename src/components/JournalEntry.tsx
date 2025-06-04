@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -130,9 +131,13 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         
         {/* Journal Content with conditional blur and message overlay */}
         <div className="relative mb-6">
-          <div className={`transition-all duration-[3000ms] ease-in-out ${
-            entry.track && !hasClickedToPlay ? 'blur-sm opacity-70' : 'blur-none opacity-100'
-          }`}>
+          <div
+            style={{
+              filter: entry.track && !hasClickedToPlay ? 'blur(4px)' : 'blur(0px)',
+              opacity: entry.track && !hasClickedToPlay ? 0.7 : 1,
+              transition: 'filter 3s ease, opacity 3s ease',
+            }}
+          >
             <EntryContent content={entry.content} />
           </div>
           
@@ -149,9 +154,13 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         {!isPreview && (
           <>
             {/* Reflection Module */}
-            <div className={`transition-all duration-[3000ms] ease-in-out ${
-              entry.track && !hasClickedToPlay ? 'blur-sm opacity-70' : 'blur-none opacity-100'
-            }`}>
+            <div
+              style={{
+                filter: entry.track && !hasClickedToPlay ? 'blur(4px)' : 'blur(0px)',
+                opacity: entry.track && !hasClickedToPlay ? 0.7 : 1,
+                transition: 'filter 3s ease, opacity 3s ease',
+              }}
+            >
               <ReflectionModule
                 entryId={entry.id}
                 entryContent={entry.content}
@@ -162,9 +171,14 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
               />
             </div>
 
-            <div className={`border-t border-border my-4 pt-4 transition-all duration-[3000ms] ease-in-out ${
-              entry.track && !hasClickedToPlay ? 'blur-sm opacity-70' : 'blur-none opacity-100'
-            }`}>
+            <div 
+              className="border-t border-border my-4 pt-4"
+              style={{
+                filter: entry.track && !hasClickedToPlay ? 'blur(4px)' : 'blur(0px)',
+                opacity: entry.track && !hasClickedToPlay ? 0.7 : 1,
+                transition: 'filter 3s ease, opacity 3s ease',
+              }}
+            >
               <CommentSection
                 comments={entry.comments || []}
                 onAddComment={handleAddComment}
