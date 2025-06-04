@@ -144,7 +144,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     };
 
     fetchEntries();
-  }, [authState.user?.id, authState.loading]); // Only depend on user ID and loading state
+  }, [authState.user?.id]); // Removed authState.loading from dependency array
   
   // Generate stats data
   const statsData = React.useMemo(() => {
