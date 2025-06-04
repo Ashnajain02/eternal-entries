@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { JournalEntry } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -172,18 +173,20 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
           </Alert>
         )}
         
+        <div className="mb-6">
+          <SpotifySection
+            selectedTrack={selectedTrack}
+            onTrackSelect={setSelectedTrack}
+            spotifyConnected={spotifyConnected}
+            onSpotifyConnect={handleSpotifyConnectClick}
+          />
+        </div>
+        
         <ContentEditor
           content={content}
           onContentChange={setContent}
           selectedMood={selectedMood}
           onMoodChange={setSelectedMood}
-        />
-        
-        <SpotifySection
-          selectedTrack={selectedTrack}
-          onTrackSelect={setSelectedTrack}
-          spotifyConnected={spotifyConnected}
-          onSpotifyConnect={handleSpotifyConnectClick}
         />
         
         <EditorControls
