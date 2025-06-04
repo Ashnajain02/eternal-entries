@@ -18,6 +18,7 @@ const Auth = () => {
   const [tokenError, setTokenError] = useState(false);
   const [showUpdateTab, setShowUpdateTab] = useState(false);
   const [recoveryToken, setRecoveryToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const { authState } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -35,6 +36,7 @@ const Auth = () => {
     if (window.location.hash) {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const accessToken = hashParams.get('access_token');
+      const refreshTokenFromHash = hashParams.get('refresh_token');
       const type = hashParams.get('type');
       
       if (accessToken && type === 'recovery') {
@@ -42,6 +44,7 @@ const Auth = () => {
         setActiveTab('update-password');
         setShowUpdateTab(true);
         setRecoveryToken(accessToken);
+        setRefreshToken(refreshTokenFromHash);
         
         // Clean the URL to remove the token for security
         window.history.replaceState({}, document.title, window.location.pathname + '?tab=update-password');
@@ -137,6 +140,7 @@ const Auth = () => {
                 <UpdatePasswordForm 
                   onBackToSignIn={handleBackToSignIn} 
                   recoveryToken={recoveryToken}
+                  refreshToken={refreshToken}
                 />
               </TabsContent>
             </Tabs>

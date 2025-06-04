@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const updatePasswordSchema = z.object({
@@ -23,9 +23,14 @@ type UpdatePasswordValues = z.infer<typeof updatePasswordSchema>;
 interface UpdatePasswordFormProps {
   onBackToSignIn: () => void;
   recoveryToken?: string | null;
+  refreshToken?: string | null;
 }
 
-export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ onBackToSignIn, recoveryToken }) => {
+export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ 
+  onBackToSignIn, 
+  recoveryToken, 
+  refreshToken 
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
   const { updatePassword } = useAuth();
@@ -39,13 +44,10 @@ export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ onBackTo
   });
 
   const handleUpdatePassword = async (values: UpdatePasswordValues) => {
-    console.log('Updating password with recovery token present:', !!recoveryToken);
-    console.log('Current URL when updating password:', window.location.href);
-    
     setIsLoading(true);
     try {
-      // Pass the recovery token to the updatePassword function
-      await updatePassword(values.password, recoveryToken);
+      // Pass both tokens to the updatePassword function
+      await updatePassword(values.password, recoveryToken, refreshToken);
       setUpdateSuccess(true);
       form.reset();
       
@@ -70,27 +72,15 @@ export const UpdatePasswordForm: React.FC<UpdatePasswordFormProps> = ({ onBackTo
           </AlertDescription>
         </Alert>
       ) : (
-        <>
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-2">
-            <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-blue-700">
-              {recoveryToken ? 
-                "Please enter your new password below." : 
-                "Enter your new password below."
-              }
-            </p>
-          </div>
-          
-          {/* Add debug info */}
-          <Alert className="mb-4 bg-gray-50 border-gray-200">
-            <Info className="h-4 w-4 text-gray-600" />
-            <AlertDescription className="text-gray-700 text-xs">
-              Current site: {window.location.origin}
-              <br />
-              Recovery token present: {recoveryToken ? "Yes" : "No"}
-            </AlertDescription>
-          </Alert>
-        </>
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-start gap-2">
+          <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-blue-700">
+            {recoveryToken ? 
+              "Please enter your new password below." : 
+              "Enter your new password below."
+            }
+          </p>
+        </div>
       )}
       
       <Form {...form}>

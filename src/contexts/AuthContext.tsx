@@ -10,7 +10,7 @@ const AuthContext = createContext<{
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string, redirectTo?: string) => Promise<void>;
-  updatePassword: (password: string, recoveryToken?: string | null) => Promise<void>;
+  updatePassword: (password: string, accessToken?: string | null, refreshToken?: string | null) => Promise<void>;
 }>({
   authState: { session: null, user: null, loading: true },
   signUp: async () => {},

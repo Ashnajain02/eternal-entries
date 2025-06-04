@@ -162,30 +162,29 @@ export const useAuthProvider = () => {
     }
   };
   
-  const updatePassword = async (password: string, accessToken?: string | null) => {
+  const updatePassword = async (
+    password: string, 
+    accessToken?: string | null, 
+    refreshToken?: string | null
+  ) => {
     try {
       let error;
       
-      // If we have an access token from a recovery flow, use it directly
+      // If we have tokens from a recovery flow, set the session first
       if (accessToken) {
-        // Set the access token in the session
         const { error: sessionError } = await supabase.auth.setSession({
           access_token: accessToken,
-          refresh_token: '',
+          refresh_token: refreshToken || '',
         });
         
         if (sessionError) {
           throw sessionError;
         }
-        
-        // Then update the password
-        const { error: updateError } = await supabase.auth.updateUser({ password });
-        error = updateError;
-      } else {
-        // Regular flow for logged-in users
-        const { error: updateError } = await supabase.auth.updateUser({ password });
-        error = updateError;
       }
+      
+      // Update the password
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      error = updateError;
       
       if (error) throw error;
       
