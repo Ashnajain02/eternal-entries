@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { JournalEntry } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
@@ -130,10 +129,12 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   const handleCancel = () => {
     // Ask for confirmation if there is content and this is a new entry
     if (content.trim() && (!initialEntry || initialEntry.id.startsWith('temp-'))) {
-      const confirmCancel = window.confirm("You have unsaved changes. Your draft has been auto-saved, but are you sure you want to exit the editor?");
+      const confirmCancel = window.confirm("You have unsaved changes. Are you sure you want to exit the editor? Your draft will be deleted.");
       if (!confirmCancel) {
         return;
       }
+      // Clear the draft since user confirmed they want to cancel
+      clearDraft();
     }
     
     if (onSave) {
