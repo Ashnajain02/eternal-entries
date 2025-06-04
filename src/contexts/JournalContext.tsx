@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { JournalEntry, Mood, SpotifyTrack, WeatherData, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,86 +48,103 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const { authState } = useAuth();
   const { toast } = useToast();
+  const hasLoadedEntriesRef = useRef(false);
+  const currentUserIdRef = useRef<string | null>(null);
   
-  // Load entries from Supabase on auth state change
+  // Load entries from Supabase only when necessary
   useEffect(() => {
     const fetchEntries = async () => {
+      // Don't fetch if no user
       if (!authState.user) {
         setEntries([]);
+        setIsLoading(false);
+        hasLoadedEntriesRef.current = false;
+        currentUserIdRef.current = null;
+        return;
+      }
+
+      // Don't fetch if we already have entries for this user
+      if (hasLoadedEntriesRef.current && currentUserIdRef.current === authState.user.id) {
         setIsLoading(false);
         return;
       }
 
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('journal_entries')
-          .select('*')
-          .eq('user_id', authState.user.id)
-          .order('timestamp_started', { ascending: false });
-
-        if (error) throw error;
-
-        // Transform and decrypt the data
-        const transformedEntries: JournalEntry[] = [];
+      // Only fetch if user changed or we haven't loaded entries yet
+      if (currentUserIdRef.current !== authState.user.id) {
+        setIsLoading(true);
         
-        for (const entry of data) {
-          // Create Spotify track object if track data exists
-          let track: SpotifyTrack | undefined = undefined;
-          if (entry.spotify_track_uri) {
-            track = {
-              id: entry.spotify_track_uri.split(':').pop() || '',
-              name: entry.spotify_track_name || '',
-              artist: entry.spotify_track_artist || '',
-              album: entry.spotify_track_album || '',
-              albumArt: entry.spotify_track_image || '',
-              uri: entry.spotify_track_uri
-            };
-          }
-          
-          // Create the basic entry object
-          const journalEntry: JournalEntry = {
-            id: entry.id,
-            content: entry.entry_text,
-            date: new Date(entry.timestamp_started).toISOString().split('T')[0],
-            timestamp: entry.timestamp_started,
-            mood: entry.mood as Mood,
-            weather: entry.weather_temperature ? {
-              temperature: entry.weather_temperature,
-              description: entry.weather_description || '',
-              icon: entry.weather_icon || '',
-              location: entry.weather_location || ''
-            } : undefined,
-            track: track,
-            createdAt: new Date(entry.created_at).getTime(),
-            updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
-            user_id: entry.user_id,
-            comments: [], // Initialize comments array (will be populated during decryption)
-            reflectionQuestion: entry.reflection_question || undefined,
-            reflectionAnswer: entry.reflection_answer || undefined
-          };
-          
-          // Decrypt the content
-          const decryptedEntry = await decryptJournalEntry(journalEntry, authState.user.id);
-          transformedEntries.push(decryptedEntry);
-        }
+        try {
+          const { data, error } = await supabase
+            .from('journal_entries')
+            .select('*')
+            .eq('user_id', authState.user.id)
+            .order('timestamp_started', { ascending: false });
 
-        console.log("Loaded entries with tracks:", transformedEntries.filter(e => e.track).length);
-        setEntries(transformedEntries);
-      } catch (error: any) {
-        console.error('Error loading journal entries:', error.message);
-        toast({
-          title: "Error loading journal entries",
-          description: error.message,
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
+          if (error) throw error;
+
+          // Transform and decrypt the data
+          const transformedEntries: JournalEntry[] = [];
+          
+          for (const entry of data) {
+            // Create Spotify track object if track data exists
+            let track: SpotifyTrack | undefined = undefined;
+            if (entry.spotify_track_uri) {
+              track = {
+                id: entry.spotify_track_uri.split(':').pop() || '',
+                name: entry.spotify_track_name || '',
+                artist: entry.spotify_track_artist || '',
+                album: entry.spotify_track_album || '',
+                albumArt: entry.spotify_track_image || '',
+                uri: entry.spotify_track_uri
+              };
+            }
+            
+            // Create the basic entry object
+            const journalEntry: JournalEntry = {
+              id: entry.id,
+              content: entry.entry_text,
+              date: new Date(entry.timestamp_started).toISOString().split('T')[0],
+              timestamp: entry.timestamp_started,
+              mood: entry.mood as Mood,
+              weather: entry.weather_temperature ? {
+                temperature: entry.weather_temperature,
+                description: entry.weather_description || '',
+                icon: entry.weather_icon || '',
+                location: entry.weather_location || ''
+              } : undefined,
+              track: track,
+              createdAt: new Date(entry.created_at).getTime(),
+              updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
+              user_id: entry.user_id,
+              comments: [], // Initialize comments array (will be populated during decryption)
+              reflectionQuestion: entry.reflection_question || undefined,
+              reflectionAnswer: entry.reflection_answer || undefined
+            };
+            
+            // Decrypt the content
+            const decryptedEntry = await decryptJournalEntry(journalEntry, authState.user.id);
+            transformedEntries.push(decryptedEntry);
+          }
+
+          console.log("Loaded entries with tracks:", transformedEntries.filter(e => e.track).length);
+          setEntries(transformedEntries);
+          hasLoadedEntriesRef.current = true;
+          currentUserIdRef.current = authState.user.id;
+        } catch (error: any) {
+          console.error('Error loading journal entries:', error.message);
+          toast({
+            title: "Error loading journal entries",
+            description: error.message,
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchEntries();
-  }, [authState.user]);
+  }, [authState.user?.id, authState.loading]); // Only depend on user ID and loading state
   
   // Generate stats data
   const statsData = React.useMemo(() => {
