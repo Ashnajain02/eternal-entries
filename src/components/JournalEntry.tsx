@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -129,15 +128,23 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           </div>
         )}
         
-        {/* Journal Content with conditional blur */}
-        <div className={cn(
-          "transition-all duration-500 ease-in-out",
-          entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : ""
-        )}>
-          <EntryContent 
-            content={entry.content} 
-            showPlayMessage={entry.track && !hasClickedToPlay}
-          />
+        {/* Journal Content with conditional blur and message overlay */}
+        <div className="relative mb-6">
+          <div className={cn(
+            "transition-all duration-500 ease-in-out",
+            entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : ""
+          )}>
+            <EntryContent content={entry.content} />
+          </div>
+          
+          {/* Message overlay when content is blurred - positioned outside the blurred area */}
+          {entry.track && !hasClickedToPlay && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="bg-white bg-opacity-90 px-4 py-2 rounded-full text-sm text-gray-800 shadow-md">
+                Play the song to begin reading
+              </div>
+            </div>
+          )}
         </div>
         
         {!isPreview && (
