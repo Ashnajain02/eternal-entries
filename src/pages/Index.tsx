@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { useJournal } from '@/contexts/JournalContext';
 import Layout from '@/components/Layout';
 import JournalEditor from '@/components/JournalEditor';
 import JournalEntryView from '@/components/JournalEntry';
+import LandingPage from '@/components/landing/LandingPage';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Plus, Loader2 } from 'lucide-react';
@@ -73,15 +73,9 @@ const Index = () => {
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 
+  // Show landing page for non-authenticated users
   if (!authState.user) {
-    return (
-      <Layout>
-        <div className="max-w-3xl mx-auto text-center py-16">
-          <h1 className="text-3xl font-bold mb-4">Welcome to Eternal Entries</h1>
-          <p className="mb-6">Please sign in to start journaling</p>
-        </div>
-      </Layout>
-    );
+    return <LandingPage />;
   }
 
   return (
