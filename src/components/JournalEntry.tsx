@@ -27,6 +27,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   isPreview = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [hasClickedToPlay, setHasClickedToPlay] = useState(false);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
   const { toast } = useToast();
   
@@ -87,6 +88,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     const updatedEntry = { ...entry };
     await updateEntry(updatedEntry);
   };
+
+  const handleSpotifyPlayerClick = () => {
+    setHasClickedToPlay(true);
+  };
   
   if (isEditing) {
     return <JournalEditor entry={entry} onSave={() => setIsEditing(false)} />;
@@ -116,25 +121,43 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         {/* Spotify Track Section */}
         {entry.track && (
           <div className="mb-6">
-            <SpotifyPlayer track={entry.track} className="mb-2" />
+            <SpotifyPlayer 
+              track={entry.track} 
+              className="mb-2" 
+              onPlayerClick={handleSpotifyPlayerClick}
+            />
           </div>
         )}
         
-        <EntryContent content={entry.content} />
+        {/* Journal Content with conditional blur */}
+        <div className={cn(
+          "transition-all duration-500 ease-in-out",
+          entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : ""
+        )}>
+          <EntryContent content={entry.content} />
+        </div>
         
         {!isPreview && (
           <>
             {/* Reflection Module */}
-            <ReflectionModule
-              entryId={entry.id}
-              entryContent={entry.content}
-              entryMood={entry.mood}
-              reflectionQuestion={entry.reflectionQuestion || null}
-              reflectionAnswer={entry.reflectionAnswer || null}
-              onReflectionUpdate={handleReflectionUpdate}
-            />
+            <div className={cn(
+              "transition-all duration-500 ease-in-out",
+              entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : ""
+            )}>
+              <ReflectionModule
+                entryId={entry.id}
+                entryContent={entry.content}
+                entryMood={entry.mood}
+                reflectionQuestion={entry.reflectionQuestion || null}
+                reflectionAnswer={entry.reflectionAnswer || null}
+                onReflectionUpdate={handleReflectionUpdate}
+              />
+            </div>
 
-            <div className="border-t border-border my-4 pt-4">
+            <div className={cn(
+              "border-t border-border my-4 pt-4 transition-all duration-500 ease-in-out",
+              entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : ""
+            )}>
               <CommentSection
                 comments={entry.comments || []}
                 onAddComment={handleAddComment}
