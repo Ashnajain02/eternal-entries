@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { SpotifyTrack } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -237,7 +236,7 @@ const SpotifyWebPlayer: React.FC<SpotifyWebPlayerProps> = ({
         
         <div className="flex-1">
           <div className="text-sm font-medium">{track.name}</div>
-          <div className="text-xs text-gray-400">{track.artists?.[0]?.name}</div>
+          <div className="text-xs text-gray-400">{track.artist}</div>
         </div>
       </div>
     </div>
