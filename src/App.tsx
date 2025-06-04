@@ -28,14 +28,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/callback" element={<Callback />} />
-              <Route 
-                path="/" 
-                element={
-                  <ProtectedRoute>
-                    <Index />
-                  </ProtectedRoute>
-                } 
-              />
+              <Route path="/" element={<Index />} />
               <Route 
                 path="/archive" 
                 element={
