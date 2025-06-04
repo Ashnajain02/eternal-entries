@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType } from '@/types';
@@ -131,10 +130,9 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         
         {/* Journal Content with conditional blur and message overlay */}
         <div className="relative mb-6">
-          <div className={cn(
-            "transition-all duration-[3000ms]",
-            entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : "blur-none opacity-100"
-          )}>
+          <div className={`transition-all duration-[3000ms] ease-in-out ${
+            entry.track && !hasClickedToPlay ? 'blur-sm opacity-70' : 'blur-none opacity-100'
+          }`}>
             <EntryContent content={entry.content} />
           </div>
           
@@ -151,10 +149,9 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         {!isPreview && (
           <>
             {/* Reflection Module */}
-            <div className={cn(
-              "transition-all duration-[3000ms]",
-              entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : "blur-none opacity-100"
-            )}>
+            <div className={`transition-all duration-[3000ms] ease-in-out ${
+              entry.track && !hasClickedToPlay ? 'blur-sm opacity-70' : 'blur-none opacity-100'
+            }`}>
               <ReflectionModule
                 entryId={entry.id}
                 entryContent={entry.content}
@@ -165,10 +162,9 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
               />
             </div>
 
-            <div className={cn(
-              "border-t border-border my-4 pt-4 transition-all duration-[3000ms]",
-              entry.track && !hasClickedToPlay ? "blur-sm opacity-70" : "blur-none opacity-100"
-            )}>
+            <div className={`border-t border-border my-4 pt-4 transition-all duration-[3000ms] ease-in-out ${
+              entry.track && !hasClickedToPlay ? 'blur-sm opacity-70' : 'blur-none opacity-100'
+            }`}>
               <CommentSection
                 comments={entry.comments || []}
                 onAddComment={handleAddComment}
