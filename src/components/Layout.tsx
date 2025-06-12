@@ -3,7 +3,9 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { AuthButtons } from './AuthButtons';
-import { Notebook, Archive, BarChart3, Settings } from 'lucide-react';
+import { Notebook, Archive, BarChart3, Settings, Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -19,66 +21,75 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Check if the current route is the auth page
   const isAuthPage = location.pathname === '/auth';
 
+  const navigationItems = [
+    { path: '/', icon: Notebook, label: 'Journal' },
+    { path: '/archive', icon: Archive, label: 'Archive' },
+    { path: '/stats', icon: BarChart3, label: 'Stats' },
+    { path: '/settings', icon: Settings, label: 'Settings' }
+  ];
+
+  const NavigationContent = () => (
+    <>
+      {navigationItems.map(({ path, icon: Icon, label }) => (
+        <Link
+          key={path}
+          to={path}
+          className={cn(
+            "flex items-center gap-2 px-3 py-2 rounded-md transition-colors text-sm",
+            isActive(path)
+              ? "text-primary font-medium bg-primary/10"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent"
+          )}
+        >
+          <Icon className="h-4 w-4" />
+          <span>{label}</span>
+        </Link>
+      ))}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background antialiased">
       <div className="fixed inset-x-0 top-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
-        <div className="container flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center font-semibold">
+        <div className="container flex items-center justify-between h-14 px-4">
+          <Link to="/" className="flex items-center font-semibold text-lg">
             Eternal Entries
           </Link>
-          <div className="flex items-center space-x-4">
-            {/* Only show navigation when NOT on auth page */}
+          
+          <div className="flex items-center space-x-2">
+            {/* Desktop Navigation */}
             {!isAuthPage && (
-              <nav className="flex items-center space-x-2">
-                <Link
-                  to="/"
-                  className={cn(
-                    "flex items-center gap-2 transition-colors",
-                    isActive("/")
-                      ? "text-primary font-medium"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Notebook className="h-4 w-4" />
-                  <span>Journal</span>
-                </Link>
-                <Link
-                  to="/archive"
-                  className={cn(
-                    "flex items-center gap-2 transition-colors",
-                    isActive("/archive")
-                      ? "text-primary font-medium"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Archive className="h-4 w-4" />
-                  <span>Archive</span>
-                </Link>
-                <Link
-                  to="/stats"
-                  className={cn(
-                    "flex items-center gap-2 transition-colors",
-                    isActive("/stats")
-                      ? "text-primary font-medium"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  <span>Stats</span>
-                </Link>
-                <Link to="/settings" className={cn("flex items-center gap-2 transition-colors", 
-                  isActive("/settings") ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground"
-                )}>
-                  <Settings className="h-4 w-4" />
-                  <span>Settings</span>
-                </Link>
+              <nav className="hidden md:flex items-center space-x-1">
+                <NavigationContent />
               </nav>
             )}
+            
+            {/* Mobile Navigation */}
+            {!isAuthPage && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Toggle menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-64">
+                  <div className="flex flex-col space-y-2 mt-6">
+                    <NavigationContent />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+            
             <AuthButtons />
           </div>
         </div>
       </div>
-      <main className="container pt-20 pb-12">{children}</main>
+      <main className="pt-14 pb-6 px-4 sm:px-6 lg:px-8">
+        <div className="container mx-auto">
+          {children}
+        </div>
+      </main>
     </div>
   );
 };
