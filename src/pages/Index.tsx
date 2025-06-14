@@ -95,13 +95,13 @@ const Index = () => {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
+      <div className="max-w-3xl mx-auto space-y-8">
         <div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold">Journal</h1>
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl font-bold">Journal</h1>
             
             {!isWriting && (
-              <Button onClick={handleCreateNewEntry} className="flex items-center gap-2 w-full sm:w-auto">
+              <Button onClick={handleCreateNewEntry} className="flex items-center gap-1">
                 <Plus className="h-4 w-4" /> New Entry
               </Button>
             )}
@@ -112,27 +112,23 @@ const Index = () => {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : isWriting ? (
-            <div className="w-full">
-              <JournalEditor onSave={handleFinishWriting} />
-            </div>
+            <JournalEditor onSave={handleFinishWriting} />
           ) : sortedEntries.length > 0 ? (
-            <div className="space-y-4 sm:space-y-6">
+            <div className="space-y-6">
               {sortedEntries.map(entry => {
                 console.log(`Entry ${entry.id} has track:`, !!entry.track);
                 return (
-                  <div key={entry.id} className="w-full">
-                    <JournalEntryView entry={entry} />
-                  </div>
+                  <JournalEntryView key={entry.id} entry={entry} />
                 );
               })}
             </div>
           ) : (
             <Card className="p-6 text-center space-y-4 animated-gradient">
-              <h2 className="text-lg sm:text-xl font-semibold">Start your journal</h2>
-              <p className="text-muted-foreground text-sm sm:text-base">
+              <h2 className="text-xl font-semibold">Start your journal</h2>
+              <p className="text-muted-foreground">
                 Capture your thoughts, the weather, and what you're listening to.
               </p>
-              <Button onClick={handleCreateNewEntry} className="w-full sm:w-auto">
+              <Button onClick={handleCreateNewEntry}>
                 Write Your First Entry
               </Button>
             </Card>

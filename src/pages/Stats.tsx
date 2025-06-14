@@ -138,11 +138,10 @@ const Stats = () => {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto space-y-6">
-        <h1 className="text-2xl sm:text-3xl font-bold">Journal Stats</h1>
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6">Journal Stats</h1>
         
-        {/* Stats Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -150,7 +149,7 @@ const Stats = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl sm:text-3xl font-bold">{statsData.totalEntries}</p>
+              <p className="text-3xl font-bold">{statsData.totalEntries}</p>
             </CardContent>
           </Card>
           
@@ -161,8 +160,8 @@ const Stats = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl sm:text-3xl font-bold">
-                {additionalStats.currentStreak} <span className="text-base font-normal">{additionalStats.currentStreak === 1 ? 'day' : 'days'}</span>
+              <p className="text-3xl font-bold">
+                {additionalStats.currentStreak} {additionalStats.currentStreak === 1 ? 'day' : 'days'}
               </p>
             </CardContent>
           </Card>
@@ -174,8 +173,8 @@ const Stats = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl sm:text-3xl font-bold">
-                {statsData.longestStreak} <span className="text-base font-normal">{statsData.longestStreak === 1 ? 'day' : 'days'}</span>
+              <p className="text-3xl font-bold">
+                {statsData.longestStreak} {statsData.longestStreak === 1 ? 'day' : 'days'}
               </p>
             </CardContent>
           </Card>
@@ -183,11 +182,11 @@ const Stats = () => {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Avg Words
+                Avg Words per Entry
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl sm:text-3xl font-bold">{additionalStats.avgWordsPerEntry}</p>
+              <p className="text-3xl font-bold">{additionalStats.avgWordsPerEntry}</p>
             </CardContent>
           </Card>
           
@@ -198,7 +197,7 @@ const Stats = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xl sm:text-2xl font-bold">
+              <p className="text-3xl font-bold">
                 {statsData.mostCommonTime || 'N/A'}
               </p>
             </CardContent>
@@ -211,7 +210,7 @@ const Stats = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-xl sm:text-2xl font-bold">{additionalStats.mostActiveDay}</p>
+              <p className="text-3xl font-bold">{additionalStats.mostActiveDay}</p>
             </CardContent>
           </Card>
 
@@ -222,7 +221,7 @@ const Stats = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl sm:text-3xl font-bold">{additionalStats.musicPercentage}%</p>
+              <p className="text-3xl font-bold">{additionalStats.musicPercentage}%</p>
             </CardContent>
           </Card>
 
@@ -233,11 +232,11 @@ const Stats = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl sm:text-3xl font-bold">{additionalStats.weatherPercentage}%</p>
+              <p className="text-3xl font-bold">{additionalStats.weatherPercentage}%</p>
             </CardContent>
           </Card>
           
-          <Card className="sm:col-span-2 lg:col-span-1">
+          <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Most Common Mood
@@ -247,7 +246,7 @@ const Stats = () => {
               {(() => {
                 // Find the mood with highest count
                 const moodEntries = Object.entries(statsData.moodCounts);
-                if (moodEntries.length === 0) return <p className="text-2xl sm:text-3xl font-bold">N/A</p>;
+                if (moodEntries.length === 0) return <p className="text-3xl font-bold">N/A</p>;
                 
                 const [topMood] = moodEntries.reduce((max, current) => 
                   current[1] > max[1] ? current : max
@@ -268,8 +267,8 @@ const Stats = () => {
                 
                 return (
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl sm:text-3xl">{moodEmojis[topMood as keyof typeof moodEmojis]}</span>
-                    <span className="text-lg sm:text-xl font-bold capitalize">{topMood.replace('-', ' ')}</span>
+                    <span className="text-3xl">{moodEmojis[topMood as keyof typeof moodEmojis]}</span>
+                    <span className="text-2xl font-bold capitalize">{topMood.replace('-', ' ')}</span>
                   </div>
                 );
               })()}
@@ -277,25 +276,18 @@ const Stats = () => {
           </Card>
         </div>
         
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Mood Distribution</CardTitle>
+              <CardTitle>Mood Distribution</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-48 sm:h-64">
+              <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={moodChartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <BarChart data={moodChartData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis 
-                      dataKey="name" 
-                      tick={{ fontSize: 12 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="name" />
+                    <YAxis />
                     <Tooltip 
                       formatter={(value) => [`${value} entries`, 'Count']} 
                       cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
@@ -313,15 +305,15 @@ const Stats = () => {
           
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Entries by Day of Week</CardTitle>
+              <CardTitle>Entries by Day of Week</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-48 sm:h-64">
+              <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={additionalStats.dayOfWeekData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <BarChart data={additionalStats.dayOfWeekData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="name" />
+                    <YAxis />
                     <Tooltip 
                       formatter={(value) => [`${value} entries`, 'Count']} 
                       cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
@@ -334,18 +326,18 @@ const Stats = () => {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Entries by Month (This Year)</CardTitle>
+              <CardTitle>Entries by Month (This Year)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-48 sm:h-64">
+              <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyChartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <LineChart data={monthlyChartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <XAxis dataKey="name" />
+                    <YAxis />
                     <Tooltip 
                       formatter={(value) => [`${value} entries`, 'Count']} 
                       cursor={{ stroke: '#9b87f5', strokeWidth: 2 }}
@@ -366,19 +358,19 @@ const Stats = () => {
           {additionalStats.topArtists.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg sm:text-xl">Top Artists in Your Journal</CardTitle>
+                <CardTitle>Top Artists in Your Journal</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {additionalStats.topArtists.map((artist, index) => (
                     <div key={artist.artist} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <span className="text-base sm:text-lg font-bold text-muted-foreground flex-shrink-0">
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-bold text-muted-foreground">
                           #{index + 1}
                         </span>
-                        <span className="font-medium truncate">{artist.artist}</span>
+                        <span className="font-medium">{artist.artist}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground flex-shrink-0 ml-2">
+                      <span className="text-sm text-muted-foreground">
                         {artist.count} {artist.count === 1 ? 'entry' : 'entries'}
                       </span>
                     </div>
