@@ -35,7 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           key={path}
           to={path}
           className={cn(
-            "flex items-center gap-2 px-3 py-2 rounded-md transition-colors text-sm",
+            "flex items-center gap-2 px-3 py-2 rounded-md transition-colors text-sm relative z-10",
             isActive(path)
               ? "text-primary font-medium bg-primary/10"
               : "text-muted-foreground hover:text-foreground hover:bg-accent"
@@ -52,14 +52,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="min-h-screen bg-background antialiased">
       <div className="fixed inset-x-0 top-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
         <div className="container flex items-center justify-between h-14 px-4">
-          <Link to="/" className="flex items-center font-semibold text-lg">
+          <Link to="/" className="flex items-center font-semibold text-lg relative z-10">
             Eternal Entries
           </Link>
           
           <div className="flex items-center space-x-2">
             {/* Desktop Navigation */}
             {!isAuthPage && (
-              <nav className="hidden md:flex items-center space-x-1">
+              <nav className="hidden md:flex items-center space-x-1 relative z-10">
                 <NavigationContent />
               </nav>
             )}
@@ -68,12 +68,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {!isAuthPage && (
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="md:hidden">
+                  <Button variant="ghost" size="icon" className="md:hidden relative z-10">
                     <Menu className="h-5 w-5" />
                     <span className="sr-only">Toggle menu</span>
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-64">
+                <SheetContent side="right" className="w-64 z-[100]">
                   <div className="flex flex-col space-y-2 mt-6">
                     <NavigationContent />
                   </div>
@@ -81,7 +81,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Sheet>
             )}
             
-            <AuthButtons />
+            <div className="relative z-10">
+              <AuthButtons />
+            </div>
           </div>
         </div>
       </div>
