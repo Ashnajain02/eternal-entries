@@ -19,6 +19,64 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Encryption/Decryption utility functions
+async function encryptToken(token: string): Promise<string> {
+  const encryptionKey = Deno.env.get("SPOTIFY_TOKEN_ENCRYPTION_KEY");
+  if (!encryptionKey) {
+    throw new Error("Encryption key not configured");
+  }
+
+  const keyData = new TextEncoder().encode(encryptionKey);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(token)
+  );
+
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encrypted), iv.length);
+
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function decryptToken(encryptedToken: string): Promise<string> {
+  const encryptionKey = Deno.env.get("SPOTIFY_TOKEN_ENCRYPTION_KEY");
+  if (!encryptionKey) {
+    throw new Error("Encryption key not configured");
+  }
+
+  const keyData = new TextEncoder().encode(encryptionKey);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["decrypt"]
+  );
+
+  const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
+  const iv = combined.slice(0, 12);
+  const encrypted = combined.slice(12);
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encrypted
+  );
+
+  return new TextDecoder().decode(decrypted);
+}
+
 serve(async (req) => {
   console.log("Spotify Search Function - Request received");
   
@@ -122,8 +180,12 @@ serve(async (req) => {
       );
     }
     
+    // Decrypt the tokens
+    console.log("Decrypting Spotify tokens");
+    let accessToken = await decryptToken(spotify_access_token);
+    const refreshToken = await decryptToken(spotify_refresh_token);
+    
     // Check if token is expired and refresh if needed
-    let accessToken = spotify_access_token;
     const now = new Date();
     const expires_at = new Date(spotify_token_expires_at);
     
@@ -157,7 +219,7 @@ serve(async (req) => {
         },
         body: new URLSearchParams({
           grant_type: "refresh_token",
-          refresh_token: spotify_refresh_token
+          refresh_token: refreshToken
         })
       });
       
@@ -174,15 +236,17 @@ serve(async (req) => {
         );
       }
       
-      // Update token in database
+      // Update token in database (encrypt the new token)
       console.log("Updating token in database");
       const newExpiresAt = new Date();
       newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshData.expires_in);
       
+      const encryptedNewToken = await encryptToken(refreshData.access_token);
+      
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
-          spotify_access_token: refreshData.access_token,
+          spotify_access_token: encryptedNewToken,
           spotify_token_expires_at: newExpiresAt.toISOString()
         })
         .eq("id", userId);

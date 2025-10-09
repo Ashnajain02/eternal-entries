@@ -7,6 +7,41 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Encryption utility functions
+async function encryptToken(token: string): Promise<string> {
+  const encryptionKey = Deno.env.get("SPOTIFY_TOKEN_ENCRYPTION_KEY");
+  if (!encryptionKey) {
+    throw new Error("Encryption key not configured");
+  }
+
+  // Convert the encryption key to a CryptoKey
+  const keyData = new TextEncoder().encode(encryptionKey);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"]
+  );
+
+  // Generate a random IV
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  // Encrypt the token
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    new TextEncoder().encode(token)
+  );
+
+  // Combine IV and encrypted data, then base64 encode
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encrypted), iv.length);
+
+  return btoa(String.fromCharCode(...combined));
+}
+
 serve(async (req) => {
   console.log("Spotify Auth Function - Request received");
   
@@ -241,11 +276,16 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
     const expires_at = new Date();
     expires_at.setSeconds(expires_at.getSeconds() + tokenData.expires_in);
     
-    // Store the tokens in the database
+    // Encrypt tokens before storing
+    console.log("Encrypting Spotify tokens");
+    const encryptedAccessToken = await encryptToken(tokenData.access_token);
+    const encryptedRefreshToken = await encryptToken(tokenData.refresh_token);
+    
+    // Store the encrypted tokens in the database
     const { error } = await supabase.rpc("update_profile_spotify_data", {
       p_user_id: user_id,
-      p_access_token: tokenData.access_token,
-      p_refresh_token: tokenData.refresh_token,
+      p_access_token: encryptedAccessToken,
+      p_refresh_token: encryptedRefreshToken,
       p_expires_at: expires_at.toISOString(),
       p_username: profileData.id,
     });
