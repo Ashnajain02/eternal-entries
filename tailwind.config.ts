@@ -68,11 +68,10 @@ export default {
           ring: 'hsl(var(--sidebar-ring))'
         },
         journal: {
-          purple: '#9b87f5',
-          dark: '#1A1F2C',
-          light: '#E5DEFF',
-          green: '#1DB954', // Spotify green
-          blue: '#0EA5E9', // For sky/weather
+          dark: '#000000',
+          light: '#FFFFFF',
+          green: '#000000',
+          blue: '#000000',
         },
       },
       borderRadius: {
