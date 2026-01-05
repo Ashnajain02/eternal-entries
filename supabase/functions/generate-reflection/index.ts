@@ -24,11 +24,66 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { content, mood, track } = await req.json();
-    
-    if (!content) {
-      throw new Error("Journal content is required");
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
+
+    const { content, mood, track } = requestData;
+    
+    // Validate content - required, must be string, max 10000 chars
+    if (!content || typeof content !== 'string') {
+      return new Response(JSON.stringify({ error: "Journal content is required and must be a string" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+    
+    if (content.length > 10000) {
+      return new Response(JSON.stringify({ error: "Journal content exceeds maximum length of 10000 characters" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+    
+    // Validate mood - optional, must be string if provided, max 50 chars
+    if (mood !== undefined && (typeof mood !== 'string' || mood.length > 50)) {
+      return new Response(JSON.stringify({ error: "Mood must be a string with maximum 50 characters" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+    
+    // Validate track - optional, must be object with name/artist strings if provided
+    if (track !== undefined) {
+      if (typeof track !== 'object' || track === null) {
+        return new Response(JSON.stringify({ error: "Track must be an object" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+      if (track.name && (typeof track.name !== 'string' || track.name.length > 200)) {
+        return new Response(JSON.stringify({ error: "Track name must be a string with maximum 200 characters" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+      if (track.artist && (typeof track.artist !== 'string' || track.artist.length > 200)) {
+        return new Response(JSON.stringify({ error: "Track artist must be a string with maximum 200 characters" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+    }
+    
+    // Sanitize inputs by trimming whitespace
+    const sanitizedContent = content.trim();
+    const sanitizedMood = mood?.trim() || 'neutral';
     
     // Build the track context if provided
     let trackContext = "";
@@ -40,8 +95,8 @@ serve(async (req) => {
     const prompt = `
     You are an emotionally intelligent journaling assistant. Based on the following journal entry:
     
-    Content: "${content}"
-    Mood: "${mood || 'neutral'}"${trackContext}
+    Content: "${sanitizedContent}"
+    Mood: "${sanitizedMood}"${trackContext}
     
     Generate a single question that:
     1. Is directly related to the content and emotion in the entry
