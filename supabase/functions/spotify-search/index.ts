@@ -92,54 +92,16 @@ serve(async (req) => {
   try {
     console.log("Parsing request body");
 
-    // Parse request body with error handling
-    let requestData;
-    try {
-      requestData = await req.json();
-    } catch {
-      return new Response(
-        JSON.stringify({ error: "Invalid JSON body" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
+    // Parse request body
+    const requestData = await req.json();
     const { query, type = 'track', limit = 10 } = requestData;
     
-    // Validate query - required, must be string, max 200 chars
-    if (!query || typeof query !== 'string') {
+    if (!query) {
       return new Response(
-        JSON.stringify({ error: "Query parameter is required and must be a string" }),
+        JSON.stringify({ error: "Query parameter is required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
-    
-    if (query.length > 200) {
-      return new Response(
-        JSON.stringify({ error: "Query exceeds maximum length of 200 characters" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    // Validate type - must be one of allowed values
-    const allowedTypes = ['track', 'album', 'artist', 'playlist'];
-    if (typeof type !== 'string' || !allowedTypes.includes(type)) {
-      return new Response(
-        JSON.stringify({ error: "Type must be one of: " + allowedTypes.join(", ") }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    // Validate limit - must be number between 1 and 50
-    const parsedLimit = typeof limit === 'number' ? limit : parseInt(limit, 10);
-    if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
-      return new Response(
-        JSON.stringify({ error: "Limit must be a number between 1 and 50" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    // Sanitize query by trimming whitespace
-    const sanitizedQuery = query.trim();
     
     // Create a Supabase client with the service role key
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -299,9 +261,9 @@ serve(async (req) => {
     // Search Spotify API
     console.log("Searching Spotify API");
     const searchParams = new URLSearchParams({
-      q: sanitizedQuery,
+      q: query,
       type,
-      limit: parsedLimit.toString()
+      limit: limit.toString()
     });
     
     const searchResponse = await fetch(`https://api.spotify.com/v1/search?${searchParams.toString()}`, {
