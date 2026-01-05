@@ -54,9 +54,64 @@ serve(async (req) => {
   try {
     console.log("Parsing request body");
 
-    // Parse request body
-    const requestData = await req.json();
+    // Parse request body with error handling
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const { action, code, redirect_uri } = requestData;
+    
+    // Validate action - required, must be one of allowed values
+    const allowedActions = ["is_token_expired", "authorize", "callback", "revoke"];
+    if (!action || typeof action !== 'string' || !allowedActions.includes(action)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid action. Must be one of: " + allowedActions.join(", ") }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    
+    // Validate redirect_uri if provided - must be string, max 500 chars, valid URL format
+    if (redirect_uri !== undefined) {
+      if (typeof redirect_uri !== 'string' || redirect_uri.length > 500) {
+        return new Response(
+          JSON.stringify({ error: "redirect_uri must be a string with maximum 500 characters" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+      // Basic URL validation
+      try {
+        new URL(redirect_uri);
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "redirect_uri must be a valid URL" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    }
+    
+    // Validate code if provided - must be string, max 500 chars, alphanumeric with some special chars
+    if (code !== undefined) {
+      if (typeof code !== 'string' || code.length > 500) {
+        return new Response(
+          JSON.stringify({ error: "code must be a string with maximum 500 characters" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+      // OAuth codes are typically alphanumeric with dashes/underscores
+      if (!/^[a-zA-Z0-9_-]+$/.test(code)) {
+        return new Response(
+          JSON.stringify({ error: "code contains invalid characters" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    }
+    
     console.log(`Action requested: ${action}`);
     
     // Create a Supabase client with the service role key
@@ -106,6 +161,7 @@ serve(async (req) => {
       return await revokeAccess(supabase, userId);
     }
 
+    // This should not be reached due to validation above, but kept as fallback
     console.log("Invalid request action");
     return new Response(
       JSON.stringify({ error: "Invalid request" }),
