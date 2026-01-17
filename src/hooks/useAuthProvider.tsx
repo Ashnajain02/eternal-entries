@@ -97,30 +97,17 @@ export const useAuthProvider = () => {
     try {
       console.log('Starting sign out process...');
       
-      // First clear the local auth state immediately
+      // Clear local auth state immediately
       setAuthState({
         session: null,
         user: null,
         loading: false,
       });
       
-      // Check if there's an active session before attempting to sign out
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        // Sign out globally to invalidate the session on the server
-        const { error } = await supabase.auth.signOut({ scope: 'global' });
-        
-        if (error) {
-          console.error('Sign out error:', error);
-          // Don't throw for session-related errors
-          if (!error.message?.includes('session') && !error.message?.includes('Session')) {
-            throw error;
-          }
-        }
-      } else {
-        console.log('No active session found, clearing local state only');
-      }
+      // Use scope: 'local' to clear localStorage tokens
+      // This works even if the server session is already expired/invalid
+      // and prevents the session from being restored on page refresh
+      await supabase.auth.signOut({ scope: 'local' });
       
       console.log('Sign out completed successfully');
       toast({
@@ -130,7 +117,8 @@ export const useAuthProvider = () => {
     } catch (error: any) {
       console.error('Sign out error:', error);
       
-      // Even if there's an error, we already cleared local state above
+      // Even on error, the local state is already cleared
+      // Show success since the user wanted to sign out
       toast({
         title: "Signed out",
         description: "You've been signed out successfully.",
