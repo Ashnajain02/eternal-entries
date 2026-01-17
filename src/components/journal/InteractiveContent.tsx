@@ -72,21 +72,36 @@ const InteractiveContent: React.FC<InteractiveContentProps> = ({
     const taskItems = doc.querySelectorAll('li[data-type="taskItem"]');
     taskItems.forEach((li) => {
       const isChecked = li.getAttribute('data-checked') === 'true';
-      const checkbox = li.querySelector('input[type="checkbox"]');
+      
+      // Look for existing checkbox (could be inside a label or direct child)
+      let checkbox = li.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+      let label = li.querySelector('label');
       
       if (checkbox) {
-        (checkbox as HTMLInputElement).checked = isChecked;
-        // Remove disabled attribute if present
+        // Checkbox exists - just update its state
+        checkbox.checked = isChecked;
         checkbox.removeAttribute('disabled');
-      } else {
-        // If no checkbox exists, create one (for backward compatibility)
-        const label = doc.createElement('label');
+      } else if (!label) {
+        // No checkbox and no label - create one (backward compatibility only)
+        label = doc.createElement('label');
         label.contentEditable = 'false';
         const input = doc.createElement('input');
         input.type = 'checkbox';
         input.checked = isChecked;
         label.appendChild(input);
         li.insertBefore(label, li.firstChild);
+      }
+      
+      // Apply visual styling for checked state to the content div
+      const contentDiv = li.querySelector(':scope > div');
+      if (contentDiv) {
+        if (isChecked) {
+          (contentDiv as HTMLElement).style.textDecoration = 'line-through';
+          (contentDiv as HTMLElement).style.color = 'hsl(var(--muted-foreground))';
+        } else {
+          (contentDiv as HTMLElement).style.textDecoration = 'none';
+          (contentDiv as HTMLElement).style.color = '';
+        }
       }
     });
 
