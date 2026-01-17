@@ -12,48 +12,58 @@ serve(async (req: Request) => {
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders });
   }
   
   try {
-    // Check environment
-    console.log("Environment check on startup:");
-    console.log(`SUPABASE_URL available: ${!!Deno.env.get("SUPABASE_URL")}`);
-    console.log(`SUPABASE_ANON_KEY available: ${!!Deno.env.get("SUPABASE_ANON_KEY")}`);
-    console.log(`SUPABASE_SERVICE_ROLE_KEY available: ${!!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`);
-
     // Get the auth token from the request
-    console.log("Auth header present:", !!req.headers.get("Authorization"));
-    
     const authHeader = req.headers.get("Authorization") || "";
-    console.log("Raw auth header:", authHeader);
     
     // Extract the token part (removes "Bearer " prefix if present)
     const token = authHeader.replace(/^Bearer\s/, "").trim();
-    console.log(`Token extracted, length: ${token.length}`);
-    console.log(`Token first 20 chars: ${token.substring(0, 20)}...`);
+    
+    if (!token) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Authorization token required"
+        }),
+        { 
+          status: 401,
+          headers: { "Content-Type": "application/json", ...corsHeaders }
+        }
+      );
+    }
     
     // Create Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get user data from token
-    console.log("Attempting to get user from token");
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-    if (userError) {
-      console.error(`Failed to get user: ${userError.message}`);
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing Supabase configuration");
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Failed to verify token: " + userError.message,
-          tokenInfo: {
-            length: token.length,
-            preview: token.substring(0, 10) + "..."
-          }
+          error: "Server configuration error"
+        }),
+        { 
+          status: 500,
+          headers: { "Content-Type": "application/json", ...corsHeaders }
+        }
+      );
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get user data from token
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError) {
+      console.error("Token verification failed");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid or expired token"
         }),
         { 
           status: 401,
@@ -63,15 +73,10 @@ serve(async (req: Request) => {
     }
 
     if (!user) {
-      console.error("No user found for the provided token");
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Auth session missing!",
-          tokenInfo: {
-            length: token.length,
-            preview: token.substring(0, 10) + "..."
-          }
+          error: "User not found"
         }),
         { 
           status: 401, 
@@ -80,7 +85,7 @@ serve(async (req: Request) => {
       );
     }
 
-    console.log(`User authenticated successfully: ${user.id}`);
+    console.log("User authenticated successfully");
 
     // Return success with user data
     return new Response(
@@ -98,11 +103,11 @@ serve(async (req: Request) => {
     );
 
   } catch (error) {
-    console.error(`Unexpected error: ${error.message}`);
+    console.error("Unexpected error in auth-test");
     return new Response(
       JSON.stringify({
         success: false,
-        error: `Server error: ${error.message}`
+        error: "Server error"
       }),
       {
         status: 500,
