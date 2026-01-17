@@ -99,24 +99,33 @@ const Archive = () => {
         (entry.track?.artist?.toLowerCase().includes(lowercaseQuery))
       );
     } else if (searchMode === 'specificDate') {
-      if (selectedMonth !== null && selectedDay !== null) {
-        const month = parseInt(selectedMonth);
-        const day = parseInt(selectedDay);
-        
+      // Filter by any combination of month, day, year
+      const hasMonth = selectedMonth !== null;
+      const hasDay = selectedDay !== null;
+      const hasYear = selectedYear !== null && selectedYear !== "any";
+      
+      // Only filter if at least one criteria is selected
+      if (hasMonth || hasDay || hasYear) {
         filtered = entries.filter(entry => {
           const entryDate = parseEntryDate(entry);
           
-          const monthMatches = entryDate.getMonth() === month;
-          const dayMatches = entryDate.getDate() === day;
-          
-          // If year is selected and it's not "any", filter by exact date
-          if (selectedYear !== null && selectedYear !== "any") {
-            const year = parseInt(selectedYear);
-            return monthMatches && dayMatches && entryDate.getFullYear() === year;
+          // Check each criteria only if it's set
+          if (hasMonth) {
+            const month = parseInt(selectedMonth);
+            if (entryDate.getMonth() !== month) return false;
           }
           
-          // Otherwise, filter by month and day across all years
-          return monthMatches && dayMatches;
+          if (hasDay) {
+            const day = parseInt(selectedDay);
+            if (entryDate.getDate() !== day) return false;
+          }
+          
+          if (hasYear) {
+            const year = parseInt(selectedYear);
+            if (entryDate.getFullYear() !== year) return false;
+          }
+          
+          return true;
         });
       }
     }
@@ -137,13 +146,32 @@ const Archive = () => {
       return `Entries from ${currentMonthName} ${currentDay} in Previous Years`;
     } else if (searchMode === 'keyword' && searchQuery.trim()) {
       return `Search Results for "${searchQuery}"`;
-    } else if (searchMode === 'specificDate' && selectedMonth !== null && selectedDay !== null) {
-      const monthName = format(new Date(2000, parseInt(selectedMonth), 1), 'MMMM');
+    } else if (searchMode === 'specificDate') {
+      const hasMonth = selectedMonth !== null;
+      const hasDay = selectedDay !== null;
+      const hasYear = selectedYear !== null && selectedYear !== "any";
       
-      if (selectedYear !== null && selectedYear !== "any") {
-        return `Entries from ${monthName} ${selectedDay}, ${selectedYear}`;
+      if (!hasMonth && !hasDay && !hasYear) {
+        return "Journal Archive";
       }
-      return `Entries from ${monthName} ${selectedDay} Across the Years`;
+      
+      const parts: string[] = [];
+      
+      if (hasMonth) {
+        const monthName = format(new Date(2000, parseInt(selectedMonth), 1), 'MMMM');
+        parts.push(monthName);
+      }
+      
+      if (hasDay) {
+        parts.push(selectedDay!);
+      }
+      
+      if (hasYear) {
+        parts.push(selectedYear!);
+      }
+      
+      const dateStr = parts.join(' ');
+      return `Entries from ${dateStr}`;
     }
     
     return "Journal Archive";
