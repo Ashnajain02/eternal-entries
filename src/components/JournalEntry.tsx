@@ -43,7 +43,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [hasClickedToPlay, setHasClickedToPlay] = useState(false);
-  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
+  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry, updateEntryContent } = useJournal();
   const { toast } = useToast();
   const { authState } = useAuth();
 
@@ -127,11 +127,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     await updateEntry(updatedEntry);
   };
 
-  // Handle interactive content changes (e.g., checkbox toggles)
+  // Handle interactive content changes (e.g., checkbox toggles) - silent update
   const handleContentChange = useCallback(async (newContent: string) => {
-    const updatedEntry = { ...entry, content: newContent };
-    await updateEntry(updatedEntry);
-  }, [entry, updateEntry]);
+    await updateEntryContent(entry.id, newContent);
+  }, [entry.id, updateEntryContent]);
 
   const handleSpotifyPlayerClick = () => {
     setHasClickedToPlay(true);

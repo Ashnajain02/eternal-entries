@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface InteractiveContentProps {
@@ -10,6 +10,7 @@ interface InteractiveContentProps {
 /**
  * Renders journal entry HTML content with interactive checkboxes for task items.
  * When a checkbox is toggled, the HTML is updated and onContentChange is called.
+ * Users can only check/uncheck existing todos - not add or remove them.
  */
 const InteractiveContent: React.FC<InteractiveContentProps> = ({
   content,
@@ -17,6 +18,12 @@ const InteractiveContent: React.FC<InteractiveContentProps> = ({
   className
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [localContent, setLocalContent] = useState(content);
+
+  // Update local content when prop changes
+  useEffect(() => {
+    setLocalContent(content);
+  }, [content]);
 
   const handleCheckboxChange = useCallback((e: Event) => {
     const target = e.target as HTMLInputElement;
@@ -35,6 +42,11 @@ const InteractiveContent: React.FC<InteractiveContentProps> = ({
 
     // Get the updated HTML
     const newContent = container.innerHTML;
+    
+    // Update local state immediately for responsive UI
+    setLocalContent(newContent);
+    
+    // Persist the change
     onContentChange(newContent);
   }, [onContentChange]);
 
@@ -54,7 +66,7 @@ const InteractiveContent: React.FC<InteractiveContentProps> = ({
   const processedContent = useCallback(() => {
     // Parse the HTML and make checkboxes interactive
     const parser = new DOMParser();
-    const doc = parser.parseFromString(content, 'text/html');
+    const doc = parser.parseFromString(localContent, 'text/html');
     
     // Find all task items and ensure checkboxes match data-checked state
     const taskItems = doc.querySelectorAll('li[data-type="taskItem"]');
@@ -79,7 +91,7 @@ const InteractiveContent: React.FC<InteractiveContentProps> = ({
     });
 
     return doc.body.innerHTML;
-  }, [content]);
+  }, [localContent]);
 
   return (
     <div
