@@ -108,15 +108,9 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (!supabaseUrl || !supabaseKey) {
-      console.error("Missing Supabase URL or key:", { 
-        hasUrl: !!supabaseUrl, 
-        hasKey: !!supabaseKey 
-      });
+      console.error("Missing Supabase configuration");
       return new Response(
-        JSON.stringify({ 
-          error: "Server configuration error",
-          details: "Missing Supabase URL or service role key"
-        }),
+        JSON.stringify({ error: "Server configuration error" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -143,7 +137,7 @@ serve(async (req) => {
     if (userError || !user) {
       console.error("Error getting user from token:", userError);
       return new Response(
-        JSON.stringify({ error: "Invalid authentication", details: userError?.message }),
+        JSON.stringify({ error: "Invalid authentication" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -162,10 +156,7 @@ serve(async (req) => {
     if (profileError || !profileData) {
       console.error("Error getting user profile:", profileError);
       return new Response(
-        JSON.stringify({ 
-          error: "Failed to retrieve user profile", 
-          details: profileError?.message 
-        }),
+        JSON.stringify({ error: "Failed to retrieve user profile" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -313,13 +304,9 @@ serve(async (req) => {
       { headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error) {
-    console.error("Error in Spotify search function:", error);
+    console.error("Error in Spotify search function:", error.message, error.stack);
     return new Response(
-      JSON.stringify({ 
-        error: "Server error", 
-        details: error.message,
-        stack: error.stack
-      }),
+      JSON.stringify({ error: "Search failed" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }

@@ -62,8 +62,6 @@ serve(async (req) => {
     // Create a Supabase client with the service role key
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    console.log(`Supabase URL available: ${Boolean(supabaseUrl)}`);
-    console.log(`Supabase Key available: ${Boolean(supabaseKey)}`);
 
     const supabase = createClient(
       supabaseUrl ?? "",
@@ -112,9 +110,9 @@ serve(async (req) => {
       { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error) {
-    console.error("Error in Spotify Auth function:", error);
+    console.error("Error in Spotify Auth function:", error.message);
     return new Response(
-      JSON.stringify({ error: "Server error", details: error.message }),
+      JSON.stringify({ error: "Server error" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
@@ -291,9 +289,9 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
     });
     
     if (error) {
-      console.error("Database error:", error);
+      console.error("Database error:", error.message);
       return new Response(
-        JSON.stringify({ error: "Database error", details: error.message }),
+        JSON.stringify({ error: "Failed to save Spotify data" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
