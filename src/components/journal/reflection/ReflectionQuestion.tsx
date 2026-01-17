@@ -1,14 +1,16 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCcw, X } from 'lucide-react';
+import { RefreshCcw, ChevronRight, X } from 'lucide-react';
 
 interface ReflectionQuestionProps {
   question: string;
   isEditing: boolean;
   isLoading: boolean;
   onRefresh: () => void;
+  onCycle: () => void;
   onClose: () => void;
+  totalQuestions: number;
+  currentIndex: number;
 }
 
 const ReflectionQuestion: React.FC<ReflectionQuestionProps> = ({
@@ -16,14 +18,36 @@ const ReflectionQuestion: React.FC<ReflectionQuestionProps> = ({
   isEditing,
   isLoading,
   onRefresh,
-  onClose
+  onCycle,
+  onClose,
+  totalQuestions,
+  currentIndex
 }) => {
   return (
     <div className={`flex justify-between items-start p-2 rounded-md ${!isEditing ? 'bg-muted/60' : ''}`}>
-      <div className="flex-1 font-medium text-left">
-        {question}
+      <div className="flex-1">
+        <div className="font-medium text-left">
+          {question}
+        </div>
+        {isEditing && totalQuestions > 1 && (
+          <div className="text-xs text-muted-foreground mt-1">
+            Question {currentIndex + 1} of {totalQuestions}
+          </div>
+        )}
       </div>
-      <div className="flex space-x-2 ml-2">
+      <div className="flex space-x-1 ml-2">
+        {isEditing && totalQuestions > 1 && (
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            onClick={onCycle} 
+            disabled={isLoading}
+            className="h-8 w-8 p-0"
+            title="Next question"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        )}
         {isEditing && (
           <Button 
             size="icon" 
@@ -31,6 +55,7 @@ const ReflectionQuestion: React.FC<ReflectionQuestionProps> = ({
             onClick={onRefresh} 
             disabled={isLoading}
             className="h-8 w-8 p-0"
+            title="Generate new questions"
           >
             <RefreshCcw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
@@ -40,6 +65,7 @@ const ReflectionQuestion: React.FC<ReflectionQuestionProps> = ({
           variant="ghost" 
           onClick={onClose}
           className="h-8 w-8 p-0"
+          title="Close"
         >
           <X className="h-4 w-4" />
         </Button>

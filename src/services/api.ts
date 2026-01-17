@@ -9,10 +9,11 @@ export const fetchWeatherData = async (lat: number, lon: number): Promise<Weathe
 };
 
 /**
- * Generate a reflection question for a journal entry using the Gemini AI
+ * Generate multiple reflection questions for a journal entry using the AI
+ * Returns an array of 10 unique questions
  */
-export const generateReflectionQuestion = async (content: string, mood: string, track?: { name: string; artist: string }): Promise<string> => {
-   console.log("inside generateReflectionQuestion function")
+export const generateReflectionQuestions = async (content: string, mood: string, track?: { name: string; artist: string }): Promise<string[]> => {
+  console.log("inside generateReflectionQuestions function");
   try {
     const { data, error } = await supabase.functions.invoke('generate-reflection', {
       body: { content, mood, track }
@@ -20,12 +21,12 @@ export const generateReflectionQuestion = async (content: string, mood: string, 
 
     if (error) {
       console.error('Supabase function error:', error);
-      throw new Error(error.message || 'Error generating reflection question');
+      throw new Error(error.message || 'Error generating reflection questions');
     }
 
-    return data.reflectionQuestion;
+    return data.reflectionQuestions || [data.reflectionQuestion];
   } catch (error: any) {
     console.error('Error calling generate-reflection:', error);
-    throw new Error('Failed to generate reflection question. Please try again later.');
+    throw new Error('Failed to generate reflection questions. Please try again later.');
   }
 };

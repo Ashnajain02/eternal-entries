@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { generateReflectionQuestion } from '@/services/api';
+import { generateReflectionQuestions } from '@/services/api';
 import ReflectionQuestion from './reflection/ReflectionQuestion';
 import ReflectionEditor from './reflection/ReflectionEditor';
 import ReflectionDisplay from './reflection/ReflectionDisplay';
@@ -29,12 +29,15 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
 }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [question, setQuestion] = useState(reflectionQuestion || '');
+  const [questions, setQuestions] = useState<string[]>(reflectionQuestion ? [reflectionQuestion] : []);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answer, setAnswer] = useState(reflectionAnswer || '');
   const [isEditing, setIsEditing] = useState(false);
   const [showModule, setShowModule] = useState(!!reflectionQuestion);
 
-  const generateQuestion = async () => {
+  const currentQuestion = questions[currentQuestionIndex] || '';
+
+  const generateQuestions = async () => {
     setIsLoading(true);
     try {
       // Include track information if available
@@ -44,16 +47,17 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
       } : undefined;
       
       // Use the API service to call the Supabase function
-      const generatedQuestion = await generateReflectionQuestion(entryContent, entryMood, trackInfo);
+      const generatedQuestions = await generateReflectionQuestions(entryContent, entryMood, trackInfo);
       
-      setQuestion(generatedQuestion);
+      setQuestions(generatedQuestions);
+      setCurrentQuestionIndex(0);
       setShowModule(true);
       setIsEditing(true);
     } catch (error) {
-      console.error('Error generating reflection question:', error);
+      console.error('Error generating reflection questions:', error);
       toast({
         title: 'Error generating reflection',
-        description: 'Could not generate a reflection question. Please try again.',
+        description: 'Could not generate reflection questions. Please try again.',
         variant: 'destructive'
       });
     } finally {
@@ -61,8 +65,14 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
     }
   };
 
+  const cycleQuestion = () => {
+    if (questions.length > 1) {
+      setCurrentQuestionIndex((prev) => (prev + 1) % questions.length);
+    }
+  };
+
   const saveReflection = async () => {
-    if (!question || !answer.trim()) {
+    if (!currentQuestion || !answer.trim()) {
       toast({
         title: 'Cannot save empty reflection',
         description: 'Please write your reflection before saving.',
@@ -76,7 +86,7 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
       const { error } = await supabase
         .from('journal_entries')
         .update({
-          reflection_question: question,
+          reflection_question: currentQuestion,
           reflection_answer: answer.trim(),
           updated_at: new Date().toISOString()
         })
@@ -117,7 +127,8 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
 
       if (error) throw error;
       
-      setQuestion('');
+      setQuestions([]);
+      setCurrentQuestionIndex(0);
       setAnswer('');
       setShowModule(false);
       onReflectionUpdate();
@@ -150,24 +161,28 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
     } else {
       // If there's a saved reflection, return to view mode
       setIsEditing(false);
-      setQuestion(reflectionQuestion || '');
+      setQuestions(reflectionQuestion ? [reflectionQuestion] : []);
+      setCurrentQuestionIndex(0);
       setAnswer(reflectionAnswer || '');
     }
   };
 
   if (!showModule) {
-    return <ReflectionTrigger onClick={generateQuestion} isLoading={isLoading} />;
+    return <ReflectionTrigger onClick={generateQuestions} isLoading={isLoading} />;
   }
 
   return (
     <div className="border border-border rounded-md p-4 mt-4 bg-muted/20">
       <div className="flex flex-col space-y-4">
         <ReflectionQuestion 
-          question={question}
+          question={currentQuestion}
           isEditing={isEditing}
           isLoading={isLoading}
-          onRefresh={generateQuestion}
+          onRefresh={generateQuestions}
+          onCycle={cycleQuestion}
           onClose={handleClose}
+          totalQuestions={questions.length}
+          currentIndex={currentQuestionIndex}
         />
         
         {isEditing ? (
