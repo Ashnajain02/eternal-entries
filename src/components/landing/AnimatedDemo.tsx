@@ -1,23 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Music, Calendar, ChevronRight } from 'lucide-react';
+import { Music, Calendar } from 'lucide-react';
 
 const journalText = "Today I realized how far I've come. Looking back at where I was a year ago, I barely recognize that version of myself. The growth has been slow but undeniable...";
 
 const pastEntries = [
-  { year: "2025", text: "Still figuring things out, but I'm hopeful about what's ahead.", mood: "😌" },
-  { year: "2024", text: "Everything feels uncertain right now. I hope future me has more answers.", mood: "😔" },
-  { year: "2023", text: "Just started this journey. Nervous but excited to see where it leads.", mood: "🤞" },
+  { year: "2025", text: "Still figuring things out, but I'm hopeful about what's ahead.", mood: "Content" },
+  { year: "2024", text: "Everything feels uncertain right now. I hope future me has more answers.", mood: "Anxious" },
+  { year: "2023", text: "Just started this journey. Nervous but excited to see where it leads.", mood: "Excited" },
 ];
 
 const AnimatedDemo = () => {
-  const [phase, setPhase] = useState(0); // 0: writing, 1: spotify, 2: past entries
+  const [phase, setPhase] = useState(0);
   const [typedText, setTypedText] = useState('');
   const [showCursor, setShowCursor] = useState(true);
   const [visibleEntries, setVisibleEntries] = useState(0);
 
-  // Typing animation
   useEffect(() => {
     if (phase === 0 && typedText.length < journalText.length) {
       const timeout = setTimeout(() => {
@@ -30,13 +29,11 @@ const AnimatedDemo = () => {
     }
   }, [typedText, phase]);
 
-  // Cursor blink
   useEffect(() => {
     const interval = setInterval(() => setShowCursor(prev => !prev), 530);
     return () => clearInterval(interval);
   }, []);
 
-  // Spotify phase
   useEffect(() => {
     if (phase === 1) {
       const timeout = setTimeout(() => setPhase(2), 2500);
@@ -44,7 +41,6 @@ const AnimatedDemo = () => {
     }
   }, [phase]);
 
-  // Past entries reveal
   useEffect(() => {
     if (phase === 2 && visibleEntries < pastEntries.length) {
       const timeout = setTimeout(() => {
@@ -63,7 +59,6 @@ const AnimatedDemo = () => {
 
   return (
     <div className="relative w-full max-w-lg mx-auto">
-      {/* Demo container */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -76,15 +71,14 @@ const AnimatedDemo = () => {
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">January 17, 2026</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">😊</span>
-          </div>
+          <span className="px-2.5 py-1 text-xs rounded-full bg-accent text-accent-foreground">
+            Reflective
+          </span>
         </div>
 
         {/* Content area */}
         <div className="p-5 min-h-[280px]">
           <AnimatePresence mode="wait">
-            {/* Phase 0: Writing */}
             {phase === 0 && (
               <motion.div
                 key="writing"
@@ -100,7 +94,6 @@ const AnimatedDemo = () => {
               </motion.div>
             )}
 
-            {/* Phase 1: Spotify */}
             {phase === 1 && (
               <motion.div
                 key="spotify"
@@ -126,12 +119,11 @@ const AnimatedDemo = () => {
                     <p className="text-sm font-medium text-foreground truncate">Sunset Lover</p>
                     <p className="text-xs text-muted-foreground truncate">Petit Biscuit</p>
                   </div>
-                  <span className="text-xs text-muted-foreground">♪ Playing</span>
+                  <span className="text-xs text-muted-foreground">Playing</span>
                 </motion.div>
               </motion.div>
             )}
 
-            {/* Phase 2: Past entries */}
             {phase === 2 && (
               <motion.div
                 key="past"
@@ -159,7 +151,9 @@ const AnimatedDemo = () => {
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-medium text-muted-foreground">{entry.year}</span>
-                      <span className="text-sm">{entry.mood}</span>
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-accent text-accent-foreground">
+                        {entry.mood}
+                      </span>
                     </div>
                     <p className="text-sm text-foreground/80 italic">"{entry.text}"</p>
                   </motion.div>
