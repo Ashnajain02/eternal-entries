@@ -104,10 +104,12 @@ export const useAuthProvider = () => {
         loading: false,
       });
       
-      // Then attempt to sign out from Supabase
-      const { error } = await supabase.auth.signOut();
+      // Sign out globally to invalidate the session on the server
+      // This ensures the session cannot be restored on page refresh
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       
       // If there's an error but it's related to session not found, that's okay
+      // The session is already gone, which is what we want
       if (error && !error.message.includes('session_not_found') && !error.message.includes('Session not found')) {
         console.error('Sign out error:', error);
         throw error;
@@ -129,7 +131,7 @@ export const useAuthProvider = () => {
       });
       
       // Only show error toast for non-session related errors
-      if (!error.message.includes('session') && !error.message.includes('Session')) {
+      if (!error.message?.includes('session') && !error.message?.includes('Session')) {
         toast({
           title: "Error",
           description: error.message || "Failed to sign out",
