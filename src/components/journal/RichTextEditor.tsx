@@ -303,23 +303,24 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           margin: 0;
         }
         /* Task list styles */
-        .tiptap ul.task-list {
+        .tiptap ul[data-type="taskList"] {
           list-style: none;
           padding-left: 0;
           margin: 0.5rem 0;
         }
-        .tiptap li.task-item {
+        .tiptap li[data-type="taskItem"] {
           display: flex;
           align-items: flex-start;
           gap: 0.5rem;
           margin: 0.25rem 0;
         }
-        .tiptap li.task-item > label {
+        .tiptap li[data-type="taskItem"] > label {
           display: flex;
           align-items: center;
-          margin-top: 0.125rem;
+          margin-top: 0.25rem;
+          flex-shrink: 0;
         }
-        .tiptap li.task-item > label > input[type="checkbox"] {
+        .tiptap li[data-type="taskItem"] > label > input[type="checkbox"] {
           width: 1rem;
           height: 1rem;
           border-radius: 0.25rem;
@@ -329,12 +330,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           appearance: none;
           -webkit-appearance: none;
           position: relative;
+          flex-shrink: 0;
         }
-        .tiptap li.task-item > label > input[type="checkbox"]:checked {
+        .tiptap li[data-type="taskItem"] > label > input[type="checkbox"]:checked {
           background: hsl(var(--primary));
           border-color: hsl(var(--primary));
         }
-        .tiptap li.task-item > label > input[type="checkbox"]:checked::after {
+        .tiptap li[data-type="taskItem"] > label > input[type="checkbox"]:checked::after {
           content: '';
           position: absolute;
           left: 3px;
@@ -345,9 +347,17 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           border-width: 0 2px 2px 0;
           transform: rotate(45deg);
         }
-        .tiptap li.task-item[data-checked="true"] > div {
+        .tiptap li[data-type="taskItem"] > div {
+          flex: 1;
+          min-width: 0;
+        }
+        .tiptap li[data-type="taskItem"][data-checked="true"] > div {
           text-decoration: line-through;
           opacity: 0.6;
+        }
+        /* Ensure cursor is visible */
+        .tiptap .ProseMirror-cursor {
+          border-left: 2px solid hsl(var(--foreground));
         }
       `}</style>
     </div>
