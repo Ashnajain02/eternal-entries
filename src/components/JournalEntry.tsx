@@ -175,20 +175,19 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           
           <div className="flex items-center justify-between sm:justify-end gap-3">
             {entry.weather && (
-              <div className="flex items-center gap-1.5 text-sm">
-                <span className="font-semibold text-foreground">{formatTemperature(entry.weather.temperature)}</span>
-                {entry.weather.description && (
-                  <>
-                    <span className="text-muted-foreground">·</span>
-                    <span className="text-muted-foreground capitalize">{entry.weather.description}</span>
-                  </>
-                )}
+              <div className="flex flex-col text-sm text-right">
                 {entry.weather.location && (
-                  <>
-                    <span className="text-muted-foreground">·</span>
-                    <span className="text-muted-foreground text-xs">{entry.weather.location}</span>
-                  </>
+                  <span className="text-muted-foreground text-xs">{entry.weather.location}</span>
                 )}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-foreground">{formatTemperature(entry.weather.temperature)}</span>
+                  {entry.weather.description && (
+                    <>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground capitalize">{entry.weather.description}</span>
+                    </>
+                  )}
+                </div>
               </div>
             )}
             {!isPreview && (
