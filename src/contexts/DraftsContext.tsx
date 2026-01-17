@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { encryptJournalEntry, decryptJournalEntry } from '@/utils/encryption';
 
-interface UseDraftsReturn {
+interface DraftsContextType {
   drafts: JournalEntry[];
   isLoadingDrafts: boolean;
   currentDraft: JournalEntry | null;
@@ -17,9 +17,20 @@ interface UseDraftsReturn {
   createNewDraft: () => JournalEntry;
   autoSaveDraft: (entry: JournalEntry, onIdChanged?: (newId: string) => void) => void;
   lastAutoSave: Date | null;
+  reloadDrafts: () => void;
 }
 
-export function useDrafts(): UseDraftsReturn {
+const DraftsContext = createContext<DraftsContextType | undefined>(undefined);
+
+export function useDrafts(): DraftsContextType {
+  const context = useContext(DraftsContext);
+  if (!context) {
+    throw new Error('useDrafts must be used within a DraftsProvider');
+  }
+  return context;
+}
+
+export function DraftsProvider({ children }: { children: React.ReactNode }) {
   const { authState } = useAuth();
   const { toast } = useToast();
   const [drafts, setDrafts] = useState<JournalEntry[]>([]);
@@ -95,6 +106,9 @@ export function useDrafts(): UseDraftsReturn {
       loadDrafts();
     } else {
       setDrafts([]);
+      // Clear mappings on logout
+      tempIdToRealIdRef.current = {};
+      createDraftInFlightRef.current = {};
     }
   }, [authState.user, loadDrafts]);
 
@@ -267,25 +281,35 @@ export function useDrafts(): UseDraftsReturn {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
+    // Check if this temp ID maps to a real ID
+    const realId = draftId.startsWith('draft-') ? tempIdToRealIdRef.current[draftId] : draftId;
+
     // If it's a temp draft that hasn't been saved yet, just clear it
-    if (draftId.startsWith('draft-')) {
+    if (draftId.startsWith('draft-') && !realId) {
       setCurrentDraft(null);
       currentDraftIdRef.current = null;
       return;
     }
 
+    const idToDelete = realId || draftId;
+
     try {
       const { error } = await supabase
         .from('journal_entries')
         .delete()
-        .eq('id', draftId);
+        .eq('id', idToDelete);
 
       if (error) throw error;
 
-      setDrafts(prev => prev.filter(d => d.id !== draftId));
-      if (currentDraft?.id === draftId) {
+      setDrafts(prev => prev.filter(d => d.id !== idToDelete && d.id !== draftId));
+      if (currentDraft?.id === idToDelete || currentDraft?.id === draftId) {
         setCurrentDraft(null);
         currentDraftIdRef.current = null;
+      }
+
+      // Clean up mapping
+      if (draftId.startsWith('draft-')) {
+        delete tempIdToRealIdRef.current[draftId];
       }
 
       toast({
@@ -316,9 +340,18 @@ export function useDrafts(): UseDraftsReturn {
       return;
     }
 
+    // Clear any pending auto-save
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    // Check if this temp ID maps to a real ID
+    const realId = entry.id.startsWith('draft-') ? tempIdToRealIdRef.current[entry.id] : null;
+    const actualId = realId || entry.id;
+    const isNewDraft = entry.id.startsWith('draft-') && !realId;
+
     try {
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
-      const isNewDraft = entry.id.startsWith('draft-');
 
       if (isNewDraft) {
         // Insert as published
@@ -345,6 +378,14 @@ export function useDrafts(): UseDraftsReturn {
 
         if (error) throw error;
         
+        // Add to journal context
+        const publishedEntry: JournalEntry = {
+          ...entry,
+          id: data.id,
+          createdAt: new Date(data.created_at).getTime(),
+        };
+        await addToContext(publishedEntry);
+
         // Clear from drafts list
         setDrafts(prev => prev.filter(d => d.id !== entry.id));
       } else {
@@ -366,18 +407,26 @@ export function useDrafts(): UseDraftsReturn {
             weather_location: entry.weather?.location,
             updated_at: new Date().toISOString()
           })
-          .eq('id', entry.id);
+          .eq('id', actualId);
 
         if (error) throw error;
 
+        // Add to journal context
+        const publishedEntry: JournalEntry = {
+          ...entry,
+          id: actualId,
+        };
+        await addToContext(publishedEntry);
+
         // Remove from drafts list
-        setDrafts(prev => prev.filter(d => d.id !== entry.id));
+        setDrafts(prev => prev.filter(d => d.id !== actualId && d.id !== entry.id));
       }
 
-      // Clear current draft
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
+      // Clean up
+      if (entry.id.startsWith('draft-')) {
+        delete tempIdToRealIdRef.current[entry.id];
       }
+
       setCurrentDraft(null);
       currentDraftIdRef.current = null;
 
@@ -420,7 +469,7 @@ export function useDrafts(): UseDraftsReturn {
     };
   }, []);
 
-  return {
+  const value: DraftsContextType = {
     drafts,
     isLoadingDrafts,
     currentDraft,
@@ -431,6 +480,13 @@ export function useDrafts(): UseDraftsReturn {
     clearCurrentDraft,
     createNewDraft,
     autoSaveDraft,
-    lastAutoSave
+    lastAutoSave,
+    reloadDrafts: loadDrafts
   };
+
+  return (
+    <DraftsContext.Provider value={value}>
+      {children}
+    </DraftsContext.Provider>
+  );
 }

@@ -10,7 +10,7 @@ import { Plus, Loader2, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useDrafts } from '@/hooks/useDrafts';
+import { useDrafts } from '@/contexts/DraftsContext';
 import { JournalEntry } from '@/types';
 
 const SPOTIFY_REDIRECT_KEY = 'spotify_redirect_from_journal';
