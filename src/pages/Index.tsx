@@ -6,13 +6,11 @@ import JournalEditor from '@/components/JournalEditor';
 import JournalEntryView from '@/components/JournalEntry';
 import LandingPage from '@/components/landing/LandingPage';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Plus, Loader2 } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Plus, Loader2, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
-// Keys for storage
 const DRAFT_STORAGE_KEY = 'journal_draft_entry';
 const SPOTIFY_REDIRECT_KEY = 'spotify_redirect_from_journal';
 
@@ -21,34 +19,27 @@ const Index = () => {
   const [isWriting, setIsWriting] = useState(false);
   const location = useLocation();
   
-  // Only access journal context if user is authenticated
-  const journalContext = authState.user ? useJournal() : null;
-  const { entries = [], isLoading = false, createNewEntry } = journalContext || {};
+  // Always call useJournal but only use its values when authenticated
+  const journalContext = useJournal();
+  const entries = authState.user ? (journalContext?.entries || []) : [];
+  const isLoading = authState.user ? (journalContext?.isLoading || false) : false;
+  const createNewEntry = journalContext?.createNewEntry;
   
-  // Check for existing draft on component mount
   useEffect(() => {
     const checkForDraft = () => {
-      // Only check for drafts if authenticated and not already in writing mode
       if (authState.user && !isWriting) {
         try {
-          // Check if we're returning from Spotify auth
           const redirectSource = localStorage.getItem(SPOTIFY_REDIRECT_KEY);
           if (redirectSource === 'journal_editor') {
-            // Automatically return to writing mode
             setIsWriting(true);
             return;
           }
           
-          // Otherwise, check for regular drafts
           const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
           if (savedDraft) {
             const parsedDraft = JSON.parse(savedDraft);
-            
-            // Verify it's from today to avoid showing old drafts
-            // Using en-CA locale to get YYYY-MM-DD format
             const today = new Date().toLocaleDateString('en-CA');
             if (parsedDraft && parsedDraft.date === today && parsedDraft.content?.trim()) {
-              console.log("Found valid draft from today, entering writing mode");
               setIsWriting(true);
             }
           }
@@ -59,7 +50,6 @@ const Index = () => {
       }
     };
     
-    // Small delay to ensure auth state is properly loaded
     const timer = setTimeout(checkForDraft, 100);
     return () => clearTimeout(timer);
   }, [authState.user, location, isWriting]);
@@ -72,68 +62,89 @@ const Index = () => {
     setIsWriting(false);
   };
 
-  // Show landing page for non-authenticated users
   if (!authState.user) {
     return <LandingPage />;
   }
 
-  // Show loading if auth is still loading
   if (authState.loading) {
     return (
       <Layout>
-        <div className="flex justify-center items-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       </Layout>
     );
   }
 
-  // Sort entries by timestamp, most recent first
   const sortedEntries = [...entries].sort((a, b) => 
     new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto space-y-8">
-        <div>
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl font-bold">Journal</h1>
-            
-            {!isWriting && (
-              <Button onClick={handleCreateNewEntry} className="flex items-center gap-1">
-                <Plus className="h-4 w-4" /> New Entry
-              </Button>
-            )}
-          </div>
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="flex items-center justify-between mb-10"
+        >
+          <h1 className="font-display text-4xl">Journal</h1>
           
-          {isLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : isWriting ? (
-            <JournalEditor onSave={handleFinishWriting} />
-          ) : sortedEntries.length > 0 ? (
-            <div className="space-y-6">
-              {sortedEntries.map(entry => {
-                console.log(`Entry ${entry.id} has track:`, !!entry.track);
-                return (
-                  <JournalEntryView key={entry.id} entry={entry} />
-                );
-              })}
-            </div>
-          ) : (
-            <Card className="p-6 text-center space-y-4 animated-gradient">
-              <h2 className="text-xl font-semibold">Start your journal</h2>
-              <p className="text-muted-foreground">
-                Capture your thoughts, the weather, and what you're listening to.
-              </p>
-              <Button onClick={handleCreateNewEntry}>
-                Write Your First Entry
-              </Button>
-            </Card>
+          {!isWriting && (
+            <Button 
+              onClick={handleCreateNewEntry} 
+              className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-5"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Entry
+            </Button>
           )}
-        </div>
+        </motion.div>
+        
+        {isLoading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : isWriting ? (
+          <JournalEditor onSave={handleFinishWriting} />
+        ) : sortedEntries.length > 0 ? (
+          <div className="space-y-6">
+            {sortedEntries.map((entry, index) => (
+              <motion.div
+                key={entry.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.05 }}
+              >
+                <JournalEntryView entry={entry} />
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center py-20"
+          >
+            <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center mx-auto mb-6">
+              <BookOpen className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <h2 className="font-display text-2xl mb-3">Start your journal</h2>
+            <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
+              Capture your thoughts, moods, and the music you're listening to. 
+              Your future self will thank you.
+            </p>
+            <Button 
+              onClick={handleCreateNewEntry}
+              className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-6"
+            >
+              Write Your First Entry
+            </Button>
+          </motion.div>
+        )}
       </div>
     </Layout>
   );

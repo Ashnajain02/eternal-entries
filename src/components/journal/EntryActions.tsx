@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Pencil, Trash } from 'lucide-react';
+import { Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,6 +12,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface EntryActionsProps {
   onEdit: () => void;
@@ -32,36 +38,45 @@ const EntryActions: React.FC<EntryActionsProps> = ({ onEdit, onDelete }) => {
 
   return (
     <>
-      <div className="flex gap-2">
-        <Button 
-          variant="outline" 
-          size="icon"
-          onClick={onEdit}
-          className="h-8 w-8 p-0 border border-primary/30"
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button 
-          variant="outline" 
-          size="icon" 
-          onClick={handleDelete}
-          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 border border-destructive/30"
-        >
-          <Trash className="h-4 w-4" />
-        </Button>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-32">
+          <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
+            <Pencil className="h-3.5 w-3.5 mr-2" />
+            Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem 
+            onClick={handleDelete} 
+            className="cursor-pointer text-destructive focus:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-2" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle className="font-display text-xl">Delete this entry?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your journal entry.
+              This action cannot be undone. This entry will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
