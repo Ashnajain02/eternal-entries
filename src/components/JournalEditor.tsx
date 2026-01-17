@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { JournalEntry } from '@/types';
 import JournalEditorContainer from './journal/JournalEditorContainer';
-import { useDrafts } from '@/hooks/useDrafts';
+import { useDrafts } from '@/contexts/DraftsContext';
 import { useJournal } from '@/contexts/JournalContext';
 
 interface JournalEditorProps {
