@@ -23,6 +23,10 @@ export default {
       }
     },
     extend: {
+      fontFamily: {
+        display: ['Cormorant Garamond', 'Georgia', 'serif'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -66,13 +70,6 @@ export default {
           'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))'
-        },
-        journal: {
-          purple: '#9b87f5',
-          dark: '#1A1F2C',
-          light: '#E5DEFF',
-          green: '#1DB954', // Spotify green
-          blue: '#0EA5E9', // For sky/weather
         },
       },
       borderRadius: {
