@@ -20,57 +20,63 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isAuthPage = location.pathname === '/auth';
 
   return (
-    <div className="min-h-screen bg-background antialiased">
-      <div className="fixed inset-x-0 top-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
+    <div className="min-h-screen bg-background">
+      <div className="fixed inset-x-0 top-0 border-b border-border/50 bg-background/80 backdrop-blur-sm z-50">
         <div className="container flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center font-semibold">
+          <Link to="/" className="font-display text-xl tracking-tight text-foreground">
             Eternal Entries
           </Link>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-6">
             {/* Only show navigation when NOT on auth page */}
             {!isAuthPage && (
-              <nav className="flex items-center space-x-2">
+              <nav className="flex items-center space-x-1">
                 <Link
                   to="/"
                   className={cn(
-                    "flex items-center gap-2 transition-colors",
+                    "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-all duration-200",
                     isActive("/")
-                      ? "text-primary font-medium"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "text-foreground bg-accent"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                   )}
                 >
                   <Notebook className="h-4 w-4" />
-                  <span>Journal</span>
+                  <span className="font-body">Journal</span>
                 </Link>
                 <Link
                   to="/archive"
                   className={cn(
-                    "flex items-center gap-2 transition-colors",
+                    "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-all duration-200",
                     isActive("/archive")
-                      ? "text-primary font-medium"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "text-foreground bg-accent"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                   )}
                 >
                   <Archive className="h-4 w-4" />
-                  <span>Archive</span>
+                  <span className="font-body">Archive</span>
                 </Link>
                 <Link
                   to="/stats"
                   className={cn(
-                    "flex items-center gap-2 transition-colors",
+                    "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-all duration-200",
                     isActive("/stats")
-                      ? "text-primary font-medium"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "text-foreground bg-accent"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                   )}
                 >
                   <BarChart3 className="h-4 w-4" />
-                  <span>Stats</span>
+                  <span className="font-body">Stats</span>
                 </Link>
-                <Link to="/settings" className={cn("flex items-center gap-2 transition-colors", 
-                  isActive("/settings") ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground"
-                )}>
+                <Link 
+                  to="/settings" 
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-all duration-200", 
+                    isActive("/settings") 
+                      ? "text-foreground bg-accent" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  )}
+                >
                   <Settings className="h-4 w-4" />
-                  <span>Settings</span>
+                  <span className="font-body">Settings</span>
                 </Link>
               </nav>
             )}
@@ -78,7 +84,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
       </div>
-      <main className="container pt-20 pb-12">{children}</main>
+      <main className="container pt-24 pb-16">{children}</main>
     </div>
   );
 };
