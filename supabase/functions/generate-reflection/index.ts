@@ -45,9 +45,9 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseServiceKey) {
       console.error("Missing Supabase configuration");
       return new Response(
         JSON.stringify({ error: 'Server configuration error' }),
@@ -55,14 +55,13 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
+    // Create admin client to verify JWT
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const token = authHeader.replace('Bearer ', '');
-    const { data, error: authError } = await supabase.auth.getClaims(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (authError || !data?.claims) {
+    if (authError || !user) {
       console.error("Auth validation failed:", authError?.message);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -70,7 +69,7 @@ serve(async (req) => {
       );
     }
 
-    const userId = data.claims.sub;
+    const userId = user.id;
     console.log("Authenticated user:", userId);
 
     // Get the Lovable API key from environment variables
