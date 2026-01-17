@@ -40,9 +40,8 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentDraftIdRef = useRef<string | null>(null);
 
-  // Prevent multiple inserts for the same "in-progress" temp draft
+  // Map temp IDs to real DB IDs (survives across component lifecycle but not page refresh)
   const tempIdToRealIdRef = useRef<Record<string, string>>({});
-  const createDraftInFlightRef = useRef<Record<string, Promise<string | null>>>({});
 
   // Load drafts from database
   const loadDrafts = useCallback(async () => {
@@ -108,7 +107,6 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
       setDrafts([]);
       // Clear mappings on logout
       tempIdToRealIdRef.current = {};
-      createDraftInFlightRef.current = {};
     }
   }, [authState.user, loadDrafts]);
 
@@ -131,7 +129,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
     return !!(textContent || entry.track || entry.mood !== 'neutral');
   };
 
-  // Save or update draft in database
+  // Save or update draft in database using upsert (prevents duplicates across refreshes)
   const saveDraft = useCallback(async (entry: JournalEntry): Promise<string | null> => {
     if (!authState.user) return null;
 
@@ -140,24 +138,6 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
 
     const isTempId = entry.id.startsWith('draft-');
     const tempId = isTempId ? entry.id : null;
-    const mappedId = tempId ? tempIdToRealIdRef.current[tempId] : null;
-
-    const buildDbPayload = (encryptedContent: string) => ({
-      user_id: authState.user!.id,
-      entry_text: encryptedContent,
-      mood: entry.mood,
-      status: 'draft',
-      spotify_track_uri: entry.track?.uri,
-      spotify_track_name: entry.track?.name,
-      spotify_track_artist: entry.track?.artist,
-      spotify_track_album: entry.track?.album,
-      spotify_track_image: entry.track?.albumArt,
-      weather_temperature: entry.weather?.temperature,
-      weather_description: entry.weather?.description,
-      weather_icon: entry.weather?.icon,
-      weather_location: entry.weather?.location,
-      timestamp_started: entry.timestamp
-    });
 
     try {
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
@@ -169,7 +149,8 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
         });
       };
 
-      const updateExisting = async (id: string) => {
+      // For real IDs (already in DB), just update by id
+      if (!isTempId) {
         const { error } = await supabase
           .from('journal_entries')
           .update({
@@ -186,70 +167,66 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
             weather_location: entry.weather?.location,
             updated_at: new Date().toISOString()
           })
-          .eq('id', id);
+          .eq('id', entry.id);
 
         if (error) throw error;
 
-        const saved: JournalEntry = { ...entry, id, updatedAt: Date.now() };
-        upsertDraftState(saved, tempId);
+        const saved: JournalEntry = { ...entry, updatedAt: Date.now() };
+        upsertDraftState(saved);
         setLastAutoSave(new Date());
-        return id;
+        return entry.id;
+      }
+
+      // For temp IDs: use upsert on (user_id, timestamp_started) to prevent duplicates
+      // This handles refreshes, navigation, and race conditions uniformly
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .upsert(
+          {
+            user_id: authState.user.id,
+            entry_text: encryptedEntry.content,
+            mood: entry.mood,
+            status: 'draft',
+            spotify_track_uri: entry.track?.uri || null,
+            spotify_track_name: entry.track?.name || null,
+            spotify_track_artist: entry.track?.artist || null,
+            spotify_track_album: entry.track?.album || null,
+            spotify_track_image: entry.track?.albumArt || null,
+            weather_temperature: entry.weather?.temperature ?? null,
+            weather_description: entry.weather?.description || null,
+            weather_icon: entry.weather?.icon || null,
+            weather_location: entry.weather?.location || null,
+            timestamp_started: entry.timestamp,
+            updated_at: new Date().toISOString()
+          },
+          {
+            onConflict: 'user_id,timestamp_started',
+            ignoreDuplicates: false
+          }
+        )
+        .select('id, created_at')
+        .single();
+
+      if (error) throw error;
+
+      const savedDraft: JournalEntry = {
+        ...entry,
+        id: data.id,
+        createdAt: new Date(data.created_at).getTime(),
+        updatedAt: Date.now()
       };
 
-      // If this temp id was already created earlier, just update the existing DB row
-      if (mappedId) {
-        return await updateExisting(mappedId);
-      }
-
-      // If we're still creating the DB row for this temp id, wait for it, then update
-      if (tempId && createDraftInFlightRef.current[tempId]) {
-        const realId = await createDraftInFlightRef.current[tempId];
-        if (!realId) return null;
-        tempIdToRealIdRef.current[tempId] = realId;
-        return await updateExisting(realId);
-      }
-
-      // Create new draft row (only once per temp id)
+      // Map temp id to real id for future reference
       if (tempId) {
-        const createPromise = (async (): Promise<string | null> => {
-          const { data, error } = await supabase
-            .from('journal_entries')
-            .insert([buildDbPayload(encryptedEntry.content)])
-            .select('id, created_at')
-            .single();
-
-          if (error) throw error;
-
-          const savedDraft: JournalEntry = {
-            ...entry,
-            id: data.id,
-            createdAt: new Date(data.created_at).getTime(),
-          };
-
-          upsertDraftState(savedDraft, tempId);
-          setCurrentDraft(savedDraft);
-          currentDraftIdRef.current = data.id;
-          setLastAutoSave(new Date());
-
-          return data.id;
-        })().catch((err) => {
-          console.error('Error creating draft:', err);
-          return null;
-        });
-
-        createDraftInFlightRef.current[tempId] = createPromise;
-        const realId = await createPromise;
-        delete createDraftInFlightRef.current[tempId];
-
-        if (realId) {
-          tempIdToRealIdRef.current[tempId] = realId;
-        }
-
-        return realId;
+        tempIdToRealIdRef.current[tempId] = data.id;
       }
 
-      // Non-temp IDs always update
-      return await updateExisting(entry.id);
+      upsertDraftState(savedDraft, tempId);
+      setCurrentDraft(savedDraft);
+      currentDraftIdRef.current = data.id;
+      setLastAutoSave(new Date());
+
+      return data.id;
     } catch (error: any) {
       console.error('Error saving draft:', error);
       return null;
