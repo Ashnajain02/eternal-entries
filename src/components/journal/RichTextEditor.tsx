@@ -113,12 +113,17 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         throw error;
       }
 
-      const { data: { publicUrl } } = supabase.storage
+      // Use signed URL for private bucket access
+      const { data: signedData, error: signedError } = await supabase.storage
         .from('journal-images')
-        .getPublicUrl(data.path);
+        .createSignedUrl(data.path, 31536000); // 1 year expiry for journal images
 
-      if (editor) {
-        editor.chain().focus().setImage({ src: publicUrl }).run();
+      if (signedError) {
+        throw signedError;
+      }
+
+      if (editor && signedData) {
+        editor.chain().focus().setImage({ src: signedData.signedUrl }).run();
       }
 
       toast({
