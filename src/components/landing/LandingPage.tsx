@@ -1,17 +1,12 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Calendar, Sparkles } from 'lucide-react';
+import AnimatedDemo from './AnimatedDemo';
 
 const LandingPage = () => {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   return (
     <div className="min-h-screen bg-background overflow-hidden">
       {/* Decorative Elements */}
@@ -54,7 +49,7 @@ const LandingPage = () => {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+      <div className="relative z-10">
         {/* Header */}
         <header className="container py-8">
           <motion.div
@@ -73,90 +68,204 @@ const LandingPage = () => {
         </header>
 
         {/* Hero Section */}
-        <main className="flex-1 container flex flex-col justify-center py-20">
-          <div className="max-w-3xl">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-            >
-              <span className="text-sm uppercase tracking-[0.2em] text-muted-foreground mb-6 block">
-                A personal journal
-              </span>
-            </motion.div>
-
-            <motion.h1
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              className="font-display text-5xl md:text-7xl lg:text-8xl leading-[0.95] tracking-tight mb-8"
-            >
-              Capture moments.
-              <br />
-              <span className="text-muted-foreground">Reflect deeply.</span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.5 }}
-              className="text-lg md:text-xl text-muted-foreground max-w-xl mb-12 leading-relaxed"
-            >
-              A quiet space to write, remember, and grow. Track your moods, 
-              anchor memories with music, and watch your story unfold over time.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.7 }}
-              className="flex flex-col sm:flex-row gap-4"
-            >
-              <Button 
-                asChild 
-                size="lg" 
-                className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-8 group"
+        <main className="container py-16 lg:py-24">
+          <div className="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center">
+            {/* Left: Text */}
+            <div>
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
               >
-                <Link to="/auth?tab=signup" className="flex items-center gap-2">
-                  Begin Writing
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-              </Button>
-            </motion.div>
+                <span className="text-sm uppercase tracking-[0.2em] text-muted-foreground mb-6 block">
+                  A journaling experience
+                </span>
+              </motion.div>
+
+              <motion.h1
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.3 }}
+                className="font-display text-4xl md:text-5xl lg:text-6xl leading-[1.1] tracking-tight mb-6"
+              >
+                Write today.
+                <br />
+                <span className="text-muted-foreground">Revisit tomorrow.</span>
+                <br />
+                <span className="italic">Grow forever.</span>
+              </motion.h1>
+
+              <motion.p
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.5 }}
+                className="text-base md:text-lg text-muted-foreground max-w-md mb-8 leading-relaxed"
+              >
+                Eternal Entries is more than a journal—it's a mirror that reflects your growth. 
+                See what you wrote on this exact day in years past. Watch patterns emerge. 
+                Celebrate how far you've come.
+              </motion.p>
+
+              {/* Key feature callouts */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.6 }}
+                className="flex flex-col gap-3 mb-10"
+              >
+                <div className="flex items-center gap-3 text-sm">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <span className="text-foreground">"On this day" memories from previous years</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="text-foreground">Watch your personal evolution unfold</span>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.7 }}
+                className="flex flex-col sm:flex-row gap-4"
+              >
+                <Button 
+                  asChild 
+                  size="lg" 
+                  className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-8 group"
+                >
+                  <Link to="/auth?tab=signup" className="flex items-center gap-2">
+                    Start Your Journey
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+              </motion.div>
+            </div>
+
+            {/* Right: Animated Demo */}
+            <div className="order-first lg:order-last">
+              <AnimatedDemo />
+            </div>
           </div>
         </main>
 
-        {/* Bottom Section - Features hint */}
+        {/* Value Proposition Section */}
+        <section className="container py-20 border-t border-border">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="max-w-3xl mx-auto text-center"
+          >
+            <h2 className="font-display text-3xl md:text-4xl mb-6">
+              Your past self has wisdom to share
+            </h2>
+            <p className="text-muted-foreground text-lg leading-relaxed mb-12">
+              Most journals collect dust. Eternal Entries brings your words back to life. 
+              Every day, you'll see what you wrote on this day in previous years—creating 
+              a conversation across time with yourself.
+            </p>
+
+            <div className="grid md:grid-cols-3 gap-8 text-left">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="space-y-3"
+              >
+                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                  <span className="font-display text-lg">1</span>
+                </div>
+                <h3 className="font-display text-xl">Write</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Capture your thoughts, moods, and the music you're listening to. 
+                  Make each moment memorable.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="space-y-3"
+              >
+                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                  <span className="font-display text-lg">2</span>
+                </div>
+                <h3 className="font-display text-xl">Revisit</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  "On this day" memories surface automatically, showing you 
+                  where you were mentally in years past.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="space-y-3"
+              >
+                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                  <span className="font-display text-lg">3</span>
+                </div>
+                <h3 className="font-display text-xl">Grow</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Watch your evolution unfold. Celebrate progress. 
+                  Learn from patterns you couldn't see before.
+                </p>
+              </motion.div>
+            </div>
+          </motion.div>
+        </section>
+
+        {/* Features Footer */}
         <motion.footer
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 1 }}
-          className="container pb-12"
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1 }}
+          className="container py-12 border-t border-border"
         >
-          <div className="flex flex-wrap gap-x-12 gap-y-4 text-sm text-muted-foreground">
-            <span>Mood Tracking</span>
-            <span className="text-border">·</span>
-            <span>Weather Context</span>
-            <span className="text-border">·</span>
-            <span>Spotify Integration</span>
-            <span className="text-border">·</span>
-            <span>AI Reflections</span>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm text-muted-foreground">
+              <span>Mood Tracking</span>
+              <span className="hidden md:inline text-border">·</span>
+              <span>Weather Context</span>
+              <span className="hidden md:inline text-border">·</span>
+              <span>Spotify Integration</span>
+              <span className="hidden md:inline text-border">·</span>
+              <span>AI Reflections</span>
+            </div>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="rounded-full"
+            >
+              <Link to="/auth?tab=signup">
+                Begin Writing Free
+              </Link>
+            </Button>
           </div>
         </motion.footer>
-      </div>
 
-      {/* Animated Quote */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.5, delay: 1.2 }}
-        className="fixed bottom-8 right-8 max-w-xs text-right hidden lg:block"
-      >
-        <p className="font-display text-lg italic text-muted-foreground/60 leading-relaxed">
-          "The unexamined life is not worth living."
-        </p>
-        <p className="text-xs text-muted-foreground/40 mt-2 tracking-wide">— Socrates</p>
-      </motion.div>
+        {/* Quote */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.5 }}
+          className="container py-16 text-center"
+        >
+          <p className="font-display text-2xl md:text-3xl italic text-muted-foreground/60 max-w-2xl mx-auto leading-relaxed">
+            "The unexamined life is not worth living."
+          </p>
+          <p className="text-sm text-muted-foreground/40 mt-4 tracking-wide">— Socrates</p>
+        </motion.div>
+      </div>
     </div>
   );
 };
