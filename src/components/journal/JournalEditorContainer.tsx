@@ -10,10 +10,9 @@ import SpotifySection from './SpotifySection';
 import { useJournalDraft } from '@/hooks/useJournalDraft';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { useSpotifyConnection } from '@/hooks/useSpotifyConnection';
-import { useJournalEditorState } from '@/hooks/useJournalEditorState';
 import MoodSelector from '@/components/MoodSelector';
-import AutoResizeTextarea from '@/components/AutoResizeTextarea';
 import WeatherDisplay from '@/components/WeatherDisplay';
+import RichTextEditor from './RichTextEditor';
 import { motion } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 
@@ -32,7 +31,6 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   const { entry, setEntry, saveDraft, saveImmediately, clearDraft, markAsSaved, lastAutoSave } = useJournalDraft(initialEntry, createNewEntry);
   const { 
     weatherData, 
-    setWeatherData, 
     isLoadingWeather, 
     locationError, 
     handleGetWeather 
@@ -40,22 +38,9 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   
   const { spotifyConnected, handleSpotifyConnect } = useSpotifyConnection();
   
-  const {
-    content,
-    setContent,
-    selectedMood,
-    setSelectedMood,
-    selectedTrack,
-    setSelectedTrack,
-    getEntryData
-  } = useJournalEditorState({
-    initialEntry,
-    entry,
-    weatherData,
-    saveDraft,
-    saveImmediately
-  });
-  
+  const [content, setContent] = useState(initialEntry?.content || entry.content || '');
+  const [selectedMood, setSelectedMood] = useState(initialEntry?.mood || entry.mood || 'neutral');
+  const [selectedTrack, setSelectedTrack] = useState(initialEntry?.track || entry.track);
   const [isSaving, setIsSaving] = useState(false);
   
   useEffect(() => {
@@ -71,6 +56,18 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
     }
   }, [entry, setEntry]);
 
+  // Auto-save draft
+  useEffect(() => {
+    const draftEntry: JournalEntry = {
+      ...entry,
+      content,
+      mood: selectedMood,
+      track: selectedTrack,
+      weather: weatherData || undefined,
+    };
+    saveDraft(draftEntry);
+  }, [content, selectedMood, selectedTrack, weatherData, saveDraft, entry]);
+
   const entryDate = entry.date
     ? new Date(entry.date + 'T00:00:00')
     : new Date();
@@ -79,7 +76,9 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   const formattedYear = format(entryDate, 'yyyy');
 
   const handleSave = async () => {
-    if (!content.trim()) {
+    // Strip HTML tags to check if there's actual content
+    const textContent = content.replace(/<[^>]*>/g, '').trim();
+    if (!textContent) {
       toast({
         title: "Cannot save empty entry",
         description: "Please write something in your journal before saving.",
@@ -126,7 +125,8 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   };
   
   const handleCancel = () => {
-    if (content.trim() && (!initialEntry || initialEntry.id.startsWith('temp-'))) {
+    const textContent = content.replace(/<[^>]*>/g, '').trim();
+    if (textContent && (!initialEntry || initialEntry.id.startsWith('temp-'))) {
       const confirmCancel = window.confirm("You have unsaved changes. Discard this entry?");
       if (!confirmCancel) return;
       clearDraft();
@@ -139,8 +139,11 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
 
   const handleSpotifyConnectClick = () => {
     const entryData = {
-      ...getEntryData(),
       ...entry,
+      content,
+      mood: selectedMood,
+      track: selectedTrack,
+      weather: weatherData,
       timestamp: entry.timestamp || new Date().toISOString()
     };
     
@@ -203,14 +206,12 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
         <MoodSelector selectedMood={selectedMood} onChange={setSelectedMood} />
       </div>
       
-      {/* Content */}
+      {/* Content - Rich Text Editor */}
       <div className="px-6 py-6">
-        <AutoResizeTextarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
+        <RichTextEditor
+          content={content}
+          onChange={setContent}
           placeholder="What's on your mind today..."
-          className="w-full resize-none bg-transparent border-0 p-0 text-foreground leading-relaxed focus:outline-none focus:ring-0 font-body text-base"
-          minHeight="200px"
         />
       </div>
       

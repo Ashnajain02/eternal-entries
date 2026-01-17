@@ -2,12 +2,6 @@
 import React from 'react';
 import { Mood, MoodOption } from '@/types';
 import { cn } from '@/lib/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from "@/components/ui/tooltip";
 
 interface MoodSelectorProps {
   selectedMood: Mood;
@@ -17,44 +11,36 @@ interface MoodSelectorProps {
 
 const MoodSelector: React.FC<MoodSelectorProps> = ({ selectedMood, onChange, className }) => {
   const moodOptions: MoodOption[] = [
-    { value: 'happy', label: 'Happy', emoji: '😄' },
-    { value: 'sad', label: 'Sad', emoji: '😔' },
-    { value: 'neutral', label: 'Neutral', emoji: '😐' },
-    { value: 'angry', label: 'Angry', emoji: '😠' },
-    { value: 'emotional', label: 'Emotional', emoji: '🥹' },
-    { value: 'in-love', label: 'In Love', emoji: '😍' },
-    { value: 'anxious', label: 'Anxious', emoji: '😰' },
-    { value: 'excited', label: 'Excited', emoji: '🤩' },
-    { value: 'tired', label: 'Tired', emoji: '😴' },
+    { value: 'happy', label: 'Happy' },
+    { value: 'content', label: 'Content' },
+    { value: 'neutral', label: 'Neutral' },
+    { value: 'sad', label: 'Sad' },
+    { value: 'anxious', label: 'Anxious' },
+    { value: 'angry', label: 'Angry' },
+    { value: 'emotional', label: 'Emotional' },
+    { value: 'in-love', label: 'In Love' },
+    { value: 'excited', label: 'Excited' },
+    { value: 'tired', label: 'Tired' },
   ];
 
   return (
     <div className={cn("flex flex-col sm:flex-row sm:items-center gap-3", className)}>
       <p className="text-sm text-muted-foreground">How are you feeling?</p>
       <div className="flex flex-wrap gap-2">
-        <TooltipProvider>
-          {moodOptions.map((mood) => (
-            <Tooltip key={mood.value}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => onChange(mood.value)}
-                  className={cn(
-                    "text-xl p-1.5 rounded-md transition-all duration-200",
-                    selectedMood === mood.value 
-                      ? "bg-accent scale-110" 
-                      : "hover:bg-accent/50 opacity-60 hover:opacity-100"
-                  )}
-                  aria-label={`Select mood: ${mood.label}`}
-                >
-                  {mood.emoji}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                {mood.label}
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </TooltipProvider>
+        {moodOptions.map((mood) => (
+          <button
+            key={mood.value}
+            onClick={() => onChange(mood.value)}
+            className={cn(
+              "px-3 py-1.5 text-sm rounded-full border transition-all duration-200",
+              selectedMood === mood.value 
+                ? "bg-foreground text-background border-foreground" 
+                : "bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground"
+            )}
+          >
+            {mood.label}
+          </button>
+        ))}
       </div>
     </div>
   );

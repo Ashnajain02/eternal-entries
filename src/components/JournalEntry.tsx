@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { JournalEntry as JournalEntryType } from '@/types';
+import { JournalEntry as JournalEntryType, Mood } from '@/types';
 import { cn } from '@/lib/utils';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditor from './JournalEditor';
@@ -17,6 +17,20 @@ interface JournalEntryProps {
   className?: string;
   isPreview?: boolean;
 }
+
+// Mood labels without emojis
+const moodLabels: Record<Mood, string> = {
+  'happy': 'Happy',
+  'content': 'Content',
+  'neutral': 'Neutral',
+  'sad': 'Sad',
+  'anxious': 'Anxious',
+  'angry': 'Angry',
+  'emotional': 'Emotional',
+  'in-love': 'In Love',
+  'excited': 'Excited',
+  'tired': 'Tired'
+};
 
 const JournalEntryView: React.FC<JournalEntryProps> = ({ 
   entry, 
@@ -77,16 +91,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const handleSpotifyPlayerClick = () => {
     setHasClickedToPlay(true);
   };
-
-  // Get mood emoji
-  const getMoodEmoji = (mood: string) => {
-    const moods: Record<string, string> = {
-      'happy': '😄', 'sad': '😔', 'neutral': '😐', 'angry': '😠',
-      'emotional': '🥹', 'in-love': '😍', 'anxious': '😰', 
-      'excited': '🤩', 'tired': '😴'
-    };
-    return moods[mood] || '😐';
-  };
   
   if (isEditing) {
     return <JournalEditor entry={entry} onSave={() => setIsEditing(false)} />;
@@ -117,7 +121,9 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
               )}
             </div>
           </div>
-          <span className="text-2xl">{getMoodEmoji(entry.mood)}</span>
+          <span className="px-2.5 py-1 text-xs rounded-full bg-accent text-accent-foreground">
+            {moodLabels[entry.mood] || entry.mood}
+          </span>
         </div>
         
         <div className="flex items-center gap-3">
@@ -156,9 +162,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             transition: 'filter 0.8s ease, opacity 0.8s ease',
           }}
         >
-          <p className="text-foreground leading-relaxed whitespace-pre-wrap font-body">
-            {entry.content}
-          </p>
+          <div 
+            className="prose prose-sm max-w-none text-foreground"
+            dangerouslySetInnerHTML={{ __html: entry.content }}
+          />
         </div>
         
         {entry.track && !hasClickedToPlay && (

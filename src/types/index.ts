@@ -4,7 +4,6 @@ export type Mood = 'happy' | 'content' | 'neutral' | 'sad' | 'anxious' | 'angry'
 export interface MoodOption {
   value: Mood;
   label: string;
-  emoji: string;
 }
 
 export type TemperatureUnit = 'celsius' | 'fahrenheit';
