@@ -5,10 +5,8 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import { TaskList } from './extensions/TaskList';
-import { TaskItem } from './extensions/TaskItem';
 import { Button } from '@/components/ui/button';
-import { Bold, Italic, Underline as UnderlineIcon, ImagePlus, List, ListOrdered, ListTodo } from 'lucide-react';
+import { Bold, Italic, Underline as UnderlineIcon, ImagePlus, List, ListOrdered } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -61,17 +59,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       Placeholder.configure({
         placeholder,
         emptyEditorClass: 'is-editor-empty',
-      }),
-      TaskList.configure({
-        HTMLAttributes: {
-          class: 'task-list',
-        },
-      }),
-      TaskItem.configure({
-        nested: true,
-        HTMLAttributes: {
-          class: 'task-item',
-        },
       }),
     ],
     content,
@@ -231,19 +218,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         >
           <ListOrdered className="h-4 w-4" />
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => editor.commands.toggleTaskList()}
-          className={cn(
-            "h-8 w-8 p-0",
-            editor.isActive('taskList') && "bg-accent"
-          )}
-          title="Todo List"
-        >
-          <ListTodo className="h-4 w-4" />
-        </Button>
         <div className="w-px h-5 bg-border mx-1" />
         <Button
           type="button"
@@ -286,7 +260,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           border-radius: 0.375rem;
           margin: 1rem 0;
         }
-        .tiptap ul:not(.task-list) {
+        .tiptap ul {
           list-style-type: disc;
           padding-left: 1.25rem;
           margin: 0.5rem 0;
@@ -296,39 +270,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           padding-left: 1.25rem;
           margin: 0.5rem 0;
         }
-        .tiptap li:not(.task-item) {
+        .tiptap li {
           margin: 0.25rem 0;
         }
         .tiptap li p {
           margin: 0;
-        }
-        .tiptap ul[data-type="taskList"] {
-          list-style: none;
-          padding-left: 0;
-          margin: 0.5rem 0;
-        }
-        .tiptap ul[data-type="taskList"] li {
-          display: flex;
-          align-items: flex-start;
-          gap: 0.5rem;
-          margin: 0.25rem 0;
-        }
-        .tiptap ul[data-type="taskList"] li > label {
-          flex-shrink: 0;
-          margin-top: 0.125rem;
-        }
-        .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
-          cursor: pointer;
-          width: 1rem;
-          height: 1rem;
-          accent-color: hsl(var(--primary));
-        }
-        .tiptap ul[data-type="taskList"] li > div {
-          flex: 1;
-        }
-        .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
-          text-decoration: line-through;
-          color: hsl(var(--muted-foreground));
         }
       `}</style>
     </div>

@@ -1,11 +1,10 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType, Mood } from '@/types';
 import { cn } from '@/lib/utils';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditorInline from './journal/JournalEditorInline';
-import InteractiveContent from './journal/InteractiveContent';
 import { useToast } from '@/hooks/use-toast';
 import CommentSection from './CommentSection';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
@@ -43,7 +42,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [hasClickedToPlay, setHasClickedToPlay] = useState(false);
-  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry, updateEntryContent } = useJournal();
+  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
   const { toast } = useToast();
   const { authState } = useAuth();
 
@@ -126,11 +125,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     const updatedEntry = { ...entry };
     await updateEntry(updatedEntry);
   };
-
-  // Handle interactive content changes (e.g., checkbox toggles) - silent update
-  const handleContentChange = useCallback(async (newContent: string) => {
-    await updateEntryContent(entry.id, newContent);
-  }, [entry.id, updateEntryContent]);
 
   const handleSpotifyPlayerClick = () => {
     setHasClickedToPlay(true);
@@ -263,9 +257,9 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             transition: 'filter 0.8s ease, opacity 0.8s ease',
           }}
         >
-          <InteractiveContent
-            content={entry.content}
-            onContentChange={handleContentChange}
+          <div 
+            className="prose prose-sm max-w-none text-foreground"
+            dangerouslySetInnerHTML={{ __html: entry.content }}
           />
         </div>
         
