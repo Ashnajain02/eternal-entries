@@ -11,6 +11,7 @@ interface JournalContextType {
   currentEntry: JournalEntry | null;
   addEntry: (entry: JournalEntry) => Promise<void>;
   updateEntry: (entry: JournalEntry) => Promise<void>;
+  updateEntryContent: (entryId: string, content: string) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
   getEntryById: (id: string) => JournalEntry | undefined;
   getEntriesByDate: (date: string) => JournalEntry[];
@@ -370,7 +371,47 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       throw error;
     }
   };
-  
+
+  // Silent content update for checkbox toggles - no toast notifications
+  const updateEntryContent = async (entryId: string, content: string) => {
+    if (!authState.user) {
+      console.error('Authentication required to update entry content');
+      return;
+    }
+
+    try {
+      const existingEntry = entries.find(e => e.id === entryId);
+      if (!existingEntry) {
+        console.error('Entry not found:', entryId);
+        return;
+      }
+
+      const now = new Date();
+      
+      // Encrypt the content before saving
+      const encryptedContent = await encryptText(content, authState.user.id);
+      
+      const { error } = await supabase
+        .from('journal_entries')
+        .update({
+          entry_text: encryptedContent,
+          updated_at: now.toISOString()
+        })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      // Update local state with unencrypted content
+      setEntries(prev => prev.map(entry => 
+        entry.id === entryId 
+          ? { ...entry, content, updatedAt: now.getTime() }
+          : entry
+      ));
+    } catch (error: any) {
+      console.error('Error updating entry content:', error);
+    }
+  };
+
   const deleteEntry = async (id: string) => {
     if (!authState.user) {
       toast({
@@ -595,6 +636,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     currentEntry,
     addEntry,
     updateEntry,
+    updateEntryContent,
     deleteEntry,
     getEntryById,
     getEntriesByDate,
