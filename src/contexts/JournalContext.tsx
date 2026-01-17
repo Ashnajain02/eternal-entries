@@ -388,8 +388,13 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
 
       const now = new Date();
       
-      // Encrypt the content before saving
-      const encryptedContent = await encryptText(content, authState.user.id);
+      // Use the same encryption format as encryptJournalEntry
+      // It expects JSON with content and comments
+      const dataToEncrypt = JSON.stringify({
+        content: content,
+        comments: existingEntry.comments || []
+      });
+      const encryptedContent = await encryptText(dataToEncrypt, authState.user.id);
       
       const { error } = await supabase
         .from('journal_entries')
