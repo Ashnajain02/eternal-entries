@@ -29,6 +29,10 @@ export function useDrafts(): UseDraftsReturn {
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentDraftIdRef = useRef<string | null>(null);
 
+  // Prevent multiple inserts for the same "in-progress" temp draft
+  const tempIdToRealIdRef = useRef<Record<string, string>>({});
+  const createDraftInFlightRef = useRef<Record<string, Promise<string | null>>>({});
+
   // Load drafts from database
   const loadDrafts = useCallback(async () => {
     if (!authState.user) return;
@@ -116,53 +120,42 @@ export function useDrafts(): UseDraftsReturn {
   // Save or update draft in database
   const saveDraft = useCallback(async (entry: JournalEntry): Promise<string | null> => {
     if (!authState.user) return null;
-    
+
     // Don't save if no meaningful content
     if (!hasMeaningfulContent(entry)) return null;
 
+    const isTempId = entry.id.startsWith('draft-');
+    const tempId = isTempId ? entry.id : null;
+    const mappedId = tempId ? tempIdToRealIdRef.current[tempId] : null;
+
+    const buildDbPayload = (encryptedContent: string) => ({
+      user_id: authState.user!.id,
+      entry_text: encryptedContent,
+      mood: entry.mood,
+      status: 'draft',
+      spotify_track_uri: entry.track?.uri,
+      spotify_track_name: entry.track?.name,
+      spotify_track_artist: entry.track?.artist,
+      spotify_track_album: entry.track?.album,
+      spotify_track_image: entry.track?.albumArt,
+      weather_temperature: entry.weather?.temperature,
+      weather_description: entry.weather?.description,
+      weather_icon: entry.weather?.icon,
+      weather_location: entry.weather?.location,
+      timestamp_started: entry.timestamp
+    });
+
     try {
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
-      const isNewDraft = entry.id.startsWith('draft-');
-      
-      if (isNewDraft) {
-        // Insert new draft
-        const { data, error } = await supabase
-          .from('journal_entries')
-          .insert([{
-            user_id: authState.user.id,
-            entry_text: encryptedEntry.content,
-            mood: entry.mood,
-            status: 'draft',
-            spotify_track_uri: entry.track?.uri,
-            spotify_track_name: entry.track?.name,
-            spotify_track_artist: entry.track?.artist,
-            spotify_track_album: entry.track?.album,
-            spotify_track_image: entry.track?.albumArt,
-            weather_temperature: entry.weather?.temperature,
-            weather_description: entry.weather?.description,
-            weather_icon: entry.weather?.icon,
-            weather_location: entry.weather?.location,
-            timestamp_started: entry.timestamp
-          }])
-          .select()
-          .single();
 
-        if (error) throw error;
+      const upsertDraftState = (saved: JournalEntry, removeTempId?: string | null) => {
+        setDrafts(prev => {
+          const filtered = prev.filter(d => d.id !== saved.id && (!removeTempId || d.id !== removeTempId));
+          return [saved, ...filtered];
+        });
+      };
 
-        const savedDraft: JournalEntry = {
-          ...entry,
-          id: data.id,
-          createdAt: new Date(data.created_at).getTime(),
-        };
-
-        setDrafts(prev => [savedDraft, ...prev.filter(d => d.id !== entry.id)]);
-        setCurrentDraft(savedDraft);
-        currentDraftIdRef.current = data.id;
-        setLastAutoSave(new Date());
-        
-        return data.id;
-      } else {
-        // Update existing draft
+      const updateExisting = async (id: string) => {
         const { error } = await supabase
           .from('journal_entries')
           .update({
@@ -179,15 +172,70 @@ export function useDrafts(): UseDraftsReturn {
             weather_location: entry.weather?.location,
             updated_at: new Date().toISOString()
           })
-          .eq('id', entry.id);
+          .eq('id', id);
 
         if (error) throw error;
 
-        setDrafts(prev => prev.map(d => d.id === entry.id ? { ...entry, updatedAt: Date.now() } : d));
+        const saved: JournalEntry = { ...entry, id, updatedAt: Date.now() };
+        upsertDraftState(saved, tempId);
         setLastAutoSave(new Date());
-        
-        return entry.id;
+        return id;
+      };
+
+      // If this temp id was already created earlier, just update the existing DB row
+      if (mappedId) {
+        return await updateExisting(mappedId);
       }
+
+      // If we're still creating the DB row for this temp id, wait for it, then update
+      if (tempId && createDraftInFlightRef.current[tempId]) {
+        const realId = await createDraftInFlightRef.current[tempId];
+        if (!realId) return null;
+        tempIdToRealIdRef.current[tempId] = realId;
+        return await updateExisting(realId);
+      }
+
+      // Create new draft row (only once per temp id)
+      if (tempId) {
+        const createPromise = (async (): Promise<string | null> => {
+          const { data, error } = await supabase
+            .from('journal_entries')
+            .insert([buildDbPayload(encryptedEntry.content)])
+            .select('id, created_at')
+            .single();
+
+          if (error) throw error;
+
+          const savedDraft: JournalEntry = {
+            ...entry,
+            id: data.id,
+            createdAt: new Date(data.created_at).getTime(),
+          };
+
+          upsertDraftState(savedDraft, tempId);
+          setCurrentDraft(savedDraft);
+          currentDraftIdRef.current = data.id;
+          setLastAutoSave(new Date());
+
+          return data.id;
+        })().catch((err) => {
+          console.error('Error creating draft:', err);
+          return null;
+        });
+
+        createDraftInFlightRef.current[tempId] = createPromise;
+        const realId = await createPromise;
+        delete createDraftInFlightRef.current[tempId];
+
+        if (realId) {
+          tempIdToRealIdRef.current[tempId] = realId;
+        }
+
+        return realId;
+      }
+
+      // Non-temp IDs always update
+      return await updateExisting(entry.id);
     } catch (error: any) {
       console.error('Error saving draft:', error);
       return null;
