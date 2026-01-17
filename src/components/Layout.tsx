@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { AuthButtons } from './AuthButtons';
-import { Notebook, Archive, Settings, Menu, X } from 'lucide-react';
+import { Notebook, Archive, Settings, Menu, X, ListChecks } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface LayoutProps {
@@ -24,6 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const navLinks = [
     { to: '/', icon: Notebook, label: 'Journal' },
+    { to: '/habits', icon: ListChecks, label: 'Habits' },
     { to: '/archive', icon: Archive, label: 'Archive' },
     { to: '/settings', icon: Settings, label: 'Settings' },
   ];

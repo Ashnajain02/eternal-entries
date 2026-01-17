@@ -10,10 +10,10 @@ import Index from "./pages/Index";
 import Archive from "./pages/Archive";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
+import Habits from "./pages/Habits";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Callback from "./pages/Callback";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -34,6 +34,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Archive />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/habits" 
+                  element={
+                    <ProtectedRoute>
+                      <Habits />
                     </ProtectedRoute>
                   } 
                 />
