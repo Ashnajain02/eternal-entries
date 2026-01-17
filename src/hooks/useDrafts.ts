@@ -15,7 +15,7 @@ interface UseDraftsReturn {
   loadDraft: (draftId: string) => void;
   clearCurrentDraft: () => void;
   createNewDraft: () => JournalEntry;
-  autoSaveDraft: (entry: JournalEntry) => void;
+  autoSaveDraft: (entry: JournalEntry, onIdChanged?: (newId: string) => void) => void;
   lastAutoSave: Date | null;
 }
 
@@ -194,16 +194,17 @@ export function useDrafts(): UseDraftsReturn {
     }
   }, [authState.user]);
 
-  // Auto-save with debouncing
-  const autoSaveDraft = useCallback((entry: JournalEntry) => {
+  // Auto-save with debouncing - calls onIdChanged when a temp ID is replaced with real DB ID
+  const autoSaveDraft = useCallback((entry: JournalEntry, onIdChanged?: (newId: string) => void) => {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
     
     autoSaveTimeoutRef.current = setTimeout(async () => {
       const savedId = await saveDraft(entry);
-      if (savedId && entry.id.startsWith('draft-')) {
-        // Update the current draft with the new ID
+      if (savedId && entry.id.startsWith('draft-') && savedId !== entry.id) {
+        // Notify caller that the ID has changed
+        onIdChanged?.(savedId);
         setCurrentDraft(prev => prev ? { ...prev, id: savedId } : null);
       }
     }, 1000);

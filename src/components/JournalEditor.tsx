@@ -35,14 +35,12 @@ const JournalEditor: React.FC<JournalEditorProps> = ({ initialDraft, onComplete 
 
   const handleAutoSave = useCallback((updatedEntry: JournalEntry) => {
     setCurrentEntryState(updatedEntry);
-    // Update the entry state with new ID if it was saved
-    setEntry(prev => {
-      if (prev && prev.id !== updatedEntry.id && !updatedEntry.id.startsWith('draft-')) {
-        return { ...updatedEntry };
-      }
-      return prev;
+    
+    // When auto-save returns a new ID (temp -> real), update our entry state
+    autoSaveDraft(updatedEntry, (newId) => {
+      setEntry(prev => prev ? { ...prev, id: newId } : null);
+      setCurrentEntryState(prev => prev ? { ...prev, id: newId } : null);
     });
-    autoSaveDraft(updatedEntry);
   }, [autoSaveDraft]);
 
   const handlePublish = useCallback(async () => {
