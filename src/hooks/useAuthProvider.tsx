@@ -15,6 +15,36 @@ export const useAuthProvider = () => {
   const [authState, setAuthState] = useState<AuthState>(initialState);
   const { toast } = useToast();
 
+  const forceClearSupabaseAuthStorage = () => {
+    if (typeof window === 'undefined') return;
+
+    const projectRef = 'veorhexddrwlwxtkuycb';
+    const prefix = `sb-${projectRef}-`;
+
+    const clearFromStorage = (storage: Storage) => {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (!key) continue;
+        if (key.startsWith(prefix)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => storage.removeItem(k));
+    };
+
+    try {
+      clearFromStorage(window.localStorage);
+    } catch {
+      // ignore
+    }
+
+    try {
+      clearFromStorage(window.sessionStorage);
+    } catch {
+      // ignore
+    }
+  };
   useEffect(() => {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -94,36 +124,44 @@ export const useAuthProvider = () => {
   };
 
   const signOut = async () => {
+    console.log('Starting sign out process...');
+
+    // Clear local auth state immediately so UI updates right away
+    setAuthState({
+      session: null,
+      user: null,
+      loading: false,
+    });
+
+    // Stop background refresh first to avoid tokens being refreshed while logging out
     try {
-      console.log('Starting sign out process...');
-      
-      // Clear local auth state immediately
-      setAuthState({
-        session: null,
-        user: null,
-        loading: false,
-      });
-      
-      // Use scope: 'local' to clear localStorage tokens
-      // This works even if the server session is already expired/invalid
-      // and prevents the session from being restored on page refresh
-      await supabase.auth.signOut({ scope: 'local' });
-      
-      console.log('Sign out completed successfully');
-      toast({
-        title: "Signed out",
-        description: "You've been signed out successfully.",
-      });
-    } catch (error: any) {
-      console.error('Sign out error:', error);
-      
-      // Even on error, the local state is already cleared
-      // Show success since the user wanted to sign out
-      toast({
-        title: "Signed out",
-        description: "You've been signed out successfully.",
-      });
+      supabase.auth.stopAutoRefresh();
+    } catch {
+      // ignore
     }
+
+    // Force-clear any persisted auth data regardless of server logout status
+    forceClearSupabaseAuthStorage();
+
+    try {
+      // Attempt to sign out (this may 403 if session already missing server-side)
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error) {
+        console.warn('Supabase signOut returned error (continuing):', error);
+      }
+    } catch (error) {
+      // We still consider the user signed out locally
+      console.warn('Supabase signOut threw (continuing):', error);
+    } finally {
+      // Ensure storage is cleared even if signOut failed
+      forceClearSupabaseAuthStorage();
+    }
+
+    console.log('Sign out completed successfully');
+    toast({
+      title: 'Signed out',
+      description: "You've been signed out successfully.",
+    });
   };
   
   const resetPassword = async (email: string, redirectTo?: string) => {
