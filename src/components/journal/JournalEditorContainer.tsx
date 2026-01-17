@@ -53,14 +53,21 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
     if (!entry.date || !entry.timestamp) {
       const now = new Date();
       const isoDate = now.toISOString().split('T')[0];
-  
+
       setEntry(prev => ({
         ...prev,
         date: prev.date || isoDate,
         timestamp: prev.timestamp || now.toISOString(),
       }));
     }
-  }, [entry]);
+  }, [entry.date, entry.timestamp]);
+
+  // Keep local entry id in sync with the prop (temp id -> real db id)
+  useEffect(() => {
+    if (initialEntry.id && initialEntry.id !== entry.id) {
+      setEntry(prev => ({ ...prev, id: initialEntry.id }));
+    }
+  }, [initialEntry.id]);
 
   // Build current entry state
   const getCurrentEntry = useCallback((): JournalEntry => {
