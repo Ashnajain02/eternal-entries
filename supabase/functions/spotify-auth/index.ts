@@ -60,11 +60,12 @@ serve(async (req) => {
     const { action, code, redirect_uri } = requestData;
     console.log(`Action requested: ${action}`);
     
-    // Create a Supabase client with the service role key
+    // Create a Supabase client with the service role key for database operations
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
-    const supabase = createClient(
+    const supabaseAdmin = createClient(
       supabaseUrl ?? "",
       supabaseKey ?? ""
     );
@@ -80,8 +81,21 @@ serve(async (req) => {
         // Extract the JWT token (remove 'Bearer ' prefix if present)
         const token = authHeader.replace(/^Bearer\s/, "");
         
+        // Create a client with the user's token to verify authentication
+        const supabaseWithAuth = createClient(
+          supabaseUrl ?? "",
+          supabaseAnonKey ?? "",
+          {
+            global: {
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            }
+          }
+        );
+        
         // Verify the JWT and get user information
-        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+        const { data: { user }, error: userError } = await supabaseWithAuth.auth.getUser();
         
         if (userError) {
           console.error("Error getting user from token:", userError);
@@ -93,6 +107,9 @@ serve(async (req) => {
         console.error("Error in auth verification:", error);
       }
     }
+
+    // Use the admin client for database operations
+    const supabase = supabaseAdmin;
 
     // Handle different actions
     if (action === "is_token_expired") {
