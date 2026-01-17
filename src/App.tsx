@@ -8,7 +8,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { DraftsProvider } from "./contexts/DraftsContext";
 import Index from "./pages/Index";
 import Archive from "./pages/Archive";
-import Stats from "./pages/Stats";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -35,14 +34,6 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Archive />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/stats" 
-                  element={
-                    <ProtectedRoute>
-                      <Stats />
                     </ProtectedRoute>
                   } 
                 />

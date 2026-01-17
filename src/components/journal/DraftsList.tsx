@@ -26,12 +26,9 @@ const DraftsList: React.FC<DraftsListProps> = ({
     return null;
   }
 
-  const handleDelete = async (e: React.MouseEvent, draftId: string) => {
+  const handleDelete = (e: React.MouseEvent, draftId: string) => {
     e.stopPropagation();
-    const confirmDelete = window.confirm("Are you sure you want to delete this draft?");
-    if (confirmDelete) {
-      onDeleteDraft(draftId);
-    }
+    onDeleteDraft(draftId);
   };
 
   return (
