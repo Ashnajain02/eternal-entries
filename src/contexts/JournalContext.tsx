@@ -79,6 +79,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             .from('journal_entries')
             .select('*')
             .eq('user_id', authState.user.id)
+            .eq('status', 'published')
             .order('timestamp_started', { ascending: false });
 
           if (error) throw error;

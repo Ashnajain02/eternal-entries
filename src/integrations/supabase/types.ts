@@ -27,6 +27,7 @@ export type Database = {
           spotify_track_image: string | null
           spotify_track_name: string | null
           spotify_track_uri: string | null
+          status: string
           timestamp_started: string
           updated_at: string | null
           user_id: string
@@ -47,6 +48,7 @@ export type Database = {
           spotify_track_image?: string | null
           spotify_track_name?: string | null
           spotify_track_uri?: string | null
+          status?: string
           timestamp_started?: string
           updated_at?: string | null
           user_id: string
@@ -67,6 +69,7 @@ export type Database = {
           spotify_track_image?: string | null
           spotify_track_name?: string | null
           spotify_track_uri?: string | null
+          status?: string
           timestamp_started?: string
           updated_at?: string | null
           user_id?: string

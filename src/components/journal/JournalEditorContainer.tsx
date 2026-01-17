@@ -1,34 +1,38 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { JournalEntry } from '@/types';
-import { useJournal } from '@/contexts/JournalContext';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import SpotifySection from './SpotifySection';
-import { useJournalDraft } from '@/hooks/useJournalDraft';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { useSpotifyConnection } from '@/hooks/useSpotifyConnection';
 import MoodSelector from '@/components/MoodSelector';
 import WeatherDisplay from '@/components/WeatherDisplay';
 import RichTextEditor from './RichTextEditor';
 import { motion } from 'framer-motion';
-import { X, Check } from 'lucide-react';
+import { Trash2, Save, Send } from 'lucide-react';
 
 interface JournalEditorContainerProps {
-  entry?: JournalEntry;
-  onSave?: () => void;
+  entry: JournalEntry;
+  onPublish: () => void;
+  onDelete: () => void;
+  onClose: () => void;
+  onAutoSave: (entry: JournalEntry) => void;
+  lastAutoSave: Date | null;
 }
 
 const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   entry: initialEntry,
-  onSave
+  onPublish,
+  onDelete,
+  onClose,
+  onAutoSave,
+  lastAutoSave
 }) => {
-  const { addEntry, updateEntry, createNewEntry } = useJournal();
   const { toast } = useToast();
   
-  const { entry, setEntry, saveDraft, saveImmediately, clearDraft, markAsSaved, lastAutoSave } = useJournalDraft(initialEntry, createNewEntry);
+  const [entry, setEntry] = useState<JournalEntry>(initialEntry);
   const { 
     weatherData, 
     isLoadingWeather, 
@@ -38,35 +42,42 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   
   const { spotifyConnected, handleSpotifyConnect } = useSpotifyConnection();
   
-  const [content, setContent] = useState(initialEntry?.content || entry.content || '');
-  const [selectedMood, setSelectedMood] = useState(initialEntry?.mood || entry.mood || 'neutral');
-  const [selectedTrack, setSelectedTrack] = useState(initialEntry?.track || entry.track);
-  const [isSaving, setIsSaving] = useState(false);
+  const [content, setContent] = useState(initialEntry?.content || '');
+  const [selectedMood, setSelectedMood] = useState(initialEntry?.mood || 'neutral');
+  const [selectedTrack, setSelectedTrack] = useState(initialEntry?.track);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
+  // Ensure entry has proper date/timestamp
   useEffect(() => {
     if (!entry.date || !entry.timestamp) {
       const now = new Date();
       const isoDate = now.toISOString().split('T')[0];
   
-      setEntry({
-        ...entry,
-        date: entry.date || isoDate,
-        timestamp: entry.timestamp || now.toISOString(),
-      });
+      setEntry(prev => ({
+        ...prev,
+        date: prev.date || isoDate,
+        timestamp: prev.timestamp || now.toISOString(),
+      }));
     }
-  }, [entry, setEntry]);
+  }, [entry]);
 
-  // Auto-save draft
-  useEffect(() => {
-    const draftEntry: JournalEntry = {
+  // Build current entry state
+  const getCurrentEntry = useCallback((): JournalEntry => {
+    return {
       ...entry,
       content,
       mood: selectedMood,
       track: selectedTrack,
       weather: weatherData || undefined,
     };
-    saveDraft(draftEntry);
-  }, [content, selectedMood, selectedTrack, weatherData, saveDraft, entry]);
+  }, [entry, content, selectedMood, selectedTrack, weatherData]);
+
+  // Auto-save on changes
+  useEffect(() => {
+    const currentEntry = getCurrentEntry();
+    onAutoSave(currentEntry);
+  }, [content, selectedMood, selectedTrack, weatherData]);
 
   const entryDate = entry.date
     ? new Date(entry.date + 'T00:00:00')
@@ -75,79 +86,63 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   const formattedDate = format(entryDate, 'EEEE, MMMM d');
   const formattedYear = format(entryDate, 'yyyy');
 
-  const handleSave = async () => {
-    // Strip HTML tags to check if there's actual content
+  const handlePublish = async () => {
     const textContent = content.replace(/<[^>]*>/g, '').trim();
     if (!textContent) {
       toast({
-        title: "Cannot save empty entry",
-        description: "Please write something in your journal before saving.",
+        title: "Cannot publish empty entry",
+        description: "Please write something in your journal before publishing.",
         variant: "destructive"
       });
       return;
     }
 
-    setIsSaving(true);
-
+    setIsPublishing(true);
     try {
-      const updatedEntry: JournalEntry = {
-        ...entry,
-        content,
-        mood: selectedMood,
-        weather: weatherData || undefined,
-        track: selectedTrack,
-      };
-
-      if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
-        await updateEntry(updatedEntry);
-        toast({
-          title: "Entry updated",
-          description: "Your journal entry has been saved."
-        });
-      } else {
-        await addEntry(updatedEntry);
-        toast({
-          title: "Entry saved",
-          description: "Your journal entry has been saved."
-        });
-        markAsSaved();
-        clearDraft();
-      }
-
-      if (onSave) {
-        onSave();
-      }
-    } catch (error) {
-      console.error('Error saving journal entry:', error);
+      onPublish();
     } finally {
-      setIsSaving(false);
+      setIsPublishing(false);
     }
   };
-  
-  const handleCancel = () => {
+
+  const handleDelete = async () => {
     const textContent = content.replace(/<[^>]*>/g, '').trim();
-    if (textContent && (!initialEntry || initialEntry.id.startsWith('temp-'))) {
-      const confirmCancel = window.confirm("You have unsaved changes. Discard this entry?");
-      if (!confirmCancel) return;
-      clearDraft();
-    }
+    const hasContent = textContent || selectedTrack || selectedMood !== 'neutral';
     
-    if (onSave) {
-      onSave();
+    if (hasContent) {
+      const confirmDelete = window.confirm("Are you sure you want to delete this entry? This cannot be undone.");
+      if (!confirmDelete) return;
     }
+
+    setIsDeleting(true);
+    try {
+      onDelete();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSaveAndClose = () => {
+    // Auto-save is already happening, just close
+    const currentEntry = getCurrentEntry();
+    const textContent = content.replace(/<[^>]*>/g, '').trim();
+    const hasContent = textContent || selectedTrack || selectedMood !== 'neutral';
+    
+    if (hasContent) {
+      toast({
+        title: "Draft saved",
+        description: "Your entry has been saved as a draft."
+      });
+    }
+    onClose();
   };
 
   const handleSpotifyConnectClick = () => {
-    const entryData = {
-      ...entry,
-      content,
-      mood: selectedMood,
-      track: selectedTrack,
-      weather: weatherData,
-      timestamp: entry.timestamp || new Date().toISOString()
-    };
-    
-    handleSpotifyConnect(saveImmediately, entryData);
+    const entryData = getCurrentEntry();
+    handleSpotifyConnect((data) => {
+      // Immediately trigger auto-save before redirect
+      onAutoSave(data || entryData);
+    }, entryData);
   };
 
   return (
@@ -166,7 +161,7 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
             {lastAutoSave && (
               <>
                 <span>·</span>
-                <span>Saved {format(lastAutoSave, 'h:mm a')}</span>
+                <span>Auto-saved {format(lastAutoSave, 'h:mm a')}</span>
               </>
             )}
           </div>
@@ -216,23 +211,35 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
       </div>
       
       {/* Actions */}
-      <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3">
+      <div className="px-6 py-4 border-t border-border flex items-center justify-between">
         <Button 
           variant="ghost" 
-          onClick={handleCancel}
-          className="text-muted-foreground"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
         >
-          <X className="h-4 w-4 mr-2" />
-          Cancel
+          <Trash2 className="h-4 w-4 mr-2" />
+          {isDeleting ? "Deleting..." : "Delete"}
         </Button>
-        <Button 
-          onClick={handleSave} 
-          disabled={isSaving}
-          className="bg-foreground text-background hover:bg-foreground/90"
-        >
-          <Check className="h-4 w-4 mr-2" />
-          {isSaving ? "Saving..." : "Save Entry"}
-        </Button>
+        
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            onClick={handleSaveAndClose}
+            className="text-muted-foreground"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Draft
+          </Button>
+          <Button 
+            onClick={handlePublish} 
+            disabled={isPublishing}
+            className="bg-foreground text-background hover:bg-foreground/90"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            {isPublishing ? "Publishing..." : "Publish"}
+          </Button>
+        </div>
       </div>
     </motion.div>
   );

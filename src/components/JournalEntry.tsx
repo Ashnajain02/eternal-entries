@@ -4,7 +4,7 @@ import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType, Mood } from '@/types';
 import { cn } from '@/lib/utils';
 import { useJournal } from '@/contexts/JournalContext';
-import JournalEditor from './JournalEditor';
+import JournalEditorInline from './journal/JournalEditorInline';
 import { useToast } from '@/hooks/use-toast';
 import CommentSection from './CommentSection';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
@@ -130,8 +130,16 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     setHasClickedToPlay(true);
   };
   
+  // For published entries, we use inline editing via the existing edit mode
+  // The JournalEditor is now only for new entries/drafts
   if (isEditing) {
-    return <JournalEditor entry={entry} onSave={() => setIsEditing(false)} />;
+    return (
+      <JournalEditorInline 
+        entry={entry} 
+        onSave={() => setIsEditing(false)}
+        onCancel={() => setIsEditing(false)}
+      />
+    );
   }
 
   return (
