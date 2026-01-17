@@ -5,17 +5,14 @@ import { useDrafts } from '@/hooks/useDrafts';
 import { useJournal } from '@/contexts/JournalContext';
 
 interface JournalEditorProps {
-  draftId?: string;
+  initialDraft?: JournalEntry;
   onComplete?: () => void;
 }
 
-const JournalEditor: React.FC<JournalEditorProps> = ({ draftId, onComplete }) => {
+const JournalEditor: React.FC<JournalEditorProps> = ({ initialDraft, onComplete }) => {
   const { addEntry } = useJournal();
   const { 
-    drafts,
-    currentDraft, 
     createNewDraft, 
-    loadDraft, 
     deleteDraft, 
     publishDraft,
     autoSaveDraft,
@@ -23,28 +20,28 @@ const JournalEditor: React.FC<JournalEditorProps> = ({ draftId, onComplete }) =>
     lastAutoSave
   } = useDrafts();
   
-  const [entry, setEntry] = useState<JournalEntry | null>(null);
-  const [currentEntryState, setCurrentEntryState] = useState<JournalEntry | null>(null);
+  const [entry, setEntry] = useState<JournalEntry | null>(() => {
+    return initialDraft || createNewDraft();
+  });
+  const [currentEntryState, setCurrentEntryState] = useState<JournalEntry | null>(entry);
 
+  // Update entry if initialDraft changes
   useEffect(() => {
-    if (draftId) {
-      loadDraft(draftId);
-    } else if (!entry) {
-      const newDraft = createNewDraft();
-      setEntry(newDraft);
-      setCurrentEntryState(newDraft);
+    if (initialDraft) {
+      setEntry(initialDraft);
+      setCurrentEntryState(initialDraft);
     }
-  }, [draftId]);
-
-  useEffect(() => {
-    if (currentDraft) {
-      setEntry(currentDraft);
-      setCurrentEntryState(currentDraft);
-    }
-  }, [currentDraft]);
+  }, [initialDraft?.id]);
 
   const handleAutoSave = useCallback((updatedEntry: JournalEntry) => {
     setCurrentEntryState(updatedEntry);
+    // Update the entry state with new ID if it was saved
+    setEntry(prev => {
+      if (prev && prev.id !== updatedEntry.id && !updatedEntry.id.startsWith('draft-')) {
+        return { ...updatedEntry };
+      }
+      return prev;
+    });
     autoSaveDraft(updatedEntry);
   }, [autoSaveDraft]);
 

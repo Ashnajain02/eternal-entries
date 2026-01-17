@@ -11,20 +11,21 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useDrafts } from '@/hooks/useDrafts';
+import { JournalEntry } from '@/types';
 
 const SPOTIFY_REDIRECT_KEY = 'spotify_redirect_from_journal';
 
 const Index = () => {
   const { authState } = useAuth();
   const [isWriting, setIsWriting] = useState(false);
-  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const [editingDraft, setEditingDraft] = useState<JournalEntry | null>(null);
   const location = useLocation();
   
   const journalContext = useJournal();
   const entries = authState.user ? (journalContext?.entries || []) : [];
   const isLoading = authState.user ? (journalContext?.isLoading || false) : false;
   
-  const { drafts, isLoadingDrafts, deleteDraft, loadDraft } = useDrafts();
+  const { drafts, isLoadingDrafts, deleteDraft } = useDrafts();
   
   // Check for Spotify redirect to restore editor
   useEffect(() => {
@@ -38,19 +39,21 @@ const Index = () => {
   }, [authState.user, location, isWriting]);
   
   const handleCreateNewEntry = () => {
-    setEditingDraftId(null);
+    setEditingDraft(null);
     setIsWriting(true);
   };
 
   const handleEditDraft = (draftId: string) => {
-    setEditingDraftId(draftId);
-    setIsWriting(true);
+    const draft = drafts.find(d => d.id === draftId);
+    if (draft) {
+      setEditingDraft(draft);
+      setIsWriting(true);
+    }
   };
 
   const handleFinishWriting = () => {
     setIsWriting(false);
-    setEditingDraftId(null);
-    // Entries will be automatically refreshed by the context
+    setEditingDraft(null);
   };
 
   const handleDeleteDraft = async (draftId: string) => {
@@ -104,7 +107,7 @@ const Index = () => {
           </div>
         ) : isWriting ? (
           <JournalEditor 
-            draftId={editingDraftId || undefined} 
+            initialDraft={editingDraft || undefined} 
             onComplete={handleFinishWriting} 
           />
         ) : (
