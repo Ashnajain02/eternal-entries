@@ -153,38 +153,51 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       )}
     >
       {/* Header */}
-      <div className="px-6 py-5 border-b border-border flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div>
-            <h3 className="font-display text-xl">{formattedDate}</h3>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>{formattedYear}</span>
-              {formattedTime && (
-                <>
-                  <span>·</span>
-                  <span>{formattedTime}</span>
-                </>
-              )}
+      <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <div>
+              <h3 className="font-display text-xl sm:text-2xl font-medium">{formattedDate}</h3>
+              <div className="flex items-center gap-2 text-sm sm:text-base text-muted-foreground font-medium">
+                <span>{formattedYear}</span>
+                {formattedTime && (
+                  <>
+                    <span>·</span>
+                    <span>{formattedTime}</span>
+                  </>
+                )}
+              </div>
             </div>
+            <span className="self-start px-2.5 py-1 text-xs rounded-full bg-accent text-accent-foreground">
+              {moodLabels[entry.mood] || entry.mood}
+            </span>
           </div>
-          <span className="px-2.5 py-1 text-xs rounded-full bg-accent text-accent-foreground">
-            {moodLabels[entry.mood] || entry.mood}
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          {entry.weather && (
-            <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{formatTemperature(entry.weather.temperature)}</span>
-              {entry.weather.location && <span className="text-xs">{entry.weather.location}</span>}
-            </div>
-          )}
-          {!isPreview && (
-            <EntryActions
-              onEdit={() => setIsEditing(true)}
-              onDelete={handleDelete}
-            />
-          )}
+          
+          <div className="flex items-center justify-between sm:justify-end gap-3">
+            {entry.weather && (
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="font-semibold text-foreground">{formatTemperature(entry.weather.temperature)}</span>
+                {entry.weather.description && (
+                  <>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="text-muted-foreground capitalize">{entry.weather.description}</span>
+                  </>
+                )}
+                {entry.weather.location && (
+                  <>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="text-muted-foreground text-xs">{entry.weather.location}</span>
+                  </>
+                )}
+              </div>
+            )}
+            {!isPreview && (
+              <EntryActions
+                onEdit={() => setIsEditing(true)}
+                onDelete={handleDelete}
+              />
+            )}
+          </div>
         </div>
       </div>
 
