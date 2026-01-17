@@ -130,6 +130,12 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
         <span className="font-medium text-foreground">
           {formatTemperature(weatherData.temperature)}
         </span>
+        {weatherData.description && (
+          <>
+            <span>·</span>
+            <span className="capitalize">{weatherData.description}</span>
+          </>
+        )}
         {hasValidLocation && (
           <>
             <span>·</span>
