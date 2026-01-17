@@ -204,15 +204,9 @@ serve(async (req) => {
       const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
       
       if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-        console.error("Missing Spotify credentials:", {
-          hasClientId: !!SPOTIFY_CLIENT_ID,
-          hasClientSecret: !!SPOTIFY_CLIENT_SECRET
-        });
+        console.error("Missing Spotify credentials");
         return new Response(
-          JSON.stringify({ 
-            error: "Server configuration error",
-            details: "Missing Spotify API credentials"
-          }),
+          JSON.stringify({ error: "Server configuration error" }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
@@ -235,10 +229,7 @@ serve(async (req) => {
       if (refreshData.error) {
         console.error("Error refreshing token:", refreshData.error);
         return new Response(
-          JSON.stringify({ 
-            error: "Failed to refresh Spotify token",
-            details: refreshData.error
-          }),
+          JSON.stringify({ error: "Failed to refresh Spotify token" }),
           { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       }
@@ -284,10 +275,7 @@ serve(async (req) => {
     if (searchData.error) {
       console.error("Spotify API error:", searchData.error);
       return new Response(
-        JSON.stringify({ 
-          error: "Spotify API error", 
-          details: searchData.error 
-        }),
+        JSON.stringify({ error: "Spotify search failed" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -296,10 +284,7 @@ serve(async (req) => {
     if (!searchData.tracks || !searchData.tracks.items) {
       console.error("Unexpected Spotify API response format:", searchData);
       return new Response(
-        JSON.stringify({ 
-          error: "Unexpected response from Spotify API",
-          details: "Missing tracks data"
-        }),
+        JSON.stringify({ error: "Spotify search failed" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }

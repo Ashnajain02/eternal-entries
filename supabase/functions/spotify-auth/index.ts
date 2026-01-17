@@ -157,7 +157,7 @@ async function isTokenExpired(supabase: any, user_id: string | null) {
     if (error) {
       console.error("Error checking token expiration:", error);
       return new Response(
-        JSON.stringify({ error: "Failed to check token expiration", details: error.message }),
+        JSON.stringify({ error: "Failed to check token expiration" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -170,7 +170,7 @@ async function isTokenExpired(supabase: any, user_id: string | null) {
   } catch (error) {
     console.error("Error checking token expiration:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to check token expiration", details: error.message }),
+      JSON.stringify({ error: "Failed to check token expiration" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
@@ -221,7 +221,7 @@ async function getAuthorizationUrl(redirect_uri: string) {
   } catch (error) {
     console.error("Error generating authorization URL:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to generate authorization URL", details: error.message }),
+      JSON.stringify({ error: "Failed to generate authorization URL" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
@@ -271,7 +271,7 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
     if (tokenData.error) {
       console.error("Spotify token error:", tokenData.error);
       return new Response(
-        JSON.stringify({ error: "Failed to get Spotify token", details: tokenData.error }),
+        JSON.stringify({ error: "Failed to get Spotify token" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -326,7 +326,7 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
   } catch (error) {
     console.error("Callback error:", error);
     return new Response(
-      JSON.stringify({ error: "Callback failed", details: error.message }),
+      JSON.stringify({ error: "Callback failed" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
@@ -358,7 +358,7 @@ async function revokeAccess(supabase: any, user_id: string | null) {
     if (error) {
       console.error("Error revoking access:", error);
       return new Response(
-        JSON.stringify({ error: "Failed to revoke access", details: error.message }),
+        JSON.stringify({ error: "Failed to revoke access" }),
         { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -372,7 +372,7 @@ async function revokeAccess(supabase: any, user_id: string | null) {
   } catch (error) {
     console.error("Error revoking access:", error);
     return new Response(
-      JSON.stringify({ error: "Failed to revoke access", details: error.message }),
+      JSON.stringify({ error: "Failed to revoke access" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
