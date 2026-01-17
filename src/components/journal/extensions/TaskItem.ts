@@ -89,9 +89,33 @@ export const TaskItem = Node.create<TaskItemOptions>({
       checkbox.type = 'checkbox';
       checkbox.checked = node.attrs.checked;
 
+      // Function to update visual state
+      const updateVisualState = (isChecked: boolean) => {
+        listItem.setAttribute('data-checked', isChecked.toString());
+        checkbox.checked = isChecked;
+        
+        // Apply strikethrough and dim styling directly
+        if (isChecked) {
+          content.style.textDecoration = 'line-through';
+          content.style.color = 'hsl(var(--muted-foreground))';
+        } else {
+          content.style.textDecoration = 'none';
+          content.style.color = '';
+        }
+      };
+
+      // Initial state
+      updateVisualState(node.attrs.checked);
+
       checkbox.addEventListener('change', (event) => {
         if (typeof getPos !== 'function') return;
 
+        const isChecked = (event.target as HTMLInputElement).checked;
+        
+        // Update visual state immediately
+        updateVisualState(isChecked);
+
+        // Update TipTap document state
         editor
           .chain()
           .focus(undefined, { scrollIntoView: false })
@@ -102,7 +126,7 @@ export const TaskItem = Node.create<TaskItemOptions>({
             if (currentNode) {
               tr.setNodeMarkup(pos, undefined, {
                 ...currentNode.attrs,
-                checked: (event.target as HTMLInputElement).checked,
+                checked: isChecked,
               });
             }
 
@@ -116,7 +140,6 @@ export const TaskItem = Node.create<TaskItemOptions>({
       });
 
       listItem.setAttribute('data-type', this.name);
-      listItem.setAttribute('data-checked', node.attrs.checked.toString());
 
       checkboxWrapper.append(checkbox);
       listItem.append(checkboxWrapper, content);
@@ -129,8 +152,7 @@ export const TaskItem = Node.create<TaskItemOptions>({
             return false;
           }
 
-          listItem.setAttribute('data-checked', updatedNode.attrs.checked.toString());
-          checkbox.checked = updatedNode.attrs.checked;
+          updateVisualState(updatedNode.attrs.checked);
 
           return true;
         },
