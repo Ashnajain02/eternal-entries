@@ -31,14 +31,27 @@ export const isSpotifyConnected = async (): Promise<boolean> => {
 };
 
 /**
- * Initiate the Spotify authorization process
+ * Result of initiating Spotify auth
  */
-export const initiateSpotifyAuth = async (): Promise<void> => {
+export interface SpotifyAuthResult {
+  success: boolean;
+  popupBlocked?: boolean;
+  error?: string;
+}
+
+/**
+ * Initiate the Spotify authorization process
+ * Returns info about whether popup was blocked
+ */
+export const initiateSpotifyAuth = async (): Promise<SpotifyAuthResult> => {
   try {
     // Get the current session to ensure we have a valid token
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) {
-      throw new Error('No active session. Please sign in first.');
+      return { 
+        success: false, 
+        error: 'No active session. Please sign in first.' 
+      };
     }
     
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
@@ -49,12 +62,30 @@ export const initiateSpotifyAuth = async (): Promise<void> => {
     });
 
     if (error || !data?.url) {
-      throw new Error(error?.message || 'Failed to get Spotify authorization URL');
+      return { 
+        success: false, 
+        error: error?.message || 'Failed to get Spotify authorization URL' 
+      };
     }
 
-    window.open(data.url, '_blank');
-  } catch (error) {
-    throw error;
+    // Try to open the popup
+    const popup = window.open(data.url, '_blank');
+    
+    // Check if popup was blocked
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      return { 
+        success: false, 
+        popupBlocked: true,
+        error: 'Popup was blocked by the browser'
+      };
+    }
+    
+    return { success: true };
+  } catch (error: any) {
+    return { 
+      success: false, 
+      error: error.message || 'An unexpected error occurred'
+    };
   }
 };
 
