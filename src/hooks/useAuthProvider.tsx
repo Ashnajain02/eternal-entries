@@ -104,15 +104,22 @@ export const useAuthProvider = () => {
         loading: false,
       });
       
-      // Sign out globally to invalidate the session on the server
-      // This ensures the session cannot be restored on page refresh
-      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      // Check if there's an active session before attempting to sign out
+      const { data: { session } } = await supabase.auth.getSession();
       
-      // If there's an error but it's related to session not found, that's okay
-      // The session is already gone, which is what we want
-      if (error && !error.message.includes('session_not_found') && !error.message.includes('Session not found')) {
-        console.error('Sign out error:', error);
-        throw error;
+      if (session) {
+        // Sign out globally to invalidate the session on the server
+        const { error } = await supabase.auth.signOut({ scope: 'global' });
+        
+        if (error) {
+          console.error('Sign out error:', error);
+          // Don't throw for session-related errors
+          if (!error.message?.includes('session') && !error.message?.includes('Session')) {
+            throw error;
+          }
+        }
+      } else {
+        console.log('No active session found, clearing local state only');
       }
       
       console.log('Sign out completed successfully');
@@ -123,27 +130,11 @@ export const useAuthProvider = () => {
     } catch (error: any) {
       console.error('Sign out error:', error);
       
-      // Even if there's an error, we should still clear local state
-      setAuthState({
-        session: null,
-        user: null,
-        loading: false,
+      // Even if there's an error, we already cleared local state above
+      toast({
+        title: "Signed out",
+        description: "You've been signed out successfully.",
       });
-      
-      // Only show error toast for non-session related errors
-      if (!error.message?.includes('session') && !error.message?.includes('Session')) {
-        toast({
-          title: "Error",
-          description: error.message || "Failed to sign out",
-          variant: "destructive",
-        });
-      } else {
-        // For session errors, still show success message since we cleared local state
-        toast({
-          title: "Signed out",
-          description: "You've been signed out successfully.",
-        });
-      }
     }
   };
   
