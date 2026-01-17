@@ -177,12 +177,49 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
         return entry.id;
       }
 
-      // For temp IDs: use upsert on (user_id, timestamp_started) to prevent duplicates
-      // This handles refreshes, navigation, and race conditions uniformly
-      const { data, error } = await supabase
+      // For temp IDs: First check if a draft with this timestamp already exists
+      // This handles refreshes, navigation, and race conditions by looking up existing drafts
+      const { data: existingDraft, error: lookupError } = await supabase
         .from('journal_entries')
-        .upsert(
-          {
+        .select('id')
+        .eq('user_id', authState.user.id)
+        .eq('timestamp_started', entry.timestamp)
+        .eq('status', 'draft')
+        .maybeSingle();
+
+      if (lookupError) {
+        console.error('Error looking up existing draft:', lookupError);
+      }
+
+      let savedId: string;
+      
+      if (existingDraft) {
+        // Update the existing draft
+        const { error: updateError } = await supabase
+          .from('journal_entries')
+          .update({
+            entry_text: encryptedEntry.content,
+            mood: entry.mood,
+            spotify_track_uri: entry.track?.uri || null,
+            spotify_track_name: entry.track?.name || null,
+            spotify_track_artist: entry.track?.artist || null,
+            spotify_track_album: entry.track?.album || null,
+            spotify_track_image: entry.track?.albumArt || null,
+            weather_temperature: entry.weather?.temperature ?? null,
+            weather_description: entry.weather?.description || null,
+            weather_icon: entry.weather?.icon || null,
+            weather_location: entry.weather?.location || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingDraft.id);
+
+        if (updateError) throw updateError;
+        savedId = existingDraft.id;
+      } else {
+        // Insert a new draft
+        const { data: insertedDraft, error: insertError } = await supabase
+          .from('journal_entries')
+          .insert({
             user_id: authState.user.id,
             entry_text: encryptedEntry.content,
             mood: entry.mood,
@@ -198,35 +235,31 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
             weather_location: entry.weather?.location || null,
             timestamp_started: entry.timestamp,
             updated_at: new Date().toISOString()
-          },
-          {
-            onConflict: 'user_id,timestamp_started',
-            ignoreDuplicates: false
-          }
-        )
-        .select('id, created_at')
-        .single();
+          })
+          .select('id, created_at')
+          .single();
 
-      if (error) throw error;
+        if (insertError) throw insertError;
+        savedId = insertedDraft.id;
+      }
 
       const savedDraft: JournalEntry = {
         ...entry,
-        id: data.id,
-        createdAt: new Date(data.created_at).getTime(),
+        id: savedId,
         updatedAt: Date.now()
       };
 
       // Map temp id to real id for future reference
       if (tempId) {
-        tempIdToRealIdRef.current[tempId] = data.id;
+        tempIdToRealIdRef.current[tempId] = savedId;
       }
 
       upsertDraftState(savedDraft, tempId);
       setCurrentDraft(savedDraft);
-      currentDraftIdRef.current = data.id;
+      currentDraftIdRef.current = savedId;
       setLastAutoSave(new Date());
 
-      return data.id;
+      return savedId;
     } catch (error: any) {
       console.error('Error saving draft:', error);
       return null;
