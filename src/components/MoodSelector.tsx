@@ -29,9 +29,9 @@ const MoodSelector: React.FC<MoodSelectorProps> = ({ selectedMood, onChange, cla
   ];
 
   return (
-    <div className={cn("flex flex-row items-center gap-3 p-2", className)}>
-      <p className="text-sm font-medium text-muted-foreground mr-2">How are you feeling?</p>
-      <div className="flex space-x-3">
+    <div className={cn("flex flex-col sm:flex-row sm:items-center gap-3", className)}>
+      <p className="text-sm text-muted-foreground">How are you feeling?</p>
+      <div className="flex flex-wrap gap-2">
         <TooltipProvider>
           {moodOptions.map((mood) => (
             <Tooltip key={mood.value}>
@@ -39,15 +39,17 @@ const MoodSelector: React.FC<MoodSelectorProps> = ({ selectedMood, onChange, cla
                 <button
                   onClick={() => onChange(mood.value)}
                   className={cn(
-                    "mood-emoji relative",
-                    selectedMood === mood.value && "after:absolute after:bottom-[-8px] after:left-1/2 after:w-1.5 after:h-1.5 after:bg-journal-purple after:rounded-full after:transform after:-translate-x-1/2"
+                    "text-xl p-1.5 rounded-md transition-all duration-200",
+                    selectedMood === mood.value 
+                      ? "bg-accent scale-110" 
+                      : "hover:bg-accent/50 opacity-60 hover:opacity-100"
                   )}
                   aria-label={`Select mood: ${mood.label}`}
                 >
                   {mood.emoji}
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
+              <TooltipContent side="bottom" className="text-xs">
                 {mood.label}
               </TooltipContent>
             </Tooltip>

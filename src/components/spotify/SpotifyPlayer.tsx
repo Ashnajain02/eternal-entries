@@ -15,7 +15,6 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({
 }) => {
   const [showOverlay, setShowOverlay] = useState(true);
   
-  // Extract track ID from URI (format: spotify:track:1234567890)
   const trackId = track.uri ? track.uri.split(':').pop() : '';
   
   if (!trackId) return null;
@@ -28,18 +27,18 @@ const SpotifyPlayer: React.FC<SpotifyPlayerProps> = ({
   };
   
   return (
-    <div className={`spotify-player relative ${className}`}>
+    <div className={`relative rounded-md overflow-hidden ${className}`}>
       <iframe
-        src={`https://open.spotify.com/embed/track/${trackId}`}
+        src={`https://open.spotify.com/embed/track/${trackId}?theme=0`}
         width="100%"
         height="80"
         frameBorder="0"
         allow="encrypted-media"
         loading="lazy"
         className="rounded-md"
+        style={{ backgroundColor: 'transparent' }}
       />
       
-      {/* Transparent overlay that disappears after first click */}
       {showOverlay && (
         <div 
           className="absolute inset-0 cursor-pointer rounded-md"

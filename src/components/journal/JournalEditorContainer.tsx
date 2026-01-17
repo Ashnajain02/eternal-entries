@@ -2,18 +2,20 @@
 import React, { useState, useEffect } from 'react';
 import { JournalEntry } from '@/types';
 import { useJournal } from '@/contexts/JournalContext';
-import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import EditorHeader from './EditorHeader';
-import EditorControls from './EditorControls';
-import ContentEditor from './ContentEditor';
+import { format } from 'date-fns';
 import SpotifySection from './SpotifySection';
 import { useJournalDraft } from '@/hooks/useJournalDraft';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import { useSpotifyConnection } from '@/hooks/useSpotifyConnection';
 import { useJournalEditorState } from '@/hooks/useJournalEditorState';
+import MoodSelector from '@/components/MoodSelector';
+import AutoResizeTextarea from '@/components/AutoResizeTextarea';
+import WeatherDisplay from '@/components/WeatherDisplay';
+import { motion } from 'framer-motion';
+import { X, Check } from 'lucide-react';
 
 interface JournalEditorContainerProps {
   entry?: JournalEntry;
@@ -27,7 +29,6 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   const { addEntry, updateEntry, createNewEntry } = useJournal();
   const { toast } = useToast();
   
-  // Use our custom hooks
   const { entry, setEntry, saveDraft, saveImmediately, clearDraft, markAsSaved, lastAutoSave } = useJournalDraft(initialEntry, createNewEntry);
   const { 
     weatherData, 
@@ -57,11 +58,10 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   
   const [isSaving, setIsSaving] = useState(false);
   
-  // Ensure entry has date and timestamp - only set these once when creating a new entry
   useEffect(() => {
     if (!entry.date || !entry.timestamp) {
       const now = new Date();
-      const isoDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const isoDate = now.toISOString().split('T')[0];
   
       setEntry({
         ...entry,
@@ -71,10 +71,12 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
     }
   }, [entry, setEntry]);
 
-  // Calculate the entry date for display from the entry's date property
   const entryDate = entry.date
-    ? new Date(entry.date + 'T00:00:00') // Add time part to ensure consistent parsing
-    : new Date();  
+    ? new Date(entry.date + 'T00:00:00')
+    : new Date();
+  
+  const formattedDate = format(entryDate, 'EEEE, MMMM d');
+  const formattedYear = format(entryDate, 'yyyy');
 
   const handleSave = async () => {
     if (!content.trim()) {
@@ -89,7 +91,6 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
     setIsSaving(true);
 
     try {
-      // Always preserve the original timestamp when saving
       const updatedEntry: JournalEntry = {
         ...entry,
         content,
@@ -98,21 +99,18 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
         track: selectedTrack,
       };
 
-      console.log("Saving entry with track:", selectedTrack);
-
       if (initialEntry && initialEntry.id && !initialEntry.id.startsWith('temp-')) {
         await updateEntry(updatedEntry);
         toast({
-          title: "Journal updated",
-          description: "Your journal entry has been updated successfully."
+          title: "Entry updated",
+          description: "Your journal entry has been saved."
         });
       } else {
         await addEntry(updatedEntry);
         toast({
-          title: "Journal saved",
-          description: "Your journal entry has been saved successfully."
+          title: "Entry saved",
+          description: "Your journal entry has been saved."
         });
-        // Mark as saved and clear the draft since we've properly saved it
         markAsSaved();
         clearDraft();
       }
@@ -128,13 +126,9 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   };
   
   const handleCancel = () => {
-    // Ask for confirmation if there is content and this is a new entry
     if (content.trim() && (!initialEntry || initialEntry.id.startsWith('temp-'))) {
-      const confirmCancel = window.confirm("You have unsaved changes. Are you sure you want to exit the editor? Your draft will be deleted.");
-      if (!confirmCancel) {
-        return;
-      }
-      // Clear the draft since user confirmed they want to cancel
+      const confirmCancel = window.confirm("You have unsaved changes. Discard this entry?");
+      if (!confirmCancel) return;
       clearDraft();
     }
     
@@ -154,48 +148,92 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   };
 
   return (
-    <Card className="journal-card animated-gradient">
-      <div className="p-6">
-        <EditorHeader
-          entryDate={entryDate}
-          weatherData={weatherData}
-          isLoadingWeather={isLoadingWeather}
-          onRefreshWeather={handleGetWeather}
-          lastAutoSave={lastAutoSave}
-          locationError={locationError}
-        />
-        
-        {locationError && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertDescription>
-              {locationError} <Button variant="link" className="p-0 h-auto" onClick={handleGetWeather}>Try again</Button>
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        <div className="mb-6">
-          <SpotifySection
-            selectedTrack={selectedTrack}
-            onTrackSelect={setSelectedTrack}
-            spotifyConnected={spotifyConnected}
-            onSpotifyConnect={handleSpotifyConnectClick}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="bg-card border border-border rounded-md overflow-hidden"
+    >
+      {/* Header */}
+      <div className="px-6 py-5 border-b border-border flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-xl">{formattedDate}</h2>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{formattedYear}</span>
+            {lastAutoSave && (
+              <>
+                <span>·</span>
+                <span>Saved {format(lastAutoSave, 'h:mm a')}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <WeatherDisplay 
+            weatherData={weatherData} 
+            isLoading={isLoadingWeather} 
+            onRefresh={handleGetWeather} 
           />
         </div>
-        
-        <ContentEditor
-          content={content}
-          onContentChange={setContent}
-          selectedMood={selectedMood}
-          onMoodChange={setSelectedMood}
-        />
-        
-        <EditorControls
-          isSaving={isSaving}
-          onSave={handleSave}
-          onCancel={handleCancel}
+      </div>
+      
+      {locationError && (
+        <Alert variant="destructive" className="mx-6 mt-4">
+          <AlertDescription>
+            {locationError}{' '}
+            <Button variant="link" className="p-0 h-auto text-destructive" onClick={handleGetWeather}>
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Spotify */}
+      <div className="px-6 py-4 border-b border-border bg-accent/20">
+        <SpotifySection
+          selectedTrack={selectedTrack}
+          onTrackSelect={setSelectedTrack}
+          spotifyConnected={spotifyConnected}
+          onSpotifyConnect={handleSpotifyConnectClick}
         />
       </div>
-    </Card>
+
+      {/* Mood */}
+      <div className="px-6 py-4 border-b border-border">
+        <MoodSelector selectedMood={selectedMood} onChange={setSelectedMood} />
+      </div>
+      
+      {/* Content */}
+      <div className="px-6 py-6">
+        <AutoResizeTextarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="What's on your mind today..."
+          className="w-full resize-none bg-transparent border-0 p-0 text-foreground leading-relaxed focus:outline-none focus:ring-0 font-body text-base"
+          minHeight="200px"
+        />
+      </div>
+      
+      {/* Actions */}
+      <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3">
+        <Button 
+          variant="ghost" 
+          onClick={handleCancel}
+          className="text-muted-foreground"
+        >
+          <X className="h-4 w-4 mr-2" />
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleSave} 
+          disabled={isSaving}
+          className="bg-foreground text-background hover:bg-foreground/90"
+        >
+          <Check className="h-4 w-4 mr-2" />
+          {isSaving ? "Saving..." : "Save Entry"}
+        </Button>
+      </div>
+    </motion.div>
   );
 };
 
