@@ -11,7 +11,10 @@ import {
   CloudMoonRain,
   Cloud,
   RefreshCw,
-  MapPin
+  MapPin,
+  Sun,
+  Snowflake,
+  CloudLightning
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
@@ -37,7 +40,7 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
   const { data: userProfile } = useQuery({
     queryKey: ['temperature-settings', authState.user?.id],
     queryFn: async () => {
-      if (!authState.user) return { temperature_unit: 'fahrenheit' };
+      if (!authState.user) return null;
       
       const { data, error } = await supabase
         .from('profiles')
@@ -47,98 +50,95 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
       
       if (error) {
         console.error('Error fetching temperature preferences:', error);
+        return null;
       }
       
-      return data || { temperature_unit: 'fahrenheit' };
+      return data;
     },
-    // Default to fahrenheit if we can't fetch the preference
-    initialData: { temperature_unit: 'fahrenheit' }
+    enabled: !!authState.user
   });
 
   const getWeatherIcon = (iconName: string) => {
+    const iconClass = "h-5 w-5 text-muted-foreground";
     switch (iconName) {
       case 'cloud-sun':
-        return <CloudSun className="weather-icon" />;
+        return <CloudSun className={iconClass} />;
       case 'cloud-rain':
-        return <CloudRain className="weather-icon" />;
+        return <CloudRain className={iconClass} />;
       case 'thermometer-sun':
-        return <ThermometerSun className="weather-icon" />;
+        return <Sun className={iconClass} />;
       case 'thermometer-snowflake':
-        return <ThermometerSnowflake className="weather-icon" />;
+        return <Snowflake className={iconClass} />;
       case 'droplet':
-        return <Droplet className="weather-icon" />;
+        return <Droplet className={iconClass} />;
       case 'cloud-moon-rain':
-        return <CloudMoonRain className="weather-icon" />;
+        return <CloudMoonRain className={iconClass} />;
+      case 'cloud-lightning':
+        return <CloudLightning className={iconClass} />;
       default:
-        return <Cloud className="weather-icon" />;
+        return <Cloud className={iconClass} />;
     }
   };
 
   // Convert temperature based on user preference
+  // Default to Fahrenheit for unauthenticated users or users without preference set
   const formatTemperature = (celsius: number): string => {
-    if (userProfile?.temperature_unit === 'celsius') {
-      return `${celsius.toFixed(0)}°C`;
+    const useCelsius = userProfile?.temperature_unit === 'celsius';
+    
+    if (useCelsius) {
+      return `${Math.round(celsius)}°C`;
     } else {
-      // Convert to Fahrenheit
       const fahrenheit = (celsius * 9/5) + 32;
-      return `${fahrenheit.toFixed(0)}°F`;
+      return `${Math.round(fahrenheit)}°F`;
     }
   };
 
   if (isLoading) {
     return (
-      <div className={cn("flex items-center space-x-2", className)}>
-        <div className="h-8 w-8 animate-pulse rounded-full bg-muted"></div>
-        <div className="space-y-1">
-          <div className="h-4 w-20 animate-pulse rounded bg-muted"></div>
-          <div className="h-3 w-12 animate-pulse rounded bg-muted"></div>
-        </div>
+      <div className={cn("flex items-center gap-2", className)}>
+        <div className="h-5 w-5 animate-pulse rounded-full bg-muted"></div>
+        <div className="h-4 w-16 animate-pulse rounded bg-muted"></div>
       </div>
     );
   }
 
   if (!weatherData) {
     return (
-      <div className={cn("flex items-center space-x-2", className)}>
-        <Button 
-          onClick={onRefresh} 
-          variant="outline" 
-          size="sm" 
-          className="flex items-center gap-1 text-xs"
-        >
-          <RefreshCw className="h-3 w-3" />
-          Get weather
-        </Button>
-      </div>
+      <Button 
+        onClick={onRefresh} 
+        variant="ghost" 
+        size="sm" 
+        className="text-muted-foreground text-xs h-8"
+      >
+        <RefreshCw className="h-3 w-3 mr-1" />
+        Get weather
+      </Button>
     );
   }
 
-  // Check if we should display the location
-  // If it contains any of the default data, don't show it
-  const isDefaultLocation = 
-    !weatherData.location || 
-    weatherData.location.includes("New York") || 
-    weatherData.location.includes("Manhattan") ||
-    weatherData.location === "Unknown Location";
+  // Check if location is valid
+  const hasValidLocation = weatherData.location && 
+    !weatherData.location.includes("New York") && 
+    !weatherData.location.includes("Manhattan") &&
+    weatherData.location !== "Unknown Location" &&
+    weatherData.location.trim() !== '';
 
   return (
-    <div className={cn("flex items-center space-x-2 group", className)}>
-      <div className="flex items-center space-x-2">
-        {getWeatherIcon(weatherData.icon)}
-        <div className="space-y-0">
-          <p className="text-sm font-medium leading-none">
-            {formatTemperature(weatherData.temperature)}
-            {!isDefaultLocation && weatherData.location && (
-              <> in {weatherData.location}</>
-            )}
-          </p>
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            {!isDefaultLocation && weatherData.location && (
+    <div className={cn("flex items-center gap-2 group", className)}>
+      {getWeatherIcon(weatherData.icon)}
+      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">
+          {formatTemperature(weatherData.temperature)}
+        </span>
+        {hasValidLocation && (
+          <>
+            <span>·</span>
+            <span className="flex items-center gap-1">
               <MapPin className="h-3 w-3" />
-            )}
-            {weatherData.description}
-          </p>
-        </div>
+              {weatherData.location}
+            </span>
+          </>
+        )}
       </div>
       
       {onRefresh && (

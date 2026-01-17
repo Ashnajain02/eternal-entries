@@ -6,7 +6,7 @@ import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Button } from '@/components/ui/button';
-import { Bold, Italic, Underline as UnderlineIcon, ImagePlus } from 'lucide-react';
+import { Bold, Italic, Underline as UnderlineIcon, ImagePlus, List, ListOrdered } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +34,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         codeBlock: false,
         blockquote: false,
         horizontalRule: false,
+        bulletList: {
+          HTMLAttributes: {
+            class: 'list-disc pl-5 my-2',
+          },
+        },
+        orderedList: {
+          HTMLAttributes: {
+            class: 'list-decimal pl-5 my-2',
+          },
+        },
+        listItem: {
+          HTMLAttributes: {
+            class: 'my-1',
+          },
+        },
       }),
       Underline,
       Image.configure({
@@ -178,6 +193,31 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           type="button"
           variant="ghost"
           size="sm"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('bulletList') && "bg-accent"
+          )}
+        >
+          <List className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('orderedList') && "bg-accent"
+          )}
+        >
+          <ListOrdered className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-5 bg-border mx-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => fileInputRef.current?.click()}
           className="h-8 w-8 p-0"
         >
@@ -214,6 +254,22 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           height: auto;
           border-radius: 0.375rem;
           margin: 1rem 0;
+        }
+        .tiptap ul {
+          list-style-type: disc;
+          padding-left: 1.25rem;
+          margin: 0.5rem 0;
+        }
+        .tiptap ol {
+          list-style-type: decimal;
+          padding-left: 1.25rem;
+          margin: 0.5rem 0;
+        }
+        .tiptap li {
+          margin: 0.25rem 0;
+        }
+        .tiptap li p {
+          margin: 0;
         }
       `}</style>
     </div>
