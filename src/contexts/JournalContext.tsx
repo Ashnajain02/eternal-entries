@@ -128,8 +128,19 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             transformedEntries.push(decryptedEntry);
           }
 
-          console.log("Loaded entries with tracks:", transformedEntries.filter(e => e.track).length);
-          setEntries(transformedEntries);
+          // If duplicate rows exist in the DB (e.g. from a previous double-insert),
+          // dedupe by (user_id, timestamp) so the UI doesn't show repeated entries.
+          const dedupedEntries: JournalEntry[] = [];
+          const seen = new Set<string>();
+          for (const e of transformedEntries) {
+            const key = `${e.user_id ?? authState.user.id}-${e.timestamp ?? ''}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            dedupedEntries.push(e);
+          }
+
+          console.log("Loaded entries with tracks:", dedupedEntries.filter(e => e.track).length);
+          setEntries(dedupedEntries);
           hasLoadedEntriesRef.current = true;
           currentUserIdRef.current = authState.user.id;
         } catch (error: any) {
@@ -254,12 +265,41 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       return;
     }
 
+    // IMPORTANT:
+    // DraftsContext.publishDraft() already writes the entry to the DB (insert/update)
+    // and then calls this callback to sync JournalContext state.
+    // If we insert again here, we create duplicate DB rows.
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entry.id);
+
+    // If this looks like a persisted entry id, just upsert into local state.
+    if (isUuid) {
+      const normalized: JournalEntry = {
+        ...entry,
+        createdAt: entry.createdAt ?? Date.now(),
+      };
+
+      setEntries(prev => {
+        const exists = prev.some(e => e.id === normalized.id);
+        if (exists) {
+          return prev.map(e => (e.id === normalized.id ? { ...e, ...normalized } : e));
+        }
+        return [normalized, ...prev];
+      });
+
+      toast({
+        title: "Entry published",
+        description: "Your journal entry has been published.",
+      });
+      return;
+    }
+
+    // Fallback: create a brand new entry in the DB (if called with a temp/draft id).
     try {
       console.log("Adding entry with track:", entry.track);
-      
+
       // Encrypt the entry content before saving to database
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
-      
+
       const { data, error } = await supabase
         .from('journal_entries')
         .insert([{
