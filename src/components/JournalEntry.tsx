@@ -11,6 +11,9 @@ import SpotifyPlayer from './spotify/SpotifyPlayer';
 import ReflectionModule from './journal/ReflectionModule';
 import EntryActions from './journal/EntryActions';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -41,6 +44,41 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [hasClickedToPlay, setHasClickedToPlay] = useState(false);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
   const { toast } = useToast();
+  const { authState } = useAuth();
+
+  // Get user's temperature unit preference
+  const { data: userProfile } = useQuery({
+    queryKey: ['temperature-settings', authState.user?.id],
+    queryFn: async () => {
+      if (!authState.user) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('temperature_unit')
+        .eq('id', authState.user.id)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching temperature preferences:', error);
+        return null;
+      }
+      
+      return data;
+    },
+    enabled: !!authState.user
+  });
+
+  // Format temperature based on user preference (stored as Celsius)
+  const formatTemperature = (celsius: number): string => {
+    const useCelsius = userProfile?.temperature_unit === 'celsius';
+    
+    if (useCelsius) {
+      return `${Math.round(celsius)}°C`;
+    } else {
+      const fahrenheit = (celsius * 9/5) + 32;
+      return `${Math.round(fahrenheit)}°F`;
+    }
+  };
   
   const parseDate = (dateValue: string | number) => {
     if (!dateValue) return new Date();
@@ -129,8 +167,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         <div className="flex items-center gap-3">
           {entry.weather && (
             <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
-              <span>{Math.round(entry.weather.temperature)}°</span>
-              <span className="text-xs">{entry.weather.location}</span>
+              <span className="font-medium text-foreground">{formatTemperature(entry.weather.temperature)}</span>
+              {entry.weather.location && <span className="text-xs">{entry.weather.location}</span>}
             </div>
           )}
           {!isPreview && (
