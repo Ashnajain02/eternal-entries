@@ -9,43 +9,43 @@
   :root {
     /* Soft, warm off-white palette */
     --background: 40 30% 96%;
-    --foreground: 30 10% 25%;
+    --foreground: 0 0% 10%;
 
-    --card: 40 25% 98%;
-    --card-foreground: 30 10% 25%;
+    --card: 40 20% 98%;
+    --card-foreground: 0 0% 10%;
 
-    --popover: 40 25% 98%;
-    --popover-foreground: 30 10% 25%;
+    --popover: 40 20% 98%;
+    --popover-foreground: 0 0% 10%;
 
-    /* Muted warm tones - no bright colors */
-    --primary: 30 20% 45%;
+    /* Clean black/brown tones */
+    --primary: 30 30% 35%;
     --primary-foreground: 40 30% 96%;
 
-    --secondary: 40 15% 92%;
-    --secondary-foreground: 30 10% 35%;
+    --secondary: 40 12% 92%;
+    --secondary-foreground: 0 0% 15%;
 
-    --muted: 40 15% 90%;
-    --muted-foreground: 30 10% 50%;
+    --muted: 40 12% 90%;
+    --muted-foreground: 30 8% 40%;
 
-    --accent: 35 20% 88%;
-    --accent-foreground: 30 10% 30%;
+    --accent: 35 15% 90%;
+    --accent-foreground: 0 0% 10%;
 
-    --destructive: 0 40% 50%;
-    --destructive-foreground: 40 30% 96%;
+    --destructive: 0 50% 45%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 40 15% 88%;
-    --input: 40 15% 88%;
-    --ring: 30 20% 50%;
+    --border: 40 10% 85%;
+    --input: 40 10% 85%;
+    --ring: 30 25% 40%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 40 25% 97%;
-    --sidebar-foreground: 30 10% 35%;
-    --sidebar-primary: 30 20% 45%;
+    --sidebar-background: 40 20% 97%;
+    --sidebar-foreground: 0 0% 15%;
+    --sidebar-primary: 30 30% 35%;
     --sidebar-primary-foreground: 40 30% 96%;
-    --sidebar-accent: 40 15% 92%;
-    --sidebar-accent-foreground: 30 10% 30%;
-    --sidebar-border: 40 15% 88%;
+    --sidebar-accent: 40 12% 92%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 40 10% 85%;
     --sidebar-ring: 30 20% 50%;
 
     /* Typography */
