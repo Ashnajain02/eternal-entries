@@ -78,8 +78,13 @@ const InteractiveContent: React.FC<InteractiveContentProps> = ({
       let label = li.querySelector('label');
       
       if (checkbox) {
-        // Checkbox exists - just update its state
-        checkbox.checked = isChecked;
+        // Checkbox exists - update its state using the attribute (not just property)
+        // The 'checked' attribute controls the initial state in HTML
+        if (isChecked) {
+          checkbox.setAttribute('checked', 'checked');
+        } else {
+          checkbox.removeAttribute('checked');
+        }
         checkbox.removeAttribute('disabled');
       } else if (!label) {
         // No checkbox and no label - create one (backward compatibility only)
@@ -87,7 +92,9 @@ const InteractiveContent: React.FC<InteractiveContentProps> = ({
         label.contentEditable = 'false';
         const input = doc.createElement('input');
         input.type = 'checkbox';
-        input.checked = isChecked;
+        if (isChecked) {
+          input.setAttribute('checked', 'checked');
+        }
         label.appendChild(input);
         li.insertBefore(label, li.firstChild);
       }
