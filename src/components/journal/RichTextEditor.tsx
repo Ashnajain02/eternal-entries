@@ -5,8 +5,8 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
+import { TaskList } from './extensions/TaskList';
+import { TaskItem } from './extensions/TaskItem';
 import { Button } from '@/components/ui/button';
 import { Bold, Italic, Underline as UnderlineIcon, ImagePlus, List, ListOrdered, ListTodo } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -235,7 +235,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => (editor.commands as any).toggleTaskList()}
+          onClick={() => editor.commands.toggleTaskList()}
           className={cn(
             "h-8 w-8 p-0",
             editor.isActive('taskList') && "bg-accent"
