@@ -12,7 +12,7 @@ interface DraftsContextType {
   currentDraft: JournalEntry | null;
   saveDraft: (entry: JournalEntry) => Promise<string | null>;
   deleteDraft: (draftId: string) => Promise<void>;
-  publishDraft: (entry: JournalEntry, addToLocalState: (entry: JournalEntry) => void) => Promise<void>;
+  publishDraft: (entry: JournalEntry, addToContext: (entry: JournalEntry) => Promise<void>) => Promise<void>;
   loadDraft: (draftId: string) => void;
   clearCurrentDraft: () => void;
   createNewDraft: () => JournalEntry;
@@ -247,7 +247,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authState.user, currentDraft, toast]);
 
-  const publishDraft = useCallback(async (entry: JournalEntry, addToLocalState: (entry: JournalEntry) => void) => {
+  const publishDraft = useCallback(async (entry: JournalEntry, addToContext: (entry: JournalEntry) => Promise<void>) => {
     if (!authState.user) return;
 
     const textContent = entry.content?.replace(/<[^>]*>/g, '').trim() || '';
@@ -291,8 +291,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
           id: data.id,
           createdAt: new Date(data.created_at).getTime(),
         };
-        // Only add to local state - DO NOT insert again
-        addToLocalState(publishedEntry);
+        await addToContext(publishedEntry);
         setDrafts(prev => prev.filter(d => d.id !== entry.id));
       } else {
         const { error } = await supabase
@@ -307,8 +306,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error;
 
         const publishedEntry: JournalEntry = { ...entry, id: actualId };
-        // Only add to local state - DO NOT insert again
-        addToLocalState(publishedEntry);
+        await addToContext(publishedEntry);
         setDrafts(prev => prev.filter(d => d.id !== actualId && d.id !== entry.id));
       }
 

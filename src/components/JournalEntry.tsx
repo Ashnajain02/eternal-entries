@@ -295,6 +295,11 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           <SpotifyClipPlayer 
             track={entry.track}
             entryId={entry.id}
+            clipStartSeconds={entry.track.clipStartSeconds}
+            clipEndSeconds={entry.track.clipEndSeconds}
+            onPlayStateChange={(playing) => {
+              if (playing) setHasClickedToPlay(true);
+            }}
           />
         </div>
       )}

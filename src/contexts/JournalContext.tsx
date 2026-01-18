@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { JournalEntry, Mood, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +10,6 @@ interface JournalContextType {
   entries: JournalEntry[];
   currentEntry: JournalEntry | null;
   addEntry: (entry: JournalEntry) => Promise<void>;
-  addEntryToState: (entry: JournalEntry) => void; // Add to local state only (no DB insert)
   updateEntry: (entry: JournalEntry) => Promise<void>;
   updateEntryContent: (entryId: string, newContent: string) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
@@ -220,15 +219,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       throw error;
     }
   };
-
-  // Add entry to local state only (no DB insert) - used by publishDraft
-  const addEntryToState = useCallback((entry: JournalEntry) => {
-    setEntries(prev => {
-      // Remove any existing entry with same ID to avoid duplicates
-      const filtered = prev.filter(e => e.id !== entry.id);
-      return [entry, ...filtered];
-    });
-  }, []);
   
   const updateEntry = async (updatedEntry: JournalEntry) => {
     if (!authState.user) {
@@ -494,7 +484,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     entries,
     currentEntry,
     addEntry,
-    addEntryToState,
     updateEntry,
     updateEntryContent,
     deleteEntry,
