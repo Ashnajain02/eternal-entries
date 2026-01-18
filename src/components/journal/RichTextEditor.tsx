@@ -5,10 +5,8 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
 import { Button } from '@/components/ui/button';
-import { Bold, Italic, Underline as UnderlineIcon, ImagePlus, List, ListOrdered, ListChecks } from 'lucide-react';
+import { Bold, Italic, Underline as UnderlineIcon, ImagePlus, List, ListOrdered } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -56,17 +54,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       Image.configure({
         HTMLAttributes: {
           class: 'rounded-md max-w-full my-4',
-        },
-      }),
-      TaskList.configure({
-        HTMLAttributes: {
-          class: 'task-list pl-0 my-2',
-        },
-      }),
-      TaskItem.configure({
-        nested: true,
-        HTMLAttributes: {
-          class: 'task-item flex items-start gap-2 my-1',
         },
       }),
       Placeholder.configure({
@@ -231,19 +218,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         >
           <ListOrdered className="h-4 w-4" />
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => editor.chain().focus().toggleTaskList().run()}
-          className={cn(
-            "h-8 w-8 p-0",
-            editor.isActive('taskList') && "bg-accent"
-          )}
-          title="Checklist"
-        >
-          <ListChecks className="h-4 w-4" />
-        </Button>
         <div className="w-px h-5 bg-border mx-1" />
         <Button
           type="button"
@@ -286,7 +260,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           border-radius: 0.375rem;
           margin: 1rem 0;
         }
-        .tiptap ul:not(.task-list) {
+        .tiptap ul {
           list-style-type: disc;
           padding-left: 1.25rem;
           margin: 0.5rem 0;
@@ -296,68 +270,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           padding-left: 1.25rem;
           margin: 0.5rem 0;
         }
-        .tiptap li:not(.task-item) {
+        .tiptap li {
           margin: 0.25rem 0;
         }
         .tiptap li p {
           margin: 0;
-        }
-        /* Task list styles */
-        .tiptap ul[data-type="taskList"] {
-          list-style: none;
-          padding-left: 0;
-          margin: 0.5rem 0;
-        }
-        .tiptap li[data-type="taskItem"] {
-          display: flex;
-          align-items: flex-start;
-          gap: 0.5rem;
-          margin: 0.25rem 0;
-        }
-        .tiptap li[data-type="taskItem"] > label {
-          display: flex;
-          align-items: center;
-          margin-top: 0.25rem;
-          flex-shrink: 0;
-        }
-        .tiptap li[data-type="taskItem"] > label > input[type="checkbox"] {
-          width: 1rem;
-          height: 1rem;
-          border-radius: 0.25rem;
-          border: 2px solid hsl(var(--border));
-          background: transparent;
-          cursor: pointer;
-          appearance: none;
-          -webkit-appearance: none;
-          position: relative;
-          flex-shrink: 0;
-        }
-        .tiptap li[data-type="taskItem"] > label > input[type="checkbox"]:checked {
-          background: hsl(var(--primary));
-          border-color: hsl(var(--primary));
-        }
-        .tiptap li[data-type="taskItem"] > label > input[type="checkbox"]:checked::after {
-          content: '';
-          position: absolute;
-          left: 3px;
-          top: 0px;
-          width: 5px;
-          height: 9px;
-          border: solid hsl(var(--primary-foreground));
-          border-width: 0 2px 2px 0;
-          transform: rotate(45deg);
-        }
-        .tiptap li[data-type="taskItem"] > div {
-          flex: 1;
-          min-width: 0;
-        }
-        .tiptap li[data-type="taskItem"][data-checked="true"] > div {
-          text-decoration: line-through;
-          opacity: 0.6;
-        }
-        /* Ensure cursor is visible */
-        .tiptap .ProseMirror-cursor {
-          border-left: 2px solid hsl(var(--foreground));
         }
       `}</style>
     </div>

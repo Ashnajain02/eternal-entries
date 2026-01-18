@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType, Mood } from '@/types';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,6 @@ import CommentSection from './CommentSection';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
 import ReflectionModule from './journal/ReflectionModule';
 import EntryActions from './journal/EntryActions';
-import InteractiveContent from './journal/InteractiveContent';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -126,12 +125,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     const updatedEntry = { ...entry };
     await updateEntry(updatedEntry);
   };
-
-  // Handle checkbox toggle in published entry content
-  const handleContentChange = useCallback(async (newContent: string) => {
-    const updatedEntry = { ...entry, content: newContent };
-    await updateEntry(updatedEntry);
-  }, [entry, updateEntry]);
 
   const handleSpotifyPlayerClick = () => {
     setHasClickedToPlay(true);
@@ -264,10 +257,9 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             transition: 'filter 0.8s ease, opacity 0.8s ease',
           }}
         >
-          <InteractiveContent 
-            content={entry.content}
-            onContentChange={!isPreview ? handleContentChange : undefined}
-            isReadOnly={isPreview}
+          <div 
+            className="prose prose-sm max-w-none text-foreground"
+            dangerouslySetInnerHTML={{ __html: entry.content }}
           />
         </div>
         
