@@ -244,50 +244,48 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       {/* Header - Desktop Layout */}
       <div className="hidden sm:block px-6 py-5 border-b border-border">
         <div className="flex items-start justify-between">
-          {/* Left: Date, Time, Mood */}
-          <div className="flex items-start gap-6">
-            <div>
-              <h3 className="font-display text-2xl font-semibold leading-tight text-foreground">{formattedDate}</h3>
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-sm text-muted-foreground">{formattedYear}</span>
-                {formattedTime && (
-                  <>
-                    <span className="text-muted-foreground">·</span>
-                    <span className="text-sm text-muted-foreground">{formattedTime}</span>
-                  </>
-                )}
-                <span className="px-2.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
-                  {moodLabels[entry.mood] || entry.mood}
-                </span>
-              </div>
+          {/* Left: Date, Year, Time */}
+          <div>
+            <h3 className="font-display text-2xl font-semibold leading-tight text-foreground">{formattedDate}</h3>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-sm text-muted-foreground">{formattedYear}</span>
+              {formattedTime && (
+                <>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-sm text-muted-foreground">{formattedTime}</span>
+                </>
+              )}
+              <span className="px-2.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
+                {moodLabels[entry.mood] || entry.mood}
+              </span>
+              {entry.weather && (
+                <>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-sm text-muted-foreground">{formatTemperature(entry.weather.temperature)}</span>
+                  {entry.weather.description && (
+                    <>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-sm text-muted-foreground capitalize">{entry.weather.description}</span>
+                    </>
+                  )}
+                  {entry.weather.location && (
+                    <>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-sm text-muted-foreground">{entry.weather.location}</span>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
           
-          {/* Right: Weather + Actions */}
-          <div className="flex items-start gap-4">
-            {entry.weather && (
-              <div className="text-right">
-                <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                  <span>{formatTemperature(entry.weather.temperature)}</span>
-                  {entry.weather.description && (
-                    <>
-                      <span>·</span>
-                      <span className="capitalize">{entry.weather.description}</span>
-                    </>
-                  )}
-                </div>
-                {entry.weather.location && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{entry.weather.location}</p>
-                )}
-              </div>
-            )}
-            {!isPreview && (
-              <EntryActions
-                onEdit={() => setIsEditing(true)}
-                onDelete={handleDelete}
-              />
-            )}
-          </div>
+          {/* Right: Actions */}
+          {!isPreview && (
+            <EntryActions
+              onEdit={() => setIsEditing(true)}
+              onDelete={handleDelete}
+            />
+          )}
         </div>
       </div>
 
