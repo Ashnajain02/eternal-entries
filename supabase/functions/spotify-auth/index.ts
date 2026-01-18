@@ -176,12 +176,15 @@ async function getAuthorizationUrl(redirect_uri: string) {
     // Generate a random state value for security
     const state = Math.random().toString(36).substring(2, 15);
     
-    // Required scopes for Spotify API
+    // Required scopes for Spotify API including Web Playback SDK
     const scopes = [
       'user-read-private',
       'user-read-email',
       'user-top-read',
-      'user-read-recently-played'
+      'user-read-recently-played',
+      'streaming',
+      'user-modify-playback-state',
+      'user-read-playback-state'
     ];
     
     // Create the authorization URL

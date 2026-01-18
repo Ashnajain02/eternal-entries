@@ -17,6 +17,8 @@ interface JournalEntryRow {
   spotify_track_artist: string | null;
   spotify_track_album: string | null;
   spotify_track_image: string | null;
+  spotify_clip_start_seconds: number | null;
+  spotify_clip_end_seconds: number | null;
   weather_temperature: number | null;
   weather_description: string | null;
   weather_icon: string | null;
@@ -37,7 +39,9 @@ function mapSpotifyTrack(row: JournalEntryRow): SpotifyTrack | undefined {
     artist: row.spotify_track_artist || '',
     album: row.spotify_track_album || '',
     albumArt: row.spotify_track_image || '',
-    uri: row.spotify_track_uri
+    uri: row.spotify_track_uri,
+    clipStartSeconds: row.spotify_clip_start_seconds ?? 0,
+    clipEndSeconds: row.spotify_clip_end_seconds ?? 30
   };
 }
 
@@ -88,6 +92,8 @@ export function buildDbPayload(entry: JournalEntry, encryptedContent: string) {
     spotify_track_artist: entry.track?.artist || null,
     spotify_track_album: entry.track?.album || null,
     spotify_track_image: entry.track?.albumArt || null,
+    spotify_clip_start_seconds: entry.track?.clipStartSeconds ?? null,
+    spotify_clip_end_seconds: entry.track?.clipEndSeconds ?? null,
     weather_temperature: entry.weather?.temperature ?? null,
     weather_description: entry.weather?.description || null,
     weather_icon: entry.weather?.icon || null,

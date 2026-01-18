@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { JournalProvider } from "./contexts/JournalContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { DraftsProvider } from "./contexts/DraftsContext";
+import { SpotifyPlaybackProvider } from "./contexts/SpotifyPlaybackContext";
 import Index from "./pages/Index";
 import Archive from "./pages/Archive";
 import Auth from "./pages/Auth";
@@ -20,44 +21,46 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <JournalProvider>
-          <DraftsProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/callback" element={<Callback />} />
-                <Route path="/" element={<Index />} />
-                <Route 
-                  path="/archive" 
-                  element={
-                    <ProtectedRoute>
-                      <Archive />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/habits" 
-                  element={
-                    <ProtectedRoute>
-                      <Habits />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/settings" 
-                  element={
-                    <ProtectedRoute>
-                      <Settings />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </DraftsProvider>
-        </JournalProvider>
+        <SpotifyPlaybackProvider>
+          <JournalProvider>
+            <DraftsProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/callback" element={<Callback />} />
+                  <Route path="/" element={<Index />} />
+                  <Route 
+                    path="/archive" 
+                    element={
+                      <ProtectedRoute>
+                        <Archive />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/habits" 
+                    element={
+                      <ProtectedRoute>
+                        <Habits />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/settings" 
+                    element={
+                      <ProtectedRoute>
+                        <Settings />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </DraftsProvider>
+          </JournalProvider>
+        </SpotifyPlaybackProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { SpotifyTrack } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Music } from 'lucide-react';
 import SpotifyTrackSearch from '@/components/spotify/SpotifyTrackSearch';
 import SpotifyTrackDisplay from '@/components/spotify/SpotifyTrackDisplay';
+import ClipTimestampSelector from '@/components/spotify/ClipTimestampSelector';
 
 interface SpotifySectionProps {
   selectedTrack: SpotifyTrack | null | undefined;
@@ -29,15 +29,48 @@ const SpotifySection: React.FC<SpotifySectionProps> = ({
     onTrackSelect(undefined);
   };
 
+  const handleTrackSelect = (track: SpotifyTrack) => {
+    // Set default clip timestamps when selecting a new track
+    onTrackSelect({
+      ...track,
+      clipStartSeconds: 0,
+      clipEndSeconds: 30
+    });
+  };
+
+  const handleClipStartChange = (seconds: number) => {
+    if (selectedTrack) {
+      onTrackSelect({
+        ...selectedTrack,
+        clipStartSeconds: seconds
+      });
+    }
+  };
+
+  const handleClipEndChange = (seconds: number) => {
+    if (selectedTrack) {
+      onTrackSelect({
+        ...selectedTrack,
+        clipEndSeconds: seconds
+      });
+    }
+  };
+
   return (
-    <div className="mb-6">
+    <div className="space-y-4">
       {selectedTrack ? (
-        <div className="mb-2">
+        <>
           <SpotifyTrackDisplay 
             track={selectedTrack} 
             onRemove={handleRemoveTrack} 
           />
-        </div>
+          <ClipTimestampSelector
+            clipStartSeconds={selectedTrack.clipStartSeconds ?? 0}
+            clipEndSeconds={selectedTrack.clipEndSeconds ?? 30}
+            onStartChange={handleClipStartChange}
+            onEndChange={handleClipEndChange}
+          />
+        </>
       ) : (
         <div>
           {spotifyConnected ? (
@@ -65,7 +98,7 @@ const SpotifySection: React.FC<SpotifySectionProps> = ({
       <SpotifyTrackSearch 
         isOpen={isSpotifySearchOpen} 
         onClose={() => setIsSpotifySearchOpen(false)} 
-        onTrackSelect={onTrackSelect} 
+        onTrackSelect={handleTrackSelect} 
       />
     </div>
   );

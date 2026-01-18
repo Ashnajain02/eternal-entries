@@ -7,7 +7,7 @@ import { useJournal } from '@/contexts/JournalContext';
 import JournalEditorInline from './journal/JournalEditorInline';
 import { useToast } from '@/hooks/use-toast';
 import CommentSection from './CommentSection';
-import SpotifyPlayer from './spotify/SpotifyPlayer';
+import SpotifyClipPlayer from './spotify/SpotifyClipPlayer';
 import ReflectionModule from './journal/ReflectionModule';
 import EntryActions from './journal/EntryActions';
 import InteractiveContent from './journal/InteractiveContent';
@@ -292,9 +292,14 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       {/* Spotify Track */}
       {entry.track && (
         <div className="px-6 py-4 border-b border-border bg-accent/20">
-          <SpotifyPlayer 
-            track={entry.track} 
-            onPlayerClick={handleSpotifyPlayerClick}
+          <SpotifyClipPlayer 
+            track={entry.track}
+            entryId={entry.id}
+            clipStartSeconds={entry.track.clipStartSeconds}
+            clipEndSeconds={entry.track.clipEndSeconds}
+            onPlayStateChange={(playing) => {
+              if (playing) setHasClickedToPlay(true);
+            }}
           />
         </div>
       )}
