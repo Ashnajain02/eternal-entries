@@ -30,7 +30,7 @@ const Habits: React.FC = () => {
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
         <div className="space-y-1">
-          <h1 className="text-2xl md:text-3xl font-display tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-display font-semibold tracking-tight">
             Daily Habits
           </h1>
           <p className="text-muted-foreground font-body">
