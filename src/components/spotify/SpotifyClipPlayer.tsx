@@ -64,7 +64,7 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
   if (needsReauth) {
     return (
       <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-        <img src={track.imageUrl || '/placeholder.svg'} alt={track.name} className="w-12 h-12 rounded object-cover" />
+        <img src={track.albumArt || '/placeholder.svg'} alt={track.name} className="w-12 h-12 rounded object-cover" />
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm truncate">{track.name}</p>
           <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
@@ -81,7 +81,7 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
   if (isPremium === false) {
     return (
       <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-        <img src={track.imageUrl || '/placeholder.svg'} alt={track.name} className="w-12 h-12 rounded object-cover" />
+        <img src={track.albumArt || '/placeholder.svg'} alt={track.name} className="w-12 h-12 rounded object-cover" />
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm truncate">{track.name}</p>
           <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
@@ -94,7 +94,7 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
   return (
     <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
       <div className="flex items-center gap-3">
-        <img src={track.imageUrl || '/placeholder.svg'} alt={track.name} className="w-12 h-12 rounded object-cover" />
+        <img src={track.albumArt || '/placeholder.svg'} alt={track.name} className="w-12 h-12 rounded object-cover" />
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm truncate">{track.name}</p>
           <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
