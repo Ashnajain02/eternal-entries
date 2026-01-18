@@ -88,7 +88,7 @@ const Index = () => {
           transition={{ duration: 0.4 }}
           className="flex items-center justify-between mb-10"
         >
-          <h1 className="font-display text-4xl text-primary">Journal</h1>
+          <h1 className="font-display text-4xl text-foreground font-semibold">Journal</h1>
           
           {!isWriting && (
             <Button 

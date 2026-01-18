@@ -202,7 +202,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       <div className="sm:hidden px-4 py-4 border-b border-border">
         <div className="flex items-start justify-between mb-2">
           <div>
-            <h3 className="font-display text-2xl font-medium leading-tight text-primary">{formattedDate}</h3>
+            <h3 className="font-display text-2xl font-semibold leading-tight text-foreground">{formattedDate}</h3>
             <p className="text-sm text-muted-foreground">{formattedYear}</p>
           </div>
           {!isPreview && (
@@ -247,7 +247,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           {/* Left: Date, Time, Mood */}
           <div className="flex items-start gap-6">
             <div>
-              <h3 className="font-display text-2xl font-medium leading-tight text-primary">{formattedDate}</h3>
+              <h3 className="font-display text-2xl font-semibold leading-tight text-foreground">{formattedDate}</h3>
               <div className="flex items-center gap-3 mt-1">
                 <span className="text-sm text-muted-foreground">{formattedYear}</span>
                 {formattedTime && (
