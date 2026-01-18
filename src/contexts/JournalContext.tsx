@@ -179,8 +179,27 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       return;
     }
 
+    // Check if this entry already has a real DB ID (not a temp/draft ID)
+    // If so, it was already inserted by publishDraft - only update local state
+    const isRealId = entry.id && !entry.id.startsWith('draft-') && !entry.id.startsWith('temp-');
+    
+    if (isRealId) {
+      // Entry already exists in DB (inserted by publishDraft) - just update local state
+      console.log("Adding published entry to local state:", entry.id, entry.track);
+      setEntries(prev => {
+        // Check if entry already exists in state to avoid duplicates
+        const exists = prev.some(e => e.id === entry.id);
+        if (exists) {
+          return prev.map(e => e.id === entry.id ? entry : e);
+        }
+        return [entry, ...prev];
+      });
+      return;
+    }
+
+    // Only insert to DB if this is a truly new entry (should rarely happen now)
     try {
-      console.log("Adding entry with track:", entry.track);
+      console.log("Inserting new entry with track:", entry.track);
       
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
       const payload = buildDbPayload(entry, encryptedEntry.content);

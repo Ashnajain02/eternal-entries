@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Music } from 'lucide-react';
 import SpotifyTrackSearch from '@/components/spotify/SpotifyTrackSearch';
 import SpotifyTrackDisplay from '@/components/spotify/SpotifyTrackDisplay';
-import ClipTimestampSelector from '@/components/spotify/ClipTimestampSelector';
+import ClipRangeSelector from '@/components/spotify/ClipRangeSelector';
 
 interface SpotifySectionProps {
   selectedTrack: SpotifyTrack | null | undefined;
@@ -64,7 +64,8 @@ const SpotifySection: React.FC<SpotifySectionProps> = ({
             track={selectedTrack} 
             onRemove={handleRemoveTrack} 
           />
-          <ClipTimestampSelector
+          <ClipRangeSelector
+            trackUri={selectedTrack.uri}
             clipStartSeconds={selectedTrack.clipStartSeconds ?? 0}
             clipEndSeconds={selectedTrack.clipEndSeconds ?? 30}
             onStartChange={handleClipStartChange}
