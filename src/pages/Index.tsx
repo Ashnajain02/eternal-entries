@@ -88,12 +88,12 @@ const Index = () => {
           transition={{ duration: 0.4 }}
           className="flex items-center justify-between mb-10"
         >
-          <h1 className="font-display text-4xl">Journal</h1>
+          <h1 className="font-display text-4xl text-primary">Journal</h1>
           
           {!isWriting && (
             <Button 
               onClick={handleCreateNewEntry} 
-              className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-5"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-5"
             >
               <Plus className="h-4 w-4 mr-2" />
               New Entry
@@ -141,17 +141,17 @@ const Index = () => {
                 transition={{ duration: 0.5 }}
                 className="text-center py-20"
               >
-                <div className="w-16 h-16 rounded-full bg-accent flex items-center justify-center mx-auto mb-6">
-                  <BookOpen className="h-7 w-7 text-muted-foreground" />
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                  <BookOpen className="h-7 w-7 text-primary" />
                 </div>
-                <h2 className="font-display text-2xl mb-3">Start your journal</h2>
+                <h2 className="font-display text-2xl mb-3 text-primary">Start your journal</h2>
                 <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
                   Capture your thoughts, moods, and the music you're listening to. 
                   Your future self will thank you.
                 </p>
                 <Button 
                   onClick={handleCreateNewEntry}
-                  className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-6"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
                 >
                   Write Your First Entry
                 </Button>
