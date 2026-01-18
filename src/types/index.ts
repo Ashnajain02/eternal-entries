@@ -22,6 +22,8 @@ export interface SpotifyTrack {
   album: string;
   albumArt: string;
   uri: string;
+  clipStartSeconds?: number;
+  clipEndSeconds?: number;
 }
 
 export interface JournalComment {

@@ -99,6 +99,8 @@ export type Database = {
           mood: string
           reflection_answer: string | null
           reflection_question: string | null
+          spotify_clip_end_seconds: number | null
+          spotify_clip_start_seconds: number | null
           spotify_track_album: string | null
           spotify_track_artist: string | null
           spotify_track_image: string | null
@@ -120,6 +122,8 @@ export type Database = {
           mood: string
           reflection_answer?: string | null
           reflection_question?: string | null
+          spotify_clip_end_seconds?: number | null
+          spotify_clip_start_seconds?: number | null
           spotify_track_album?: string | null
           spotify_track_artist?: string | null
           spotify_track_image?: string | null
@@ -141,6 +145,8 @@ export type Database = {
           mood?: string
           reflection_answer?: string | null
           reflection_question?: string | null
+          spotify_clip_end_seconds?: number | null
+          spotify_clip_start_seconds?: number | null
           spotify_track_album?: string | null
           spotify_track_artist?: string | null
           spotify_track_image?: string | null

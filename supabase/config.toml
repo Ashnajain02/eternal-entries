@@ -1,4 +1,3 @@
-
 project_id = "veorhexddrwlwxtkuycb"
 
 [functions.spotify-auth]
@@ -8,5 +7,8 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-reflection]
+verify_jwt = false
+
+[functions.spotify-playback-token]
 verify_jwt = false
 
