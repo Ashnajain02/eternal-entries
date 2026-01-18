@@ -200,10 +200,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     >
       {/* Header - Mobile Layout */}
       <div className="sm:hidden px-4 py-4 border-b border-border">
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-2">
           <div>
-            <h3 className="font-display text-2xl font-medium leading-tight">{formattedDate}</h3>
-            <p className="text-base text-muted-foreground font-medium">{formattedYear}</p>
+            <h3 className="font-display text-2xl font-medium leading-tight text-primary">{formattedDate}</h3>
+            <p className="text-sm text-muted-foreground">{formattedYear}</p>
           </div>
           {!isPreview && (
             <EntryActions
@@ -213,26 +213,31 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           )}
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm mt-3">
           {formattedTime && (
             <span className="text-muted-foreground">{formattedTime}</span>
           )}
-          <span className="px-2 py-0.5 text-xs rounded-full bg-accent text-accent-foreground">
+          <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
             {moodLabels[entry.mood] || entry.mood}
           </span>
-          {entry.weather && (
-            <>
-              <span className="text-muted-foreground">·</span>
-              <span className="font-medium text-foreground">{formatTemperature(entry.weather.temperature)}</span>
-              {entry.weather.description && (
-                <span className="text-muted-foreground capitalize">{entry.weather.description}</span>
-              )}
-            </>
-          )}
         </div>
         
-        {entry.weather?.location && (
-          <p className="text-xs text-muted-foreground mt-2">{entry.weather.location}</p>
+        {entry.weather && (
+          <div className="flex items-center gap-2 text-sm mt-2 text-muted-foreground">
+            <span>{formatTemperature(entry.weather.temperature)}</span>
+            {entry.weather.description && (
+              <>
+                <span>·</span>
+                <span className="capitalize">{entry.weather.description}</span>
+              </>
+            )}
+            {entry.weather.location && (
+              <>
+                <span>·</span>
+                <span>{entry.weather.location}</span>
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -242,16 +247,16 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           {/* Left: Date, Time, Mood */}
           <div className="flex items-start gap-6">
             <div>
-              <h3 className="font-display text-2xl font-medium leading-tight">{formattedDate}</h3>
+              <h3 className="font-display text-2xl font-medium leading-tight text-primary">{formattedDate}</h3>
               <div className="flex items-center gap-3 mt-1">
-                <span className="text-base text-muted-foreground font-medium">{formattedYear}</span>
+                <span className="text-sm text-muted-foreground">{formattedYear}</span>
                 {formattedTime && (
                   <>
                     <span className="text-muted-foreground">·</span>
-                    <span className="text-base text-muted-foreground">{formattedTime}</span>
+                    <span className="text-sm text-muted-foreground">{formattedTime}</span>
                   </>
                 )}
-                <span className="px-2.5 py-0.5 text-xs rounded-full bg-accent text-accent-foreground">
+                <span className="px-2.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
                   {moodLabels[entry.mood] || entry.mood}
                 </span>
               </div>
@@ -262,10 +267,13 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           <div className="flex items-start gap-4">
             {entry.weather && (
               <div className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <span className="font-semibold text-foreground text-lg">{formatTemperature(entry.weather.temperature)}</span>
+                <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+                  <span>{formatTemperature(entry.weather.temperature)}</span>
                   {entry.weather.description && (
-                    <span className="text-muted-foreground capitalize">{entry.weather.description}</span>
+                    <>
+                      <span>·</span>
+                      <span className="capitalize">{entry.weather.description}</span>
+                    </>
                   )}
                 </div>
                 {entry.weather.location && (
