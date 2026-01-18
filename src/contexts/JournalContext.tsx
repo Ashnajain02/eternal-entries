@@ -11,6 +11,7 @@ interface JournalContextType {
   currentEntry: JournalEntry | null;
   addEntry: (entry: JournalEntry) => Promise<void>;
   updateEntry: (entry: JournalEntry) => Promise<void>;
+  updateEntryContent: (entryId: string, newContent: string) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
   getEntryById: (id: string) => JournalEntry | undefined;
   getEntriesByDate: (date: string) => JournalEntry[];
@@ -370,6 +371,54 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       throw error;
     }
   };
+
+  // Update only the content of an entry (used for checklist toggles)
+  // This is a silent update that doesn't show toasts
+  const updateEntryContent = async (entryId: string, newContent: string) => {
+    if (!authState.user) {
+      throw new Error('Authentication required');
+    }
+
+    try {
+      const entryToUpdate = entries.find(e => e.id === entryId);
+      if (!entryToUpdate) {
+        throw new Error('Entry not found');
+      }
+
+      const now = new Date();
+      
+      // Create updated entry with new content
+      const updatedEntry: JournalEntry = {
+        ...entryToUpdate,
+        content: newContent
+      };
+      
+      // Encrypt content before saving
+      const encryptedEntry = await encryptJournalEntry(updatedEntry, authState.user.id);
+      
+      const { error } = await supabase
+        .from('journal_entries')
+        .update({
+          entry_text: encryptedEntry.content,
+          updated_at: now.toISOString()
+        })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      // Update local state silently
+      setEntries(prev => prev.map(entry => 
+        entry.id === entryId ? {
+          ...entry,
+          content: newContent,
+          updatedAt: now.getTime()
+        } : entry
+      ));
+    } catch (error: any) {
+      console.error('Error updating entry content:', error);
+      throw error;
+    }
+  };
   
   const deleteEntry = async (id: string) => {
     if (!authState.user) {
@@ -595,6 +644,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     currentEntry,
     addEntry,
     updateEntry,
+    updateEntryContent,
     deleteEntry,
     getEntryById,
     getEntriesByDate,
