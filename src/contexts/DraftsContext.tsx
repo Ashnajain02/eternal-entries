@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { encryptJournalEntry, decryptJournalEntry } from '@/utils/encryption';
+import { mapDbRowToJournalEntry, buildDbPayload, hasMeaningfulContent } from '@/utils/journalEntryMapper';
 
 interface DraftsContextType {
   drafts: JournalEntry[];
@@ -39,11 +40,8 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentDraftIdRef = useRef<string | null>(null);
-
-  // Map temp IDs to real DB IDs (survives across component lifecycle but not page refresh)
   const tempIdToRealIdRef = useRef<Record<string, string>>({});
 
-  // Load drafts from database
   const loadDrafts = useCallback(async () => {
     if (!authState.user) return;
     
@@ -59,35 +57,8 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       const decryptedDrafts: JournalEntry[] = [];
-      for (const entry of data || []) {
-        const journalEntry: JournalEntry = {
-          id: entry.id,
-          content: entry.entry_text,
-          date: new Date(entry.timestamp_started).toISOString().split('T')[0],
-          timestamp: entry.timestamp_started,
-          mood: entry.mood as JournalEntry['mood'],
-          weather: entry.weather_temperature ? {
-            temperature: entry.weather_temperature,
-            description: entry.weather_description || '',
-            icon: entry.weather_icon || '',
-            location: entry.weather_location || ''
-          } : undefined,
-          track: entry.spotify_track_uri ? {
-            id: entry.spotify_track_uri.split(':').pop() || '',
-            name: entry.spotify_track_name || '',
-            artist: entry.spotify_track_artist || '',
-            album: entry.spotify_track_album || '',
-            albumArt: entry.spotify_track_image || '',
-            uri: entry.spotify_track_uri
-          } : undefined,
-          createdAt: new Date(entry.created_at).getTime(),
-          updatedAt: entry.updated_at ? new Date(entry.updated_at).getTime() : undefined,
-          user_id: entry.user_id,
-          comments: [],
-          reflectionQuestion: entry.reflection_question || undefined,
-          reflectionAnswer: entry.reflection_answer || undefined
-        };
-        
+      for (const row of data || []) {
+        const journalEntry = mapDbRowToJournalEntry(row);
         const decrypted = await decryptJournalEntry(journalEntry, authState.user.id);
         decryptedDrafts.push(decrypted);
       }
@@ -105,16 +76,14 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
       loadDrafts();
     } else {
       setDrafts([]);
-      // Clear mappings on logout
       tempIdToRealIdRef.current = {};
     }
   }, [authState.user, loadDrafts]);
 
   const createNewDraft = useCallback((): JournalEntry => {
     const now = new Date();
-    const tempId = `draft-${Date.now()}`;
     return {
-      id: tempId,
+      id: `draft-${Date.now()}`,
       content: '',
       date: now.toISOString().split('T')[0],
       timestamp: now.toISOString(),
@@ -123,17 +92,15 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Check if draft has meaningful content
-  const hasMeaningfulContent = (entry: JournalEntry): boolean => {
-    const textContent = entry.content?.replace(/<[^>]*>/g, '').trim() || '';
-    return !!(textContent || entry.track || entry.mood !== 'neutral');
-  };
+  const upsertDraftState = useCallback((saved: JournalEntry, removeTempId?: string | null) => {
+    setDrafts(prev => {
+      const filtered = prev.filter(d => d.id !== saved.id && (!removeTempId || d.id !== removeTempId));
+      return [saved, ...filtered];
+    });
+  }, []);
 
-  // Save or update draft in database using upsert (prevents duplicates across refreshes)
   const saveDraft = useCallback(async (entry: JournalEntry): Promise<string | null> => {
     if (!authState.user) return null;
-
-    // Don't save if no meaningful content
     if (!hasMeaningfulContent(entry)) return null;
 
     const isTempId = entry.id.startsWith('draft-');
@@ -141,32 +108,13 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
-
-      const upsertDraftState = (saved: JournalEntry, removeTempId?: string | null) => {
-        setDrafts(prev => {
-          const filtered = prev.filter(d => d.id !== saved.id && (!removeTempId || d.id !== removeTempId));
-          return [saved, ...filtered];
-        });
-      };
+      const payload = buildDbPayload(entry, encryptedEntry.content);
 
       // For real IDs (already in DB), just update by id
       if (!isTempId) {
         const { error } = await supabase
           .from('journal_entries')
-          .update({
-            entry_text: encryptedEntry.content,
-            mood: entry.mood,
-            spotify_track_uri: entry.track?.uri,
-            spotify_track_name: entry.track?.name,
-            spotify_track_artist: entry.track?.artist,
-            spotify_track_album: entry.track?.album,
-            spotify_track_image: entry.track?.albumArt,
-            weather_temperature: entry.weather?.temperature,
-            weather_description: entry.weather?.description,
-            weather_icon: entry.weather?.icon,
-            weather_location: entry.weather?.location,
-            updated_at: new Date().toISOString()
-          })
+          .update({ ...payload, updated_at: new Date().toISOString() })
           .eq('id', entry.id);
 
         if (error) throw error;
@@ -177,8 +125,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
         return entry.id;
       }
 
-      // For temp IDs: First check if a draft with this timestamp already exists
-      // This handles refreshes, navigation, and race conditions by looking up existing drafts
+      // For temp IDs: Check if a draft with this timestamp already exists
       const { data: existingDraft, error: lookupError } = await supabase
         .from('journal_entries')
         .select('id')
@@ -194,45 +141,20 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
       let savedId: string;
       
       if (existingDraft) {
-        // Update the existing draft
         const { error: updateError } = await supabase
           .from('journal_entries')
-          .update({
-            entry_text: encryptedEntry.content,
-            mood: entry.mood,
-            spotify_track_uri: entry.track?.uri || null,
-            spotify_track_name: entry.track?.name || null,
-            spotify_track_artist: entry.track?.artist || null,
-            spotify_track_album: entry.track?.album || null,
-            spotify_track_image: entry.track?.albumArt || null,
-            weather_temperature: entry.weather?.temperature ?? null,
-            weather_description: entry.weather?.description || null,
-            weather_icon: entry.weather?.icon || null,
-            weather_location: entry.weather?.location || null,
-            updated_at: new Date().toISOString()
-          })
+          .update({ ...payload, updated_at: new Date().toISOString() })
           .eq('id', existingDraft.id);
 
         if (updateError) throw updateError;
         savedId = existingDraft.id;
       } else {
-        // Insert a new draft
         const { data: insertedDraft, error: insertError } = await supabase
           .from('journal_entries')
           .insert({
             user_id: authState.user.id,
-            entry_text: encryptedEntry.content,
-            mood: entry.mood,
+            ...payload,
             status: 'draft',
-            spotify_track_uri: entry.track?.uri || null,
-            spotify_track_name: entry.track?.name || null,
-            spotify_track_artist: entry.track?.artist || null,
-            spotify_track_album: entry.track?.album || null,
-            spotify_track_image: entry.track?.albumArt || null,
-            weather_temperature: entry.weather?.temperature ?? null,
-            weather_description: entry.weather?.description || null,
-            weather_icon: entry.weather?.icon || null,
-            weather_location: entry.weather?.location || null,
             timestamp_started: entry.timestamp,
             updated_at: new Date().toISOString()
           })
@@ -243,13 +165,8 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
         savedId = insertedDraft.id;
       }
 
-      const savedDraft: JournalEntry = {
-        ...entry,
-        id: savedId,
-        updatedAt: Date.now()
-      };
+      const savedDraft: JournalEntry = { ...entry, id: savedId, updatedAt: Date.now() };
 
-      // Map temp id to real id for future reference
       if (tempId) {
         tempIdToRealIdRef.current[tempId] = savedId;
       }
@@ -264,9 +181,8 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
       console.error('Error saving draft:', error);
       return null;
     }
-  }, [authState.user]);
+  }, [authState.user, upsertDraftState]);
 
-  // Auto-save with debouncing - calls onIdChanged when a temp ID is replaced with real DB ID
   const autoSaveDraft = useCallback((entry: JournalEntry, onIdChanged?: (newId: string) => void) => {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
@@ -275,23 +191,19 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
     autoSaveTimeoutRef.current = setTimeout(async () => {
       const savedId = await saveDraft(entry);
       if (savedId && entry.id.startsWith('draft-') && savedId !== entry.id) {
-        // Notify caller that the ID has changed
         onIdChanged?.(savedId);
         setCurrentDraft(prev => prev ? { ...prev, id: savedId } : null);
       }
     }, 1000);
   }, [saveDraft]);
 
-  // Delete draft permanently
   const deleteDraft = useCallback(async (draftId: string) => {
     if (!authState.user) return;
     
-    // Clear timeout if deleting
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
-    // Check if this temp ID maps to a real ID
     const realId = draftId.startsWith('draft-') ? tempIdToRealIdRef.current[draftId] : draftId;
 
     // If it's a temp draft that hasn't been saved yet, just clear it
@@ -317,7 +229,6 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
         currentDraftIdRef.current = null;
       }
 
-      // Clean up mapping
       if (draftId.startsWith('draft-')) {
         delete tempIdToRealIdRef.current[draftId];
       }
@@ -336,7 +247,6 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authState.user, currentDraft, toast]);
 
-  // Publish draft (change status to published)
   const publishDraft = useCallback(async (entry: JournalEntry, addToContext: (entry: JournalEntry) => Promise<void>) => {
     if (!authState.user) return;
 
@@ -350,37 +260,25 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Clear any pending auto-save
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
-    // Check if this temp ID maps to a real ID
     const realId = entry.id.startsWith('draft-') ? tempIdToRealIdRef.current[entry.id] : null;
     const actualId = realId || entry.id;
     const isNewDraft = entry.id.startsWith('draft-') && !realId;
 
     try {
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
+      const payload = buildDbPayload(entry, encryptedEntry.content);
 
       if (isNewDraft) {
-        // Insert as published
         const { data, error } = await supabase
           .from('journal_entries')
           .insert([{
             user_id: authState.user.id,
-            entry_text: encryptedEntry.content,
-            mood: entry.mood,
+            ...payload,
             status: 'published',
-            spotify_track_uri: entry.track?.uri,
-            spotify_track_name: entry.track?.name,
-            spotify_track_artist: entry.track?.artist,
-            spotify_track_album: entry.track?.album,
-            spotify_track_image: entry.track?.albumArt,
-            weather_temperature: entry.weather?.temperature,
-            weather_description: entry.weather?.description,
-            weather_icon: entry.weather?.icon,
-            weather_location: entry.weather?.location,
             timestamp_started: entry.timestamp
           }])
           .select()
@@ -388,51 +286,30 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
 
         if (error) throw error;
         
-        // Add to journal context
         const publishedEntry: JournalEntry = {
           ...entry,
           id: data.id,
           createdAt: new Date(data.created_at).getTime(),
         };
         await addToContext(publishedEntry);
-
-        // Clear from drafts list
         setDrafts(prev => prev.filter(d => d.id !== entry.id));
       } else {
-        // Update existing to published
         const { error } = await supabase
           .from('journal_entries')
           .update({
-            entry_text: encryptedEntry.content,
-            mood: entry.mood,
+            ...payload,
             status: 'published',
-            spotify_track_uri: entry.track?.uri,
-            spotify_track_name: entry.track?.name,
-            spotify_track_artist: entry.track?.artist,
-            spotify_track_album: entry.track?.album,
-            spotify_track_image: entry.track?.albumArt,
-            weather_temperature: entry.weather?.temperature,
-            weather_description: entry.weather?.description,
-            weather_icon: entry.weather?.icon,
-            weather_location: entry.weather?.location,
             updated_at: new Date().toISOString()
           })
           .eq('id', actualId);
 
         if (error) throw error;
 
-        // Add to journal context
-        const publishedEntry: JournalEntry = {
-          ...entry,
-          id: actualId,
-        };
+        const publishedEntry: JournalEntry = { ...entry, id: actualId };
         await addToContext(publishedEntry);
-
-        // Remove from drafts list
         setDrafts(prev => prev.filter(d => d.id !== actualId && d.id !== entry.id));
       }
 
-      // Clean up
       if (entry.id.startsWith('draft-')) {
         delete tempIdToRealIdRef.current[entry.id];
       }
@@ -470,7 +347,6 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
     currentDraftIdRef.current = null;
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (autoSaveTimeoutRef.current) {
