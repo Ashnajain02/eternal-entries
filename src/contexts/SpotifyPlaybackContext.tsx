@@ -241,24 +241,56 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, [loadSpotifySDK, getAccessToken]);
 
-  // Play a clip
+  // Play a clip - optimized for mobile gesture compliance
   const playClip = useCallback(async (clip: ClipPlaybackInfo) => {
-    if (!deviceId || !accessTokenRef.current) {
+    // For mobile: we need to start playback IMMEDIATELY in the gesture handler
+    // Get current token or fail fast - don't do async init here
+    const token = accessTokenRef.current;
+    const currentDeviceId = deviceId;
+    
+    if (!token || !currentDeviceId) {
+      console.log('[Mobile Debug] No token or device, initializing player...');
+      // Initialize player - this won't play immediately but prepares for next tap
       await initializePlayer();
       return;
     }
 
     // Stop current clip if different
     if (currentClip && currentClip.entryId !== clip.entryId) {
-      await pauseClip();
+      if (positionIntervalRef.current) {
+        clearInterval(positionIntervalRef.current);
+        positionIntervalRef.current = null;
+      }
+      // Don't await pause - we want to start new playback immediately
+      playerRef.current?.pause().catch(() => {});
     }
 
+    // Set state optimistically BEFORE the API call for responsive UI
+    setCurrentClip(clip);
+    setIsPlaying(true);
+    setPosition(clip.clipStartSeconds);
+
     try {
-      // Start playback via Spotify API
-      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+      console.log('[Mobile Debug] Starting playback on device:', currentDeviceId);
+      
+      // First, transfer playback to our device (important for mobile)
+      await fetch(`https://api.spotify.com/v1/me/player`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${accessTokenRef.current}`,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          device_ids: [currentDeviceId],
+          play: false
+        })
+      }).catch(() => {}); // Ignore transfer errors, try to play anyway
+
+      // Start playback via Spotify API
+      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -269,7 +301,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to start playback:', errorData);
+        console.error('[Mobile Debug] Failed to start playback:', response.status, errorData);
+        
+        // Reset state on failure
+        setIsPlaying(false);
+        setCurrentClip(null);
         
         if (response.status === 401) {
           setNeedsReauth(true);
@@ -279,9 +315,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         return;
       }
 
-      setCurrentClip(clip);
-      setIsPlaying(true);
-      setPosition(clip.clipStartSeconds);
+      console.log('[Mobile Debug] Playback started successfully');
+
+      // Set volume explicitly for mobile (some devices start muted)
+      if (playerRef.current) {
+        playerRef.current.setVolume(0.8).catch(() => {});
+      }
 
       // Start position tracking
       if (positionIntervalRef.current) {
@@ -295,15 +334,22 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             const currentPositionSec = Math.floor(state.position / 1000);
             setPosition(currentPositionSec);
 
-            // Auto-pause at clip end
+            // Auto-pause at clip end - inline to avoid circular dependency
             if (currentPositionSec >= clip.clipEndSeconds) {
-              await pauseClip();
+              if (positionIntervalRef.current) {
+                clearInterval(positionIntervalRef.current);
+                positionIntervalRef.current = null;
+              }
+              playerRef.current?.pause().catch(() => {});
+              setIsPlaying(false);
             }
           }
         }
       }, 500);
     } catch (error) {
-      console.error('Error playing clip:', error);
+      console.error('[Mobile Debug] Error playing clip:', error);
+      setIsPlaying(false);
+      setCurrentClip(null);
     }
   }, [deviceId, currentClip, initializePlayer]);
 
