@@ -15,6 +15,7 @@ export interface HabitCompletion {
   id: string;
   habit_id: string;
   completed_date: string;
+  created_at: string;
 }
 
 export function useHabits() {
@@ -26,7 +27,19 @@ export function useHabits() {
   const [loading, setLoading] = useState(true);
   const [allCompletedToday, setAllCompletedToday] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
+  const getLocalDateString = () => {
+    const now = new Date();
+    const tzOffsetMs = now.getTimezoneOffset() * 60 * 1000;
+    return new Date(now.getTime() - tzOffsetMs).toISOString().slice(0, 10);
+  };
+
+  const getLocalDateFromTimestamp = (timestamp: string) => {
+    const d = new Date(timestamp);
+    const tzOffsetMs = d.getTimezoneOffset() * 60 * 1000;
+    return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 10);
+  };
+
+  const [today, setToday] = useState<string>(getLocalDateString);
 
   const fetchHabits = useCallback(async () => {
     if (!user) return;
@@ -54,7 +67,15 @@ export function useHabits() {
         .eq('completed_date', today);
 
       if (error) throw error;
-      setCompletions(data || []);
+
+      const rows = (data || []) as HabitCompletion[];
+
+      // Backward-compatible guard: if older data was written using UTC-based dates,
+      // it can appear to "carry over" into the next local day. We only treat a
+      // completion as belonging to today if its timestamp is also today locally.
+      const todaysRows = rows.filter((c) => getLocalDateFromTimestamp(c.created_at) === today);
+
+      setCompletions(todaysRows);
     } catch (error) {
       console.error('Error fetching completions:', error);
     }
@@ -96,6 +117,27 @@ export function useHabits() {
       setAllCompletedToday(true);
     }
   }, [user, habits, completions, allCompletedToday, today, toast]);
+
+  // Keep "today" synced to the user's *local* calendar day (not UTC).
+  useEffect(() => {
+    const syncToday = () => setToday(getLocalDateString());
+
+    const intervalId = window.setInterval(syncToday, 60 * 1000);
+    window.addEventListener('focus', syncToday);
+    document.addEventListener('visibilitychange', syncToday);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncToday);
+      document.removeEventListener('visibilitychange', syncToday);
+    };
+  }, []);
+
+  // When the day changes, show a clean slate immediately.
+  useEffect(() => {
+    setCompletions([]);
+    setAllCompletedToday(false);
+  }, [today]);
 
   useEffect(() => {
     const loadData = async () => {
