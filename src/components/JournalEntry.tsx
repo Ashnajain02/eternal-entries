@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType, Mood } from '@/types';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ import CommentSection from './CommentSection';
 import SpotifyPlayer from './spotify/SpotifyPlayer';
 import ReflectionModule from './journal/ReflectionModule';
 import EntryActions from './journal/EntryActions';
+import InteractiveContent from './journal/InteractiveContent';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,9 +43,54 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [hasClickedToPlay, setHasClickedToPlay] = useState(false);
-  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntry } = useJournal();
+  const [localContent, setLocalContent] = useState(entry.content);
+  const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntryContent } = useJournal();
   const { toast } = useToast();
   const { authState } = useAuth();
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedContentRef = useRef(entry.content);
+
+  // Update local content when entry changes externally
+  React.useEffect(() => {
+    if (entry.content !== lastSavedContentRef.current) {
+      setLocalContent(entry.content);
+      lastSavedContentRef.current = entry.content;
+    }
+  }, [entry.content]);
+
+  // Handle checklist toggle with immediate save
+  const handleContentChange = useCallback((newContent: string) => {
+    // Update local state immediately for responsive UI
+    setLocalContent(newContent);
+    
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounce the save to prevent rapid-fire database updates
+    saveTimeoutRef.current = setTimeout(async () => {
+      if (newContent !== lastSavedContentRef.current) {
+        try {
+          await updateEntryContent(entry.id, newContent);
+          lastSavedContentRef.current = newContent;
+        } catch (error) {
+          console.error('Error saving checklist state:', error);
+          // Revert to last saved content on error
+          setLocalContent(lastSavedContentRef.current);
+        }
+      }
+    }, 300);
+  }, [entry.id, updateEntryContent]);
+
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Get user's temperature unit preference
   const { data: userProfile } = useQuery({
@@ -122,8 +168,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   };
 
   const handleReflectionUpdate = async () => {
-    const updatedEntry = { ...entry };
-    await updateEntry(updatedEntry);
+    // Reflection updates are handled by the ReflectionModule directly
+    // This callback is kept for compatibility
   };
 
   const handleSpotifyPlayerClick = () => {
@@ -257,9 +303,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             transition: 'filter 0.8s ease, opacity 0.8s ease',
           }}
         >
-          <div 
-            className="prose prose-sm max-w-none text-foreground"
-            dangerouslySetInnerHTML={{ __html: entry.content }}
+          <InteractiveContent 
+            content={localContent}
+            onContentChange={!isPreview ? handleContentChange : undefined}
+            disabled={isPreview}
           />
         </div>
         
