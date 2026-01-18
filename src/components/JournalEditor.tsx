@@ -10,7 +10,7 @@ interface JournalEditorProps {
 }
 
 const JournalEditor: React.FC<JournalEditorProps> = ({ initialDraft, onComplete }) => {
-  const { addEntry } = useJournal();
+  const { addEntryToState } = useJournal();
   const { 
     createNewDraft, 
     deleteDraft, 
@@ -45,11 +45,12 @@ const JournalEditor: React.FC<JournalEditorProps> = ({ initialDraft, onComplete 
 
   const handlePublish = useCallback(async () => {
     if (currentEntryState) {
-      await publishDraft(currentEntryState, addEntry);
+      // Use addEntryToState (local state only) instead of addEntry (which inserts to DB)
+      await publishDraft(currentEntryState, addEntryToState);
       clearCurrentDraft();
       onComplete?.();
     }
-  }, [currentEntryState, publishDraft, addEntry, clearCurrentDraft, onComplete]);
+  }, [currentEntryState, publishDraft, addEntryToState, clearCurrentDraft, onComplete]);
 
   const handleDelete = useCallback(async () => {
     if (currentEntryState) {

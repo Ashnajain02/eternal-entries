@@ -1,27 +1,20 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import { SpotifyTrack } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Music, AlertCircle } from 'lucide-react';
+import { Play, Pause, AlertCircle } from 'lucide-react';
 import { useSpotifyPlayback } from '@/contexts/SpotifyPlaybackContext';
-import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
+import ClipRangeSlider from './ClipRangeSlider';
 
 interface SpotifyClipPlayerProps {
   track: SpotifyTrack;
   entryId: string;
-  clipStartSeconds?: number;
-  clipEndSeconds?: number;
-  className?: string;
-  onPlayStateChange?: (isPlaying: boolean) => void;
+  onReconnectClick?: () => void;
 }
 
 const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
   track,
   entryId,
-  clipStartSeconds = 0,
-  clipEndSeconds,
-  className = '',
-  onPlayStateChange
+  onReconnectClick
 }) => {
   const {
     isReady,
@@ -35,168 +28,85 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
     pauseClip
   } = useSpotifyPlayback();
 
-  const isThisClipPlaying = currentClip?.entryId === entryId && isPlaying;
-  const isThisClipActive = currentClip?.entryId === entryId;
-
-  // Default clip end to 30 seconds after start if not specified
-  const effectiveClipEnd = clipEndSeconds ?? Math.min(clipStartSeconds + 30, 300);
-  const clipDuration = effectiveClipEnd - clipStartSeconds;
-  
-  // Calculate progress within the clip
-  const clipProgress = isThisClipActive 
-    ? Math.min(100, Math.max(0, ((position - clipStartSeconds) / clipDuration) * 100))
-    : 0;
-
-  // Format time as MM:SS
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Notify parent of play state changes
-  useEffect(() => {
-    onPlayStateChange?.(isThisClipPlaying);
-  }, [isThisClipPlaying, onPlayStateChange]);
-
-  // Initialize player on mount if needed
   useEffect(() => {
     if (!isReady && !needsReauth) {
       initializePlayer();
     }
   }, [isReady, needsReauth, initializePlayer]);
 
-  // Cleanup when component unmounts
   useEffect(() => {
     return () => {
-      if (isThisClipPlaying) {
+      if (currentClip?.entryId === entryId) {
         pauseClip();
       }
     };
-  }, [isThisClipPlaying, pauseClip]);
+  }, [entryId, currentClip, pauseClip]);
 
-  const handlePlayPause = useCallback(async () => {
-    if (isThisClipPlaying) {
+  const handleTogglePlay = async () => {
+    if (!track.uri) return;
+    const clipInfo = {
+      entryId,
+      trackUri: track.uri,
+      clipStartSeconds: track.clipStartSeconds ?? 0,
+      clipEndSeconds: track.clipEndSeconds ?? 30
+    };
+    if (isPlaying && currentClip?.entryId === entryId) {
       await pauseClip();
     } else {
-      await playClip({
-        entryId,
-        trackUri: track.uri,
-        clipStartSeconds,
-        clipEndSeconds: effectiveClipEnd
-      });
+      await playClip(clipInfo);
     }
-  }, [isThisClipPlaying, pauseClip, playClip, entryId, track.uri, clipStartSeconds, effectiveClipEnd]);
+  };
 
-  // Premium required message
-  if (isPremium === false) {
+  const isThisClipPlaying = isPlaying && currentClip?.entryId === entryId;
+  const clipStart = track.clipStartSeconds ?? 0;
+  const clipEnd = track.clipEndSeconds ?? 30;
+
+  if (needsReauth) {
     return (
-      <div className={cn("flex items-center gap-3 p-3 bg-muted/50 rounded-md", className)}>
-        {track.albumArt ? (
-          <img
-            src={track.albumArt}
-            alt={track.album}
-            className="h-12 w-12 object-cover rounded-sm flex-shrink-0"
-          />
-        ) : (
-          <div className="h-12 w-12 bg-muted flex items-center justify-center rounded-sm flex-shrink-0">
-            <Music className="h-6 w-6 text-muted-foreground" />
-          </div>
-        )}
+      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+        <img src={track.imageUrl || '/placeholder.svg'} alt={track.name} className="w-12 h-12 rounded object-cover" />
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate text-sm">{track.name}</p>
+          <p className="font-medium text-sm truncate">{track.name}</p>
           <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span className="hidden sm:inline">Premium required</span>
-        </div>
+        {onReconnectClick && (
+          <Button variant="outline" size="sm" onClick={onReconnectClick} className="shrink-0">
+            <AlertCircle className="h-4 w-4 mr-1" />Reconnect
+          </Button>
+        )}
       </div>
     );
   }
 
-  // Reauth required message
-  if (needsReauth) {
+  if (isPremium === false) {
     return (
-      <div className={cn("flex items-center gap-3 p-3 bg-muted/50 rounded-md", className)}>
-        {track.albumArt ? (
-          <img
-            src={track.albumArt}
-            alt={track.album}
-            className="h-12 w-12 object-cover rounded-sm flex-shrink-0"
-          />
-        ) : (
-          <div className="h-12 w-12 bg-muted flex items-center justify-center rounded-sm flex-shrink-0">
-            <Music className="h-6 w-6 text-muted-foreground" />
-          </div>
-        )}
+      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+        <img src={track.imageUrl || '/placeholder.svg'} alt={track.name} className="w-12 h-12 rounded object-cover" />
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate text-sm">{track.name}</p>
+          <p className="font-medium text-sm truncate">{track.name}</p>
           <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400">
-          <AlertCircle className="h-4 w-4 flex-shrink-0" />
-          <span className="hidden sm:inline">Reconnect Spotify</span>
+          <p className="text-xs text-muted-foreground mt-1">Premium required for playback</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={cn("flex flex-col gap-2 p-3 bg-muted/50 rounded-md", className)}>
+    <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
       <div className="flex items-center gap-3">
-        {/* Album art */}
-        {track.albumArt ? (
-          <img
-            src={track.albumArt}
-            alt={track.album}
-            className="h-12 w-12 object-cover rounded-sm flex-shrink-0"
-          />
-        ) : (
-          <div className="h-12 w-12 bg-muted flex items-center justify-center rounded-sm flex-shrink-0">
-            <Music className="h-6 w-6 text-muted-foreground" />
-          </div>
-        )}
-
-        {/* Track info */}
+        <img src={track.imageUrl || '/placeholder.svg'} alt={track.name} className="w-12 h-12 rounded object-cover" />
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate text-sm">{track.name}</p>
+          <p className="font-medium text-sm truncate">{track.name}</p>
           <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
         </div>
-
-        {/* Play/Pause button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
-          onClick={handlePlayPause}
-          disabled={!isReady && !needsReauth}
-        >
-          {isThisClipPlaying ? (
-            <Pause className="h-5 w-5" />
-          ) : (
-            <Play className="h-5 w-5 ml-0.5" />
-          )}
+        <Button variant="ghost" size="icon" onClick={handleTogglePlay} disabled={!isReady && isPremium !== null}
+          className="shrink-0 h-10 w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
+          {isThisClipPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
         </Button>
       </div>
-
-      {/* Progress bar (only show when this clip is active) */}
-      {isThisClipActive && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground w-10 text-right">
-            {formatTime(Math.max(0, position - clipStartSeconds))}
-          </span>
-          <Progress value={clipProgress} className="flex-1 h-1" />
-          <span className="text-xs text-muted-foreground w-10">
-            {formatTime(clipDuration)}
-          </span>
-        </div>
-      )}
-
-      {/* Clip range indicator */}
-      <div className="text-xs text-muted-foreground text-center">
-        Clip: {formatTime(clipStartSeconds)} - {formatTime(effectiveClipEnd)}
-      </div>
+      <ClipRangeSlider trackDuration={180} clipStart={clipStart} clipEnd={clipEnd}
+        currentPosition={isThisClipPlaying ? position : clipStart} isPlaying={isThisClipPlaying}
+        onRangeChange={() => {}} className="pointer-events-none opacity-80" />
     </div>
   );
 };
