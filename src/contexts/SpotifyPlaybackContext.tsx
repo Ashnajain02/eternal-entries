@@ -283,12 +283,19 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Initialize player - returns a promise that resolves when ready
   const initializePlayer = useCallback(async (): Promise<boolean> => {
-    // Already ready
+    // Already ready - fulfill any pending clip immediately
     if (playerRef.current && isReady && deviceIdRef.current) {
+      const pendingClip = pendingClipRef.current;
+      if (pendingClip) {
+        pendingClipRef.current = null;
+        log('Already ready - fulfilling pending clip:', pendingClip.entryId);
+        // Fire and forget - don't await to keep gesture chain intact
+        startClipPlayback(pendingClip);
+      }
       return true;
     }
 
-    // Already initializing - return existing promise
+    // Already initializing - return existing promise (pending clip will be handled by ready listener)
     if (initPromiseRef.current) {
       return initPromiseRef.current;
     }
