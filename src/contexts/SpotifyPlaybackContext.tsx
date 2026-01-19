@@ -104,14 +104,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const audioContextRef = useRef<AudioContext | null>(null);
   const initPromiseRef = useRef<Promise<boolean> | null>(null);
 
-  // Server-confirmed device registration gate:
-  // /v1/me/player/play is forbidden until the SDK device_id is visible in
-  // GET /v1/me/player/devices. (Important: we do NOT require is_active=true;
-  // Spotify may only mark the SDK device active after audio starts.)
-  const deviceExistsRef = useRef(false);
-  const deviceExistsPromiseRef = useRef<Promise<boolean> | null>(null);
-  const deviceTransferredRef = useRef(false);
-
+  // Playback activation:
+  // Spotify may not expose a Web Playback SDK device to the Web API until the first successful
+  // /v1/me/player/play. We therefore allow exactly one first-play attempt immediately after
+  // SDK ready, with a single short retry on 404 (Device not found).
+  const playbackActivatedRef = useRef(false);
 
   // Single-owner clip enforcement + progress (no SDK-driven pause)
   const requestedClipRef = useRef<ClipPlaybackInfo | null>(null);
@@ -226,109 +223,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     playbackStartPerfMsRef.current = null;
   }, []);
 
-  // Device registration handshake (HARD GATE):
-  // 1) Wait until the SDK device appears in GET /v1/me/player/devices (server-visible)
-  // 2) Once visible, transfer playback to it (PUT /v1/me/player { device_ids, play:false })
-  // 3) Only then allow /v1/me/player/play
-  //
-  // Note: We intentionally do NOT gate on `is_active === true` here because Spotify may only
-  // mark the SDK device active after the first audio starts.
-  const ensureDeviceExists = useCallback(async (): Promise<boolean> => {
-    if (deviceExistsRef.current && deviceTransferredRef.current) return true;
-    if (deviceExistsPromiseRef.current) return deviceExistsPromiseRef.current;
-
-    const promise = (async () => {
-      const POLL_INTERVAL_MS = 250;
-      const MAX_POLLS = 40; // ~10s
-      const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
-
-      try {
-        const token = accessTokenRef.current ?? (await getAccessToken());
-        const sdkDeviceId = deviceIdRef.current;
-
-        if (!token || !sdkDeviceId) return false;
-
-        for (let i = 0; i < MAX_POLLS; i++) {
-          const devicesRes = await fetch('https://api.spotify.com/v1/me/player/devices', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-
-          if (devicesRes.status === 401) {
-            setNeedsReauth(true);
-            return false;
-          }
-          if (devicesRes.status === 403) {
-            setIsPremium(false);
-            return false;
-          }
-          if (!devicesRes.ok) {
-            const errorData = await devicesRes.json().catch(() => ({}));
-            console.error('Failed to fetch Spotify devices:', devicesRes.status, errorData);
-            return false;
-          }
-
-          const devicesData = (await devicesRes.json().catch(() => ({ devices: [] }))) as {
-            devices?: Array<{ id: string }>;
-          };
-
-          const exists = !!devicesData.devices?.some((d) => d.id === sdkDeviceId);
-
-          // Device not visible to Web API yet -> keep polling.
-          if (!exists) {
-            await sleep(POLL_INTERVAL_MS);
-            continue;
-          }
-
-          deviceExistsRef.current = true;
-
-          // Once the device is server-visible, transfer playback to it before allowing /play.
-          if (!deviceTransferredRef.current) {
-            const transferRes = await fetch('https://api.spotify.com/v1/me/player', {
-              method: 'PUT',
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ device_ids: [sdkDeviceId], play: false })
-            });
-
-            if (transferRes.status === 401) {
-              setNeedsReauth(true);
-              return false;
-            }
-            if (transferRes.status === 403) {
-              setIsPremium(false);
-              return false;
-            }
-
-            if (!transferRes.ok) {
-              const errorData = await transferRes.json().catch(() => ({}));
-              console.error('Spotify transfer failed:', transferRes.status, errorData);
-              await sleep(POLL_INTERVAL_MS);
-              continue;
-            }
-
-            deviceTransferredRef.current = true;
-          }
-
-          return true;
-        }
-
-        console.error('Spotify device not found in /devices before timeout', {
-          deviceId: deviceIdRef.current
-        });
-        return false;
-      } catch (e) {
-        console.error('Error ensuring Spotify device exists:', e);
-        return false;
-      } finally {
-        deviceExistsPromiseRef.current = null;
-      }
-    })();
-
-    deviceExistsPromiseRef.current = promise;
-    return promise;
-  }, [getAccessToken]);
+  // NOTE (device registration race):
+  // We intentionally do NOT gate first playback on /v1/me/player/devices or is_active.
+  // Some Spotify accounts/environments only surface the SDK device to /devices AFTER the first
+  // successful /play. Gating on /devices would deadlock first playback.
 
   // Start playback of a specific clip.
   // IMPORTANT: This does NOT schedule clip-end or progress yet.
@@ -360,26 +258,31 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       // Set volume (best-effort)
       playerRef.current.setVolume(0.8).catch(() => {});
 
-      // Hard gate: /play is impossible until the SDK device is server-visible in /devices
-      // AND we've explicitly transferred playback to it.
-      const canPlay = await ensureDeviceExists();
-      if (!canPlay) {
-        setIsInitializing(false);
-        return false;
+      const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
+
+      const sendPlay = async (): Promise<Response> => {
+        return fetch(`https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            uris: [clip.trackUri],
+            position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
+          })
+        });
+      };
+
+      // First-play must be allowed immediately after SDK ready.
+      // If Spotify returns 404 (Device not found) on the very first attempt, retry ONCE shortly.
+      let response = await sendPlay();
+
+      if (!response.ok && response.status === 404 && !playbackActivatedRef.current) {
+        await response.json().catch(() => ({})); // drain body (best-effort)
+        await sleep(400);
+        response = await sendPlay();
       }
-
-
-      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          uris: [clip.trackUri],
-          position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
-        })
-      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -395,6 +298,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         return false;
       }
 
+      // Mark activation after the first successful /play.
+      playbackActivatedRef.current = true;
+
       // We intentionally do NOT set isPlaying=true here.
       // We wait for the SDK state event that confirms playback has actually begun.
       log('Play command accepted; awaiting actual playback start');
@@ -404,7 +310,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       setIsInitializing(false);
       return false;
     }
-  }, [clearClipTimers, ensureDeviceExists, getAccessToken]);
+  }, [clearClipTimers, getAccessToken]);
+
 
 
   // Core player initialization that does NOT await anything before creating the Player.
@@ -554,10 +461,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       player.addListener('ready', ({ device_id }: { device_id: string }) => {
         log('Player ready with device ID:', device_id);
 
-        // New device -> reset the handshake gate
-        deviceExistsRef.current = false;
-        deviceExistsPromiseRef.current = null;
-        deviceTransferredRef.current = false;
+        // New device -> reset activation flag
+        playbackActivatedRef.current = false;
 
         deviceIdRef.current = device_id;
         setDeviceId(device_id);
@@ -566,27 +471,23 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         initPromiseRef.current = null;
         resolve(true);
 
-        // Begin the handshake immediately; play will be queued (pendingClipRef) until it completes.
-        void ensureDeviceExists().then((ok) => {
-          if (!ok) return;
-
-          const pendingClip = pendingClipRef.current;
-          if (pendingClip) {
-            pendingClipRef.current = null;
-            log('Playing pending clip after server-confirmed device registration:', pendingClip.entryId);
-            void startClipPlayback(pendingClip);
-          }
-        });
+        // If the user tapped play while we were initializing, fulfill it now (no /devices gating).
+        const pendingClip = pendingClipRef.current;
+        if (pendingClip) {
+          pendingClipRef.current = null;
+          log('Playing pending clip after SDK ready:', pendingClip.entryId);
+          void startClipPlayback(pendingClip);
+        }
       });
+
 
       // Not Ready
       player.addListener('not_ready', ({ device_id }: { device_id: string }) => {
         log('Player not ready:', device_id);
         setIsReady(false);
-        deviceExistsRef.current = false;
-        deviceExistsPromiseRef.current = null;
-        deviceTransferredRef.current = false;
+        playbackActivatedRef.current = false;
       });
+
 
 
 
@@ -600,7 +501,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         }
       });
     });
-  }, [getAccessToken, ensureDeviceExists, startClipPlayback]);
+  }, [getAccessToken, startClipPlayback]);
 
   // Best-effort warmup after login: create the player + transfer to its device ASAP.
   // This avoids the first user click racing Spotify's device registration lifecycle.
@@ -854,9 +755,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     pendingClipRef.current = null;
     initPromiseRef.current = null;
 
-    deviceExistsRef.current = false;
-    deviceExistsPromiseRef.current = null;
-    deviceTransferredRef.current = false;
+    playbackActivatedRef.current = false;
 
   }, []);
 
