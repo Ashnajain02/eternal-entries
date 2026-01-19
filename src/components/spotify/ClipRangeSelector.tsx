@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Clock } from 'lucide-react';
+import { Play, Pause, Clock, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSpotifyPlayback } from '@/contexts/SpotifyPlaybackContext';
 import { formatTime } from '@/utils/formatTime';
@@ -32,6 +32,7 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
 
   const {
     isReady,
+    isInitializing,
     isPlaying,
     currentClip,
     position,
@@ -41,10 +42,11 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
 
   const isPreviewPlaying = currentClip?.entryId === entryId && isPlaying;
   const isPreviewActive = currentClip?.entryId === entryId;
+  const isPreviewLoading = currentClip?.entryId === entryId && isInitializing && !isPlaying;
 
   // Calculate progress within the clip for playhead
   const clipDuration = clipEndSeconds - clipStartSeconds;
-  const playheadPosition = isPreviewActive 
+  const playheadPosition = isPreviewActive && isPlaying
     ? Math.min(100, Math.max(0, ((position - clipStartSeconds) / clipDuration) * 100))
     : 0;
 
@@ -79,7 +81,7 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
       
       const deltaX = e.clientX - dragStartX;
       const deltaSeconds = pxToSeconds(deltaX);
-      const minClipDuration = 5; // Minimum 5 second clip
+      const minClipDuration = 5;
 
       if (isDragging === 'start') {
         const newStart = Math.max(0, Math.min(initialStart + deltaSeconds, initialEnd - minClipDuration));
@@ -92,7 +94,6 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
         let newStart = initialStart + deltaSeconds;
         let newEnd = initialEnd + deltaSeconds;
         
-        // Clamp to bounds
         if (newStart < 0) {
           newStart = 0;
           newEnd = rangeDuration;
@@ -218,10 +219,15 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
           variant="outline"
           size="sm"
           onClick={handlePlayPause}
-          disabled={!isReady}
+          disabled={isPreviewLoading}
           className="h-8 px-3"
         >
-          {isPreviewPlaying ? (
+          {isPreviewLoading ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              Loading
+            </>
+          ) : isPreviewPlaying ? (
             <>
               <Pause className="h-3.5 w-3.5 mr-1.5" />
               Pause
@@ -264,7 +270,7 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
           onTouchStart={(e) => handleTouchStart(e, 'range')}
         >
           {/* Playhead indicator */}
-          {isPreviewActive && (
+          {isPreviewActive && isPreviewPlaying && (
             <div 
               className="absolute top-0 h-full w-0.5 bg-foreground z-10 transition-all"
               style={{ left: `${playheadPosition}%` }}

@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { SpotifyTrack } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Music, AlertCircle } from 'lucide-react';
+import { Play, Pause, Music, AlertCircle, Loader2 } from 'lucide-react';
 import { useSpotifyPlayback } from '@/contexts/SpotifyPlaybackContext';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -26,25 +26,26 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
 }) => {
   const {
     isReady,
+    isInitializing,
     isPremium,
     isPlaying,
     currentClip,
     position,
     needsReauth,
-    initializePlayer,
     playClip,
     pauseClip
   } = useSpotifyPlayback();
 
   const isThisClipPlaying = currentClip?.entryId === entryId && isPlaying;
   const isThisClipActive = currentClip?.entryId === entryId;
+  const isThisClipLoading = currentClip?.entryId === entryId && isInitializing && !isPlaying;
 
   // Default clip end to 30 seconds after start if not specified
   const effectiveClipEnd = clipEndSeconds ?? Math.min(clipStartSeconds + 30, 300);
   const clipDuration = effectiveClipEnd - clipStartSeconds;
   
   // Calculate progress within the clip
-  const clipProgress = isThisClipActive 
+  const clipProgress = isThisClipActive && isPlaying
     ? Math.min(100, Math.max(0, ((position - clipStartSeconds) / clipDuration) * 100))
     : 0;
 
@@ -53,16 +54,10 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
     onPlayStateChange?.(isThisClipPlaying);
   }, [isThisClipPlaying, onPlayStateChange]);
 
-  // Initialize player on mount if needed
-  useEffect(() => {
-    if (!isReady && !needsReauth) {
-      initializePlayer();
-    }
-  }, [isReady, needsReauth, initializePlayer]);
-
-  // Cleanup when component unmounts
+  // Cleanup when component unmounts - pause if this clip is playing
   useEffect(() => {
     return () => {
+      // Only pause if this specific clip is playing when unmounting
       if (isThisClipPlaying) {
         pauseClip();
       }
@@ -158,15 +153,17 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
           <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
         </div>
 
-        {/* Play/Pause button */}
+        {/* Play/Pause button with loading state */}
         <Button
           variant="ghost"
           size="icon"
           className="h-10 w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
           onClick={handlePlayPause}
-          disabled={!isReady && !needsReauth}
+          disabled={isThisClipLoading}
         >
-          {isThisClipPlaying ? (
+          {isThisClipLoading ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : isThisClipPlaying ? (
             <Pause className="h-5 w-5" />
           ) : (
             <Play className="h-5 w-5 ml-0.5" />
@@ -174,8 +171,8 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
         </Button>
       </div>
 
-      {/* Progress bar (only show when this clip is active) */}
-      {isThisClipActive && (
+      {/* Progress bar (only show when this clip is active and playing) */}
+      {isThisClipActive && (isPlaying || isThisClipLoading) && (
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground w-10 text-right">
             {formatTime(Math.max(0, position - clipStartSeconds))}
