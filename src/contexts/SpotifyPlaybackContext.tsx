@@ -94,9 +94,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const [position, setPosition] = useState(0);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [needsReauth, setNeedsReauth] = useState(false);
+  const [tokenEpoch, setTokenEpoch] = useState(0);
   
   const playerRef = useRef<SpotifyPlayerInstance | null>(null);
   const accessTokenRef = useRef<string | null>(null);
+  const playerTokenRef = useRef<string | null>(null);
   const sdkLoadedRef = useRef(false);
   const pendingClipRef = useRef<ClipPlaybackInfo | null>(null);
   const currentClipRef = useRef<ClipPlaybackInfo | null>(null);
@@ -109,6 +111,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // /v1/me/player/play. We therefore allow exactly one first-play attempt immediately after
   // SDK ready, with a single short retry on 404 (Device not found).
   const playbackActivatedRef = useRef(false);
+
 
   // Single-owner clip enforcement + progress (no SDK-driven pause)
   const requestedClipRef = useRef<ClipPlaybackInfo | null>(null);
@@ -132,6 +135,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // Get access token from edge function
   const getAccessToken = useCallback(async (): Promise<string | null> => {
     try {
+      // Hard requirement: never fetch/use a Spotify token until a Supabase session exists.
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) return null;
+
       const { data, error } = await supabase.functions.invoke('spotify-playback-token', {
         body: { action: 'get_token' }
       });
@@ -147,9 +154,18 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       }
 
       if (data?.access_token) {
-        accessTokenRef.current = data.access_token;
+        const nextToken: string = data.access_token;
+        const prevToken: string | null = accessTokenRef.current;
+
+        accessTokenRef.current = nextToken;
         setIsPremium(data.is_premium ?? null);
-        return data.access_token;
+
+        // Track token changes so we can rebuild the SDK Player if needed.
+        if (prevToken && prevToken !== nextToken) {
+          setTokenEpoch((e) => e + 1);
+        }
+
+        return nextToken;
       }
 
       return null;
@@ -158,6 +174,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       return null;
     }
   }, []);
+
 
   // Load Spotify SDK script - can be called early to preload
   const loadSpotifySDK = useCallback((): Promise<void> => {
@@ -318,25 +335,37 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // This allows us to create + activate the Spotify element inside the user's tap (mobile requirement).
   const initializePlayerCore = useCallback((): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
-      if (!window.Spotify?.Player) {
-        log('Spotify SDK not available yet');
-        setIsInitializing(false);
-        initPromiseRef.current = null;
-        resolve(false);
-        return;
-      }
+      void (async () => {
+        if (!window.Spotify?.Player) {
+          log('Spotify SDK not available yet');
+          setIsInitializing(false);
+          initPromiseRef.current = null;
+          resolve(false);
+          return;
+        }
 
-      const player = new window.Spotify.Player({
-        name: 'Eternal Entries Journal',
-        getOAuthToken: async (callback) => {
-          const token = accessTokenRef.current ?? (await getAccessToken());
-          if (token) callback(token);
-        },
-        volume: 0.8
-      });
+        // REQUIRED: never construct Spotify.Player until we have a valid access token.
+        const tokenForPlayer = accessTokenRef.current ?? (await getAccessToken());
+        if (!tokenForPlayer) {
+          setIsInitializing(false);
+          initPromiseRef.current = null;
+          resolve(false);
+          return;
+        }
 
-      // Store player ref immediately
-      playerRef.current = player;
+        playerTokenRef.current = tokenForPlayer;
+
+        const player = new window.Spotify.Player({
+          name: 'Eternal Entries Journal',
+          getOAuthToken: async (callback) => {
+            const token = accessTokenRef.current ?? (await getAccessToken());
+            if (token) callback(token);
+          },
+          volume: 0.8
+        });
+
+        // Store player ref immediately
+        playerRef.current = player;
 
       // IMPORTANT: On iOS, this must be invoked from a user gesture.
       // When initializePlayerCore is called from playClip, that's exactly what happens.
@@ -491,21 +520,51 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
 
 
-      // Connect to Spotify
-      player.connect().then((connected) => {
-        if (!connected) {
-          console.error('Failed to connect Spotify player');
-          setIsInitializing(false);
-          initPromiseRef.current = null;
-          resolve(false);
-        }
-      });
+        // Connect to Spotify
+        player.connect().then((connected) => {
+          if (!connected) {
+            console.error('Failed to connect Spotify player');
+            setIsInitializing(false);
+            initPromiseRef.current = null;
+            resolve(false);
+          }
+        });
+      })();
     });
   }, [getAccessToken, startClipPlayback]);
+
+  // If the Spotify access token changes, fully destroy and recreate the SDK Player.
+  // (Player lifecycle must be tied to token lifecycle.)
+  useEffect(() => {
+    const currentToken = accessTokenRef.current;
+    if (!currentToken) return;
+
+    if (playerRef.current && playerTokenRef.current && playerTokenRef.current !== currentToken) {
+      try {
+        playerRef.current.disconnect();
+      } catch {
+        // ignore
+      }
+
+      playerRef.current = null;
+      playerTokenRef.current = null;
+      playbackActivatedRef.current = false;
+
+      setIsReady(false);
+      setDeviceId(null);
+      deviceIdRef.current = null;
+      initPromiseRef.current = null;
+
+      // Recreate with the new token (pendingClipRef will still be honored on ready).
+      setIsInitializing(true);
+      initPromiseRef.current = initializePlayerCore();
+    }
+  }, [tokenEpoch, initializePlayerCore]);
 
   // Best-effort warmup after login: create the player + transfer to its device ASAP.
   // This avoids the first user click racing Spotify's device registration lifecycle.
   useEffect(() => {
+
     if (!authState.user) return;
 
     void (async () => {
@@ -739,7 +798,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     if (playerRef.current) {
       playerRef.current.disconnect();
       playerRef.current = null;
+      playerTokenRef.current = null;
     }
+
 
     if (audioContextRef.current) {
       audioContextRef.current.close().catch(() => {});
