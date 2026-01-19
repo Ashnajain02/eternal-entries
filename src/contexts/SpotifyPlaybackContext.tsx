@@ -104,11 +104,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const audioContextRef = useRef<AudioContext | null>(null);
   const initPromiseRef = useRef<Promise<boolean> | null>(null);
 
-  // Single-owner state machine refs
-  const commandSeqRef = useRef(0);
-  const activeCommandIdRef = useRef(0);
-  const pendingCommandIdRef = useRef<number | null>(null);
-  const clipEndHandledForCommandRef = useRef<number | null>(null);
+  // Single-owner clip enforcement + progress (no SDK-driven pause)
+  const requestedClipRef = useRef<ClipPlaybackInfo | null>(null);
+  const playbackStartedRef = useRef(false);
+  const playbackStartPerfMsRef = useRef<number | null>(null);
+  const clipEndTimeoutRef = useRef<number | null>(null);
+  const progressIntervalRef = useRef<number | null>(null);
 
   // Keep refs in sync with state for use in callbacks
   useEffect(() => {
@@ -184,64 +185,82 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     });
   }, []);
 
-  // Start playback of a specific clip (single owner: only latest command may start playback)
-  const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo, commandId: number): Promise<boolean> => {
-    // Only allow the most recent command to control playback
-    if (commandId !== commandSeqRef.current) {
-      log('Ignoring stale playback command', { commandId, latest: commandSeqRef.current });
-      return false;
+  // Clear any active timers/trackers for the currently playing clip
+  const clearClipTimers = useCallback(() => {
+    if (clipEndTimeoutRef.current) {
+      window.clearTimeout(clipEndTimeoutRef.current);
+      clipEndTimeoutRef.current = null;
     }
+    if (progressIntervalRef.current) {
+      window.clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    playbackStartedRef.current = false;
+    playbackStartPerfMsRef.current = null;
+  }, []);
 
-    activeCommandIdRef.current = commandId;
-    clipEndHandledForCommandRef.current = null;
-
+  // Start playback of a specific clip.
+  // IMPORTANT: This does NOT schedule clip-end or progress yet.
+  // Those start ONLY when we observe playback actually begin (player_state_changed: paused=false).
+  const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
     const token = accessTokenRef.current;
     const currentDeviceId = deviceIdRef.current;
 
     if (!token || !currentDeviceId || !playerRef.current) {
-      log('Cannot start playback - missing token/device/player', { token: !!token, deviceId: currentDeviceId, player: !!playerRef.current });
+      log('Cannot start playback - missing token/device/player', {
+        token: !!token,
+        deviceId: currentDeviceId,
+        player: !!playerRef.current
+      });
       return false;
     }
 
     try {
       log('Starting playback for clip:', clip.entryId);
 
-      // Set volume
+      // Single owner reset
+      clearClipTimers();
+      requestedClipRef.current = clip;
+      playbackStartedRef.current = false;
+      setIsPlaying(false);
+      setPosition(clip.clipStartSeconds);
+      setIsInitializing(true);
+
+      // Set volume (best-effort)
       playerRef.current.setVolume(0.8).catch(() => {});
 
-      // Transfer playback to our device first
-      const transferResponse = await fetch('https://api.spotify.com/v1/me/player', {
+      // Transfer playback to our device first (no timers/retries here)
+      await fetch('https://api.spotify.com/v1/me/player', {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           device_ids: [currentDeviceId],
           play: false
         })
-      });
+      }).catch(() => {});
 
-      if (transferResponse.ok) {
-        await new Promise(r => setTimeout(r, 100));
-      }
-
-      // Start playback at clip start position
-      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`, {
+      // Start playback at clip start position.
+      // NOTE: avoid device_id query param to reduce "Device not found" flakiness.
+      const response = await fetch('https://api.spotify.com/v1/me/player/play', {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           uris: [clip.trackUri],
-          position_ms: clip.clipStartSeconds * 1000
+          position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to start playback:', response.status, errorData);
+
+        setIsInitializing(false);
 
         if (response.status === 401) {
           setNeedsReauth(true);
@@ -251,16 +270,16 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         return false;
       }
 
-      log('Playback started successfully');
-      setCurrentClip(clip);
-      setIsPlaying(true);
-      setPosition(clip.clipStartSeconds);
+      // We intentionally do NOT set isPlaying=true here.
+      // We wait for the SDK state event that confirms playback has actually begun.
+      log('Play command accepted; awaiting actual playback start');
       return true;
     } catch (error) {
       console.error('Error starting playback:', error);
+      setIsInitializing(false);
       return false;
     }
-  }, []);
+  }, [clearClipTimers]);
 
   // Initialize player - returns a promise that resolves when ready
   const initializePlayer = useCallback(async (): Promise<boolean> => {
@@ -327,30 +346,85 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             console.error('Spotify playback error:', message);
           });
 
-          // Position tracking via SDK events (PASSIVE - only updates state, does not control playback except clip-end)
+          // SDK events are READ-ONLY. They must never control playback.
+          // We only use this to detect when audio actually begins, then start:
+          // - one clip-end timeout
+          // - one progress timer
           player.addListener('player_state_changed', (state: SpotifyPlaybackState | null) => {
             if (!state) {
+              // No state usually means not playing on this device.
               setIsPlaying(false);
+              setIsInitializing(false);
               return;
             }
 
-            const currentPositionSec = Math.floor(state.position / 1000);
-            setIsPlaying(!state.paused);
-            setPosition(currentPositionSec);
+            const clip = requestedClipRef.current;
+            if (!clip) return;
 
-            // Auto-pause at clip end - SINGLE OWNER: only fires once per command
-            const clip = currentClipRef.current;
-            const activeCommand = activeCommandIdRef.current;
-            if (
-              clip &&
-              !state.paused &&
-              currentPositionSec >= clip.clipEndSeconds &&
-              clipEndHandledForCommandRef.current !== activeCommand
-            ) {
-              // Mark this command's clip-end as handled to prevent re-firing
-              clipEndHandledForCommandRef.current = activeCommand;
-              log('Auto-pausing at clip end, commandId:', activeCommand);
-              player.pause().catch(() => {});
+            const isTrackMatch = state.track_window?.current_track?.uri === clip.trackUri;
+            if (!isTrackMatch) return;
+
+            // Playback has ACTUALLY begun (first reliable moment to start timers)
+            if (!state.paused && !playbackStartedRef.current) {
+              playbackStartedRef.current = true;
+              playbackStartPerfMsRef.current = performance.now();
+
+              setIsInitializing(false);
+              setIsPlaying(true);
+
+              // Start progress timer (single source of truth for UI)
+              if (progressIntervalRef.current) {
+                window.clearInterval(progressIntervalRef.current);
+              }
+              progressIntervalRef.current = window.setInterval(() => {
+                const startMs = playbackStartPerfMsRef.current;
+                if (startMs === null) return;
+
+                const elapsedSec = (performance.now() - startMs) / 1000;
+                const nextPos = Math.min(clip.clipEndSeconds, clip.clipStartSeconds + elapsedSec);
+                setPosition(nextPos);
+              }, 200);
+
+              // Schedule ONE clip-end timeout
+              if (clipEndTimeoutRef.current) {
+                window.clearTimeout(clipEndTimeoutRef.current);
+              }
+              const durationMs = Math.max(0, (clip.clipEndSeconds - clip.clipStartSeconds) * 1000);
+              clipEndTimeoutRef.current = window.setTimeout(() => {
+                // Single pause command per clip
+                player.pause().catch(() => {});
+
+                // Stop timers and update state (idempotent)
+                if (clipEndTimeoutRef.current) {
+                  window.clearTimeout(clipEndTimeoutRef.current);
+                  clipEndTimeoutRef.current = null;
+                }
+                if (progressIntervalRef.current) {
+                  window.clearInterval(progressIntervalRef.current);
+                  progressIntervalRef.current = null;
+                }
+                playbackStartedRef.current = false;
+                playbackStartPerfMsRef.current = null;
+                setIsPlaying(false);
+              }, durationMs);
+
+              return;
+            }
+
+            // If Spotify reports paused while we thought we were playing, reflect it and stop timers.
+            if (state.paused && playbackStartedRef.current) {
+              if (clipEndTimeoutRef.current) {
+                window.clearTimeout(clipEndTimeoutRef.current);
+                clipEndTimeoutRef.current = null;
+              }
+              if (progressIntervalRef.current) {
+                window.clearInterval(progressIntervalRef.current);
+                progressIntervalRef.current = null;
+              }
+              playbackStartedRef.current = false;
+              playbackStartPerfMsRef.current = null;
+              setIsPlaying(false);
+              setIsInitializing(false);
             }
           });
 
@@ -365,14 +439,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             initPromiseRef.current = null;
             resolve(true);
 
-            // If there's a pending clip, play it now using the pending command ID
+            // If there's a pending clip (from a user tap), start it now.
             const pendingClip = pendingClipRef.current;
-            const pendingCommandId = pendingCommandIdRef.current;
-            if (pendingClip && pendingCommandId !== null) {
+            if (pendingClip) {
               pendingClipRef.current = null;
-              pendingCommandIdRef.current = null;
-              log('Playing pending clip:', pendingClip.entryId, 'commandId:', pendingCommandId);
-              startClipPlayback(pendingClip, pendingCommandId);
+              log('Playing pending clip:', pendingClip.entryId);
+              startClipPlayback(pendingClip);
             }
           });
 
@@ -427,45 +499,68 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Play a clip - SYNCHRONOUS entry point for mobile gesture chain
   const playClip = useCallback((clip: ClipPlaybackInfo) => {
-    // Increment command sequence - this is the ONLY place new commands are created
-    const commandId = ++commandSeqRef.current;
-    pendingCommandIdRef.current = commandId;
-    
-    log('playClip called:', clip.entryId, 'commandId:', commandId);
-    
-    // STEP 1: SYNCHRONOUSLY activate audio (critical for mobile)
+    log('playClip called:', clip.entryId);
+
+    // Critical: must be synchronous within the tap handler
     activateAudioContext();
-    
-    // STEP 2: If a different clip is playing, pause it
+
+    // If a different clip is playing, pause it (best-effort). Also clear any existing timers.
+    if (clipEndTimeoutRef.current) {
+      window.clearTimeout(clipEndTimeoutRef.current);
+      clipEndTimeoutRef.current = null;
+    }
+    if (progressIntervalRef.current) {
+      window.clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    playbackStartedRef.current = false;
+    playbackStartPerfMsRef.current = null;
+
     if (currentClipRef.current && currentClipRef.current.entryId !== clip.entryId && playerRef.current) {
       playerRef.current.pause().catch(() => {});
     }
 
-    // STEP 3: Set UI state immediately (for loading indicator)
+    // Mark this clip as active for UI (metadata is already known)
     setCurrentClip(clip);
+    requestedClipRef.current = clip;
     pendingClipRef.current = clip;
+    setIsPlaying(false);
+    setPosition(clip.clipStartSeconds);
 
-    // STEP 4: If player is ready, start playback immediately
+    // If player is ready, issue exactly one play command now.
     if (isReady && playerRef.current && accessTokenRef.current && deviceIdRef.current) {
       pendingClipRef.current = null;
-      pendingCommandIdRef.current = null;
-      startClipPlayback(clip, commandId);
+      void startClipPlayback(clip);
       return;
     }
 
-    // STEP 5: Player not ready - initialize (async, but audio context already activated)
-    initializePlayer().then((success) => {
+    // Otherwise, initialize; when ready, it will start the pending clip once.
+    void initializePlayer().then((success) => {
       if (!success && pendingClipRef.current?.entryId === clip.entryId) {
         pendingClipRef.current = null;
-        pendingCommandIdRef.current = null;
+        setIsInitializing(false);
         setCurrentClip(null);
       }
-      // If successful, the 'ready' handler will call startClipPlayback with pendingClipRef
     });
   }, [isReady, activateAudioContext, initializePlayer, startClipPlayback]);
 
-  // Pause clip
+  // Pause clip (single pause command + clear timers)
   const pauseClip = useCallback(async () => {
+    // Stop timers first so UI becomes stable immediately
+    if (clipEndTimeoutRef.current) {
+      window.clearTimeout(clipEndTimeoutRef.current);
+      clipEndTimeoutRef.current = null;
+    }
+    if (progressIntervalRef.current) {
+      window.clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    playbackStartedRef.current = false;
+    playbackStartPerfMsRef.current = null;
+
+    setIsPlaying(false);
+    setIsInitializing(false);
+
     if (playerRef.current) {
       try {
         await playerRef.current.pause();
@@ -473,11 +568,23 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         console.error('Error pausing:', error);
       }
     }
-    setIsPlaying(false);
   }, []);
 
   // Cleanup
   const cleanup = useCallback(() => {
+    // Stop timers
+    if (clipEndTimeoutRef.current) {
+      window.clearTimeout(clipEndTimeoutRef.current);
+      clipEndTimeoutRef.current = null;
+    }
+    if (progressIntervalRef.current) {
+      window.clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    playbackStartedRef.current = false;
+    playbackStartPerfMsRef.current = null;
+    requestedClipRef.current = null;
+
     if (playerRef.current) {
       playerRef.current.disconnect();
       playerRef.current = null;
