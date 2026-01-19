@@ -116,12 +116,19 @@ export const handleSpotifyCallback = async (code: string): Promise<{
     });
 
     if (error) {
-      return { success: false, error: error.message };
+      // Extract more detailed error from FunctionsHttpError
+      const errorMessage = error.message || 'Failed to connect to Spotify';
+      return { success: false, error: errorMessage };
+    }
+    
+    // Check if the response contains an error
+    if (data?.error) {
+      return { success: false, error: data.error };
     }
 
     return { 
-      success: data.success,
-      display_name: data.display_name
+      success: data?.success ?? false,
+      display_name: data?.display_name
     };
   } catch (error: any) {
     return { success: false, error: error.message };

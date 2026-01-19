@@ -255,9 +255,18 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
     const tokenData = await tokenResponse.json();
     
     if (tokenData.error) {
-      console.error("Spotify token error:", tokenData.error);
+      console.error("Spotify token error:", tokenData.error, tokenData.error_description);
+      
+      // Provide more specific error messages
+      let errorMessage = "Failed to get Spotify token";
+      if (tokenData.error === "invalid_grant") {
+        errorMessage = "Authorization code expired or already used. Please try connecting again.";
+      } else if (tokenData.error_description) {
+        errorMessage = tokenData.error_description;
+      }
+      
       return new Response(
-        JSON.stringify({ error: "Failed to get Spotify token" }),
+        JSON.stringify({ error: errorMessage }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -270,6 +279,27 @@ async function handleCallback(code: string, redirect_uri: string, supabase: any,
         "Authorization": `Bearer ${tokenData.access_token}`,
       },
     });
+    
+    // Check if profile request was successful
+    if (!profileResponse.ok) {
+      const errorText = await profileResponse.text();
+      console.error("Spotify profile error:", profileResponse.status, errorText);
+      
+      // Common error: app is in development mode and user is not in allowlist
+      if (profileResponse.status === 403 || errorText.includes("Check settings")) {
+        return new Response(
+          JSON.stringify({ 
+            error: "Spotify app is in Development Mode. Ask the app owner to add your Spotify email as a test user in the Spotify Developer Dashboard, or request Extended Quota Mode." 
+          }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ error: "Failed to get Spotify profile" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
     
     const profileData = await profileResponse.json();
     console.log(`Got Spotify profile for: ${profileData.display_name || profileData.id}`);
