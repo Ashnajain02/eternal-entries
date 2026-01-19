@@ -180,12 +180,13 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
     };
   }, [isDragging, dragStartX, initialStart, initialEnd, pxToSeconds, maxDuration, onStartChange, onEndChange]);
 
-  // Handle preview playback
-  const handlePlayPause = useCallback(async () => {
+  // CRITICAL: This handler must be synchronous for mobile gesture chain
+  const handlePlayPause = useCallback(() => {
     if (isPreviewPlaying) {
-      await pauseClip();
+      pauseClip(); // Fire and forget
     } else {
-      await playClip({
+      // playClip is synchronous - it activates audio context immediately
+      playClip({
         entryId,
         trackUri,
         clipStartSeconds,

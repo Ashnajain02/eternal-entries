@@ -62,14 +62,14 @@ interface ClipPlaybackInfo {
 
 interface SpotifyPlaybackContextType {
   isReady: boolean;
-  isInitializing: boolean; // NEW: loading state
+  isInitializing: boolean;
   isPremium: boolean | null;
   isPlaying: boolean;
   currentClip: ClipPlaybackInfo | null;
   position: number;
   deviceId: string | null;
   needsReauth: boolean;
-  playClip: (clip: ClipPlaybackInfo) => Promise<void>;
+  playClip: (clip: ClipPlaybackInfo) => void; // Changed to sync for gesture chain
   pauseClip: () => Promise<void>;
   cleanup: () => void;
 }
@@ -100,11 +100,18 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const sdkLoadedRef = useRef(false);
   const pendingClipRef = useRef<ClipPlaybackInfo | null>(null);
   const currentClipRef = useRef<ClipPlaybackInfo | null>(null);
+  const deviceIdRef = useRef<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const initPromiseRef = useRef<Promise<boolean> | null>(null);
 
-  // Keep ref in sync with state for use in callbacks
+  // Keep refs in sync with state for use in callbacks
   useEffect(() => {
     currentClipRef.current = currentClip;
   }, [currentClip]);
+
+  useEffect(() => {
+    deviceIdRef.current = deviceId;
+  }, [deviceId]);
 
   // Get access token from edge function
   const getAccessToken = useCallback(async (): Promise<string | null> => {
@@ -136,7 +143,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, []);
 
-  // Load Spotify SDK script (lazy - only when needed)
+  // Load Spotify SDK script
   const loadSpotifySDK = useCallback((): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (sdkLoadedRef.current && window.Spotify) {
@@ -174,18 +181,20 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // Start playback of a specific clip (internal - called after player is ready)
   const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
     const token = accessTokenRef.current;
-    const currentDeviceId = deviceId;
+    const currentDeviceId = deviceIdRef.current;
     
     if (!token || !currentDeviceId || !playerRef.current) {
-      log('Cannot start playback - missing token/device/player');
+      log('Cannot start playback - missing token/device/player', { token: !!token, deviceId: currentDeviceId, player: !!playerRef.current });
       return false;
     }
 
     try {
-      // Set volume for mobile (some devices start muted)
+      log('Starting playback for clip:', clip.entryId);
+      
+      // Set volume
       playerRef.current.setVolume(0.8).catch(() => {});
 
-      // Transfer playback to our device first - AWAIT this to avoid race condition
+      // Transfer playback to our device first
       const transferResponse = await fetch('https://api.spotify.com/v1/me/player', {
         method: 'PUT',
         headers: {
@@ -198,12 +207,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         })
       });
 
-      // Small delay to let Spotify register the device transfer
       if (transferResponse.ok) {
         await new Promise(r => setTimeout(r, 100));
       }
 
-      // Start playback
+      // Start playback at clip start position
       const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`, {
         method: 'PUT',
         headers: {
@@ -237,176 +245,193 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       console.error('Error starting playback:', error);
       return false;
     }
-  }, [deviceId]);
+  }, []);
 
-  // Initialize player (lazy - only called when user taps play)
+  // Initialize player - returns a promise that resolves when ready
   const initializePlayer = useCallback(async (): Promise<boolean> => {
-    if (playerRef.current && isReady) {
+    // Already ready
+    if (playerRef.current && isReady && deviceIdRef.current) {
       return true;
     }
 
-    if (isInitializing) {
-      // Wait for existing initialization
-      return new Promise((resolve) => {
-        const checkReady = setInterval(() => {
-          if (isReady) {
-            clearInterval(checkReady);
-            resolve(true);
-          }
-        }, 100);
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          clearInterval(checkReady);
-          resolve(false);
-        }, 10000);
-      });
+    // Already initializing - return existing promise
+    if (initPromiseRef.current) {
+      return initPromiseRef.current;
     }
 
     setIsInitializing(true);
 
-    try {
-      await loadSpotifySDK();
+    const initPromise = (async (): Promise<boolean> => {
+      try {
+        await loadSpotifySDK();
 
-      const token = await getAccessToken();
-      if (!token) {
+        const token = await getAccessToken();
+        if (!token) {
+          setIsInitializing(false);
+          initPromiseRef.current = null;
+          return false;
+        }
+
+        return new Promise<boolean>((resolve) => {
+          const player = new window.Spotify.Player({
+            name: 'Eternal Entries Journal',
+            getOAuthToken: async (callback) => {
+              const freshToken = await getAccessToken();
+              if (freshToken) {
+                callback(freshToken);
+              }
+            },
+            volume: 0.8
+          });
+
+          // Error handling
+          player.addListener('initialization_error', ({ message }) => {
+            console.error('Spotify initialization error:', message);
+            setIsInitializing(false);
+            initPromiseRef.current = null;
+            resolve(false);
+          });
+
+          player.addListener('authentication_error', ({ message }) => {
+            console.error('Spotify authentication error:', message);
+            setNeedsReauth(true);
+            setIsInitializing(false);
+            initPromiseRef.current = null;
+            resolve(false);
+          });
+
+          player.addListener('account_error', ({ message }) => {
+            console.error('Spotify account error:', message);
+            setIsPremium(false);
+            setIsInitializing(false);
+            initPromiseRef.current = null;
+            resolve(false);
+          });
+
+          player.addListener('playback_error', ({ message }) => {
+            console.error('Spotify playback error:', message);
+          });
+
+          // Position tracking via SDK events
+          player.addListener('player_state_changed', (state: SpotifyPlaybackState | null) => {
+            if (!state) {
+              setIsPlaying(false);
+              return;
+            }
+
+            const currentPositionSec = Math.floor(state.position / 1000);
+            setIsPlaying(!state.paused);
+            setPosition(currentPositionSec);
+
+            // Auto-pause at clip end
+            const clip = currentClipRef.current;
+            if (clip && !state.paused && currentPositionSec >= clip.clipEndSeconds) {
+              log('Auto-pausing at clip end');
+              player.pause().catch(() => {});
+            }
+          });
+
+          // Ready - player is usable
+          player.addListener('ready', async ({ device_id }: { device_id: string }) => {
+            log('Player ready with device ID:', device_id);
+            deviceIdRef.current = device_id;
+            setDeviceId(device_id);
+            setIsReady(true);
+            setIsInitializing(false);
+            playerRef.current = player;
+            initPromiseRef.current = null;
+            resolve(true);
+
+            // If there's a pending clip, play it now
+            const pendingClip = pendingClipRef.current;
+            if (pendingClip) {
+              pendingClipRef.current = null;
+              log('Playing pending clip:', pendingClip.entryId);
+              startClipPlayback(pendingClip);
+            }
+          });
+
+          // Not Ready
+          player.addListener('not_ready', ({ device_id }: { device_id: string }) => {
+            log('Player not ready:', device_id);
+            setIsReady(false);
+          });
+
+          // Connect to Spotify
+          player.connect().then((connected) => {
+            if (!connected) {
+              console.error('Failed to connect Spotify player');
+              setIsInitializing(false);
+              initPromiseRef.current = null;
+              resolve(false);
+            }
+          });
+        });
+      } catch (error) {
+        console.error('Error initializing Spotify player:', error);
         setIsInitializing(false);
+        initPromiseRef.current = null;
         return false;
       }
+    })();
 
-      return new Promise((resolve) => {
-        const player = new window.Spotify.Player({
-          name: 'Eternal Entries Journal',
-          getOAuthToken: async (callback) => {
-            const freshToken = await getAccessToken();
-            if (freshToken) {
-              callback(freshToken);
-            }
-          },
-          volume: 0.8
-        });
+    initPromiseRef.current = initPromise;
+    return initPromise;
+  }, [isReady, loadSpotifySDK, getAccessToken, startClipPlayback]);
 
-        // Error handling
-        player.addListener('initialization_error', ({ message }) => {
-          console.error('Spotify initialization error:', message);
-          setIsInitializing(false);
-          resolve(false);
-        });
-
-        player.addListener('authentication_error', ({ message }) => {
-          console.error('Spotify authentication error:', message);
-          setNeedsReauth(true);
-          setIsInitializing(false);
-          resolve(false);
-        });
-
-        player.addListener('account_error', ({ message }) => {
-          console.error('Spotify account error:', message);
-          setIsPremium(false);
-          setIsInitializing(false);
-          resolve(false);
-        });
-
-        player.addListener('playback_error', ({ message }) => {
-          console.error('Spotify playback error:', message);
-        });
-
-        // Position tracking via SDK events (no polling needed!)
-        player.addListener('player_state_changed', (state: SpotifyPlaybackState | null) => {
-          if (!state) {
-            setIsPlaying(false);
-            return;
-          }
-
-          const currentPositionSec = Math.floor(state.position / 1000);
-          setIsPlaying(!state.paused);
-          setPosition(currentPositionSec);
-
-          // Auto-pause at clip end using ref to get current clip value
-          const clip = currentClipRef.current;
-          if (clip && !state.paused && currentPositionSec >= clip.clipEndSeconds) {
-            log('Auto-pausing at clip end');
-            player.pause().catch(() => {});
-          }
-        });
-
-        // Ready
-        player.addListener('ready', async ({ device_id }: { device_id: string }) => {
-          log('Player ready with device ID:', device_id);
-          setDeviceId(device_id);
-          setIsReady(true);
-          setIsInitializing(false);
-          playerRef.current = player;
-          resolve(true);
-
-          // If there's a pending clip, play it now
-          if (pendingClipRef.current) {
-            const clip = pendingClipRef.current;
-            pendingClipRef.current = null;
-            // Small delay to ensure state is updated
-            setTimeout(() => {
-              startClipPlayback(clip);
-            }, 50);
-          }
-        });
-
-        // Not Ready
-        player.addListener('not_ready', ({ device_id }: { device_id: string }) => {
-          log('Player not ready:', device_id);
-          setIsReady(false);
-        });
-
-        // Connect
-        player.connect().then((connected) => {
-          if (!connected) {
-            console.error('Failed to connect Spotify player');
-            setIsInitializing(false);
-            resolve(false);
-          }
-        });
-      });
-    } catch (error) {
-      console.error('Error initializing Spotify player:', error);
-      setIsInitializing(false);
-      return false;
+  // CRITICAL: Activate audio context synchronously on user gesture
+  // This must be called SYNCHRONOUSLY within the click/tap handler
+  const activateAudioContext = useCallback(() => {
+    // Create or resume AudioContext to satisfy browser autoplay policy
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
-  }, [isReady, isInitializing, loadSpotifySDK, getAccessToken, startClipPlayback]);
-
-  // Play a clip - main entry point for playback
-  const playClip = useCallback(async (clip: ClipPlaybackInfo) => {
-    log('playClip called:', clip.entryId);
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(() => {});
+    }
     
-    // CRITICAL FOR MOBILE: Call activateElement SYNCHRONOUSLY before any async
+    // Also activate Spotify player element if it exists
     if (playerRef.current) {
       try {
         playerRef.current.activateElement();
       } catch (e) {
-        // activateElement may not exist on all platforms
+        // May not exist on all platforms
       }
     }
+  }, []);
 
-    // Stop current clip if different
-    if (currentClip && currentClip.entryId !== clip.entryId) {
-      playerRef.current?.pause().catch(() => {});
+  // Play a clip - SYNCHRONOUS entry point for mobile gesture chain
+  const playClip = useCallback((clip: ClipPlaybackInfo) => {
+    log('playClip called:', clip.entryId);
+    
+    // STEP 1: SYNCHRONOUSLY activate audio (critical for mobile)
+    activateAudioContext();
+    
+    // STEP 2: If a different clip is playing, pause it
+    if (currentClipRef.current && currentClipRef.current.entryId !== clip.entryId && playerRef.current) {
+      playerRef.current.pause().catch(() => {});
     }
 
-    // If player is ready, start playback immediately
-    if (isReady && playerRef.current && accessTokenRef.current && deviceId) {
-      await startClipPlayback(clip);
+    // STEP 3: Set UI state immediately (for loading indicator)
+    setCurrentClip(clip);
+    pendingClipRef.current = clip;
+
+    // STEP 4: If player is ready, start playback immediately
+    if (isReady && playerRef.current && accessTokenRef.current && deviceIdRef.current) {
+      pendingClipRef.current = null;
+      startClipPlayback(clip);
       return;
     }
 
-    // Player not ready - store pending clip and initialize
-    // Show loading state while initializing
-    pendingClipRef.current = clip;
-    setCurrentClip(clip); // Set current clip for loading UI
-    
-    const success = await initializePlayer();
-    if (!success) {
-      pendingClipRef.current = null;
-      setCurrentClip(null);
-    }
-    // If successful, the 'ready' event handler will trigger playback
-  }, [isReady, deviceId, currentClip, initializePlayer, startClipPlayback]);
+    // STEP 5: Player not ready - initialize (async, but audio context already activated)
+    initializePlayer().then((success) => {
+      if (!success && pendingClipRef.current?.entryId === clip.entryId) {
+        pendingClipRef.current = null;
+        setCurrentClip(null);
+      }
+      // If successful, the 'ready' handler will call startClipPlayback with pendingClipRef
+    });
+  }, [isReady, activateAudioContext, initializePlayer, startClipPlayback]);
 
   // Pause clip
   const pauseClip = useCallback(async () => {
@@ -427,12 +452,19 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       playerRef.current = null;
     }
 
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+
     setIsReady(false);
     setIsInitializing(false);
     setIsPlaying(false);
     setCurrentClip(null);
     setDeviceId(null);
+    deviceIdRef.current = null;
     pendingClipRef.current = null;
+    initPromiseRef.current = null;
   }, []);
 
   // Cleanup on unmount

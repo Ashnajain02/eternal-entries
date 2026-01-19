@@ -64,11 +64,13 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
     };
   }, [isThisClipPlaying, pauseClip]);
 
-  const handlePlayPause = useCallback(async () => {
+  // CRITICAL: This handler must be synchronous for mobile gesture chain
+  const handlePlayPause = useCallback(() => {
     if (isThisClipPlaying) {
-      await pauseClip();
+      pauseClip(); // Fire and forget
     } else {
-      await playClip({
+      // playClip is synchronous - it activates audio context immediately
+      playClip({
         entryId,
         trackUri: track.uri,
         clipStartSeconds,
