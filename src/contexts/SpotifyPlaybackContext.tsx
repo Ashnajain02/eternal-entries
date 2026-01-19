@@ -221,6 +221,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // IMPORTANT: This does NOT schedule clip-end or progress yet.
   // Those start ONLY when we observe playback actually begin (player_state_changed: paused=false).
   const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
+    const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
     const token = accessTokenRef.current;
     const currentDeviceId = deviceIdRef.current;
 
@@ -247,39 +249,87 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       // Set volume (best-effort)
       playerRef.current.setVolume(0.8).catch(() => {});
 
-      // Transfer playback to our device first, then start playback with device_id specified.
-      // This ensures Spotify targets our SDK device even if no other device is active.
-      const transferResponse = await fetch('https://api.spotify.com/v1/me/player', {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          device_ids: [currentDeviceId],
-          play: false
-        })
-      });
+      // Spotify can take a moment after the SDK "ready" event to register the device.
+      // If we race this, Spotify returns 404 "Device not found".
+      const MAX_ATTEMPTS = 6;
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        // Abort retries if user requested a different clip while we were waiting
+        if (requestedClipRef.current?.entryId !== clip.entryId) {
+          log('Aborting playback retries; a different clip was requested');
+          setIsInitializing(false);
+          return false;
+        }
 
-      // If transfer fails with 404, the device isn't registered yet - proceed anyway with device_id in play request
-      if (!transferResponse.ok && transferResponse.status !== 404) {
-        log('Device transfer failed:', transferResponse.status);
-      }
+        const loopToken = accessTokenRef.current;
+        const loopDeviceId = deviceIdRef.current;
+        if (!loopToken || !loopDeviceId || !playerRef.current) {
+          setIsInitializing(false);
+          return false;
+        }
 
-      // Start playback at clip start position, explicitly targeting our device
-      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          uris: [clip.trackUri],
-          position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
-        })
-      });
+        // Transfer playback to our device first.
+        const transferResponse = await fetch('https://api.spotify.com/v1/me/player', {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${loopToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            device_ids: [loopDeviceId],
+            play: false
+          })
+        });
 
-      if (!response.ok) {
+        if (transferResponse.status === 401) {
+          setNeedsReauth(true);
+          setIsInitializing(false);
+          return false;
+        }
+
+        if (transferResponse.status === 403) {
+          setIsPremium(false);
+          setIsInitializing(false);
+          return false;
+        }
+
+        // Start playback at clip start position, explicitly targeting our device.
+        const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${loopDeviceId}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${loopToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            uris: [clip.trackUri],
+            position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
+          })
+        });
+
+        if (response.ok) {
+          // We intentionally do NOT set isPlaying=true here.
+          // We wait for the SDK state event that confirms playback has actually begun.
+          log('Play command accepted; awaiting actual playback start');
+          return true;
+        }
+
+        // Retryable: device registration race
+        if (response.status === 404) {
+          const errorData = await response.json().catch(() => ({} as any));
+          const message = (errorData as any)?.error?.message as string | undefined;
+          const normalized = (message ?? '').toLowerCase();
+          const isDeviceNotFound = normalized.includes('device not found') || normalized.includes('no active device');
+
+          if (isDeviceNotFound && attempt < MAX_ATTEMPTS - 1) {
+            // Backoff: 250ms, 500ms, 750ms...
+            await sleep(250 * (attempt + 1));
+            continue;
+          }
+
+          console.error('Failed to start playback:', response.status, errorData);
+          setIsInitializing(false);
+          return false;
+        }
+
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to start playback:', response.status, errorData);
 
@@ -293,10 +343,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         return false;
       }
 
-      // We intentionally do NOT set isPlaying=true here.
-      // We wait for the SDK state event that confirms playback has actually begun.
-      log('Play command accepted; awaiting actual playback start');
-      return true;
+      console.error('Failed to start playback: device not found after retries');
+      setIsInitializing(false);
+      return false;
     } catch (error) {
       console.error('Error starting playback:', error);
       setIsInitializing(false);
