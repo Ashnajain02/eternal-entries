@@ -104,6 +104,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const audioContextRef = useRef<AudioContext | null>(null);
   const initPromiseRef = useRef<Promise<boolean> | null>(null);
 
+  // Single-owner state machine refs
+  const commandSeqRef = useRef(0);
+  const activeCommandIdRef = useRef(0);
+  const pendingCommandIdRef = useRef<number | null>(null);
+  const clipEndHandledForCommandRef = useRef<number | null>(null);
+
   // Keep refs in sync with state for use in callbacks
   useEffect(() => {
     currentClipRef.current = currentClip;
@@ -178,11 +184,20 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     });
   }, []);
 
-  // Start playback of a specific clip (internal - called after player is ready)
-  const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
+  // Start playback of a specific clip (single owner: only latest command may start playback)
+  const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo, commandId: number): Promise<boolean> => {
+    // Only allow the most recent command to control playback
+    if (commandId !== commandSeqRef.current) {
+      log('Ignoring stale playback command', { commandId, latest: commandSeqRef.current });
+      return false;
+    }
+
+    activeCommandIdRef.current = commandId;
+    clipEndHandledForCommandRef.current = null;
+
     const token = accessTokenRef.current;
     const currentDeviceId = deviceIdRef.current;
-    
+
     if (!token || !currentDeviceId || !playerRef.current) {
       log('Cannot start playback - missing token/device/player', { token: !!token, deviceId: currentDeviceId, player: !!playerRef.current });
       return false;
@@ -190,7 +205,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
     try {
       log('Starting playback for clip:', clip.entryId);
-      
+
       // Set volume
       playerRef.current.setVolume(0.8).catch(() => {});
 
@@ -227,7 +242,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to start playback:', response.status, errorData);
-        
+
         if (response.status === 401) {
           setNeedsReauth(true);
         } else if (response.status === 403) {
