@@ -327,7 +327,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             console.error('Spotify playback error:', message);
           });
 
-          // Position tracking via SDK events
+          // Position tracking via SDK events (PASSIVE - only updates state, does not control playback except clip-end)
           player.addListener('player_state_changed', (state: SpotifyPlaybackState | null) => {
             if (!state) {
               setIsPlaying(false);
@@ -338,10 +338,18 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             setIsPlaying(!state.paused);
             setPosition(currentPositionSec);
 
-            // Auto-pause at clip end
+            // Auto-pause at clip end - SINGLE OWNER: only fires once per command
             const clip = currentClipRef.current;
-            if (clip && !state.paused && currentPositionSec >= clip.clipEndSeconds) {
-              log('Auto-pausing at clip end');
+            const activeCommand = activeCommandIdRef.current;
+            if (
+              clip &&
+              !state.paused &&
+              currentPositionSec >= clip.clipEndSeconds &&
+              clipEndHandledForCommandRef.current !== activeCommand
+            ) {
+              // Mark this command's clip-end as handled to prevent re-firing
+              clipEndHandledForCommandRef.current = activeCommand;
+              log('Auto-pausing at clip end, commandId:', activeCommand);
               player.pause().catch(() => {});
             }
           });
@@ -357,12 +365,14 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             initPromiseRef.current = null;
             resolve(true);
 
-            // If there's a pending clip, play it now
+            // If there's a pending clip, play it now using the pending command ID
             const pendingClip = pendingClipRef.current;
-            if (pendingClip) {
+            const pendingCommandId = pendingCommandIdRef.current;
+            if (pendingClip && pendingCommandId !== null) {
               pendingClipRef.current = null;
-              log('Playing pending clip:', pendingClip.entryId);
-              startClipPlayback(pendingClip);
+              pendingCommandIdRef.current = null;
+              log('Playing pending clip:', pendingClip.entryId, 'commandId:', pendingCommandId);
+              startClipPlayback(pendingClip, pendingCommandId);
             }
           });
 
@@ -417,7 +427,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Play a clip - SYNCHRONOUS entry point for mobile gesture chain
   const playClip = useCallback((clip: ClipPlaybackInfo) => {
-    log('playClip called:', clip.entryId);
+    // Increment command sequence - this is the ONLY place new commands are created
+    const commandId = ++commandSeqRef.current;
+    pendingCommandIdRef.current = commandId;
+    
+    log('playClip called:', clip.entryId, 'commandId:', commandId);
     
     // STEP 1: SYNCHRONOUSLY activate audio (critical for mobile)
     activateAudioContext();
@@ -434,7 +448,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     // STEP 4: If player is ready, start playback immediately
     if (isReady && playerRef.current && accessTokenRef.current && deviceIdRef.current) {
       pendingClipRef.current = null;
-      startClipPlayback(clip);
+      pendingCommandIdRef.current = null;
+      startClipPlayback(clip, commandId);
       return;
     }
 
@@ -442,6 +457,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     initializePlayer().then((success) => {
       if (!success && pendingClipRef.current?.entryId === clip.entryId) {
         pendingClipRef.current = null;
+        pendingCommandIdRef.current = null;
         setCurrentClip(null);
       }
       // If successful, the 'ready' handler will call startClipPlayback with pendingClipRef
