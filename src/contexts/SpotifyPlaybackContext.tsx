@@ -597,7 +597,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     // This MUST happen before any async operations
     unlockBrowserAudio();
 
-    // Clear timers first
+    // If a different clip is playing, pause it (best-effort). Also clear any existing timers.
     if (clipEndTimeoutRef.current) {
       window.clearTimeout(clipEndTimeoutRef.current);
       clipEndTimeoutRef.current = null;
@@ -609,60 +609,33 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     playbackStartedRef.current = false;
     playbackStartPerfMsRef.current = null;
 
-    // CRITICAL: Clear requestedClipRef BEFORE pausing old track.
-    // This prevents player_state_changed events from the old track
-    // from interfering with our new playback state.
-    const wasPlayingDifferentClip = currentClipRef.current && 
-      currentClipRef.current.entryId !== clip.entryId && 
-      playerRef.current;
-    
-    // Clear the old clip reference so old state events are ignored
-    requestedClipRef.current = null;
+    if (currentClipRef.current && currentClipRef.current.entryId !== clip.entryId && playerRef.current) {
+      playerRef.current.pause().catch(() => {});
+    }
 
     // Mark this clip as active for UI (metadata is already known)
     setCurrentClip(clip);
+    requestedClipRef.current = clip;
     pendingClipRef.current = clip;
     setIsPlaying(false);
     setPosition(clip.clipStartSeconds);
 
-    // Helper to actually start the new clip
-    const startNewClip = () => {
-      // Set the requested clip only after we're ready to start
-      requestedClipRef.current = clip;
-      
-      if (isReady && playerRef.current && accessTokenRef.current && deviceIdRef.current) {
-        pendingClipRef.current = null;
-        activateSpotifyPlayer();
-        void startClipPlayback(clip);
-        return;
-      }
-
-      // Otherwise, initialize; when ready, it will start the pending clip once.
-      void initializePlayer().then((success) => {
-        if (!success && pendingClipRef.current?.entryId === clip.entryId) {
-          pendingClipRef.current = null;
-          setIsInitializing(false);
-          setCurrentClip(null);
-        }
-      });
-    };
-
-    // If a different clip is playing, pause it first and wait a moment
-    // to let Spotify's state events settle before starting the new track
-    if (wasPlayingDifferentClip) {
-      log('Pausing previous clip before starting new one');
-      playerRef.current!.pause().then(() => {
-        // Small delay to let Spotify state settle
-        setTimeout(() => {
-          startNewClip();
-        }, 50);
-      }).catch(() => {
-        // Even if pause fails, try to start the new clip
-        startNewClip();
-      });
-    } else {
-      startNewClip();
+    // If player is ready, activate and issue exactly one play command now.
+    if (isReady && playerRef.current && accessTokenRef.current && deviceIdRef.current) {
+      pendingClipRef.current = null;
+      activateSpotifyPlayer();
+      void startClipPlayback(clip);
+      return;
     }
+
+    // Otherwise, initialize; when ready, it will start the pending clip once.
+    void initializePlayer().then((success) => {
+      if (!success && pendingClipRef.current?.entryId === clip.entryId) {
+        pendingClipRef.current = null;
+        setIsInitializing(false);
+        setCurrentClip(null);
+      }
+    });
   }, [isReady, unlockBrowserAudio, activateSpotifyPlayer, initializePlayer, startClipPlayback]);
 
   // Pause clip (single pause command + clear timers)
