@@ -236,7 +236,7 @@ export function useHabits() {
             { onConflict: 'habit_id,completed_date', ignoreDuplicates: true }
           )
           .select()
-          .single();
+          .maybeSingle();
 
         if (error && error.code !== '23505') throw error;
         
