@@ -104,6 +104,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const audioContextRef = useRef<AudioContext | null>(null);
   const initPromiseRef = useRef<Promise<boolean> | null>(null);
 
+  // Explicit device activation gate (prevents calling /me/player/play before transfer succeeds)
+  const deviceActivatedRef = useRef(false);
+  const deviceActivationPromiseRef = useRef<Promise<boolean> | null>(null);
+
   // Single-owner clip enforcement + progress (no SDK-driven pause)
   const requestedClipRef = useRef<ClipPlaybackInfo | null>(null);
   const playbackStartedRef = useRef(false);
@@ -217,13 +221,63 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     playbackStartPerfMsRef.current = null;
   }, []);
 
+  // Ensure the SDK device is explicitly activated (transferred) before we ever call /me/player/play.
+  // This makes /play impossible to call unless Spotify has acknowledged our device.
+  const ensureDeviceActivated = useCallback(async (): Promise<boolean> => {
+    if (deviceActivatedRef.current) return true;
+    if (deviceActivationPromiseRef.current) return deviceActivationPromiseRef.current;
+
+    const activationPromise = (async () => {
+      try {
+        const token = accessTokenRef.current ?? (await getAccessToken());
+        const currentDeviceId = deviceIdRef.current;
+
+        if (!token || !currentDeviceId) return false;
+
+        const transferResponse = await fetch('https://api.spotify.com/v1/me/player', {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            device_ids: [currentDeviceId],
+            play: false
+          })
+        });
+
+        if (transferResponse.ok) {
+          deviceActivatedRef.current = true;
+          return true;
+        }
+
+        // Treat non-OK transfer as a hard stop: we must not call /play.
+        const errorData = await transferResponse.json().catch(() => ({}));
+        console.error('Spotify device transfer failed:', transferResponse.status, errorData);
+
+        if (transferResponse.status === 401) setNeedsReauth(true);
+        if (transferResponse.status === 403) setIsPremium(false);
+
+        deviceActivatedRef.current = false;
+        return false;
+      } catch (e) {
+        console.error('Error transferring Spotify playback:', e);
+        deviceActivatedRef.current = false;
+        return false;
+      } finally {
+        deviceActivationPromiseRef.current = null;
+      }
+    })();
+
+    deviceActivationPromiseRef.current = activationPromise;
+    return activationPromise;
+  }, [getAccessToken]);
+
   // Start playback of a specific clip.
   // IMPORTANT: This does NOT schedule clip-end or progress yet.
   // Those start ONLY when we observe playback actually begin (player_state_changed: paused=false).
   const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
-    const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
-
-    const token = accessTokenRef.current;
+    const token = accessTokenRef.current ?? (await getAccessToken());
     const currentDeviceId = deviceIdRef.current;
 
     if (!token || !currentDeviceId || !playerRef.current) {
@@ -249,87 +303,27 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       // Set volume (best-effort)
       playerRef.current.setVolume(0.8).catch(() => {});
 
-      // Spotify can take a moment after the SDK "ready" event to register the device.
-      // If we race this, Spotify returns 404 "Device not found".
-      const MAX_ATTEMPTS = 6;
-      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        // Abort retries if user requested a different clip while we were waiting
-        if (requestedClipRef.current?.entryId !== clip.entryId) {
-          log('Aborting playback retries; a different clip was requested');
-          setIsInitializing(false);
-          return false;
-        }
+      // Hard gate: do not allow /play until transfer succeeds.
+      const activated = await ensureDeviceActivated();
+      if (!activated) {
+        setIsInitializing(false);
+        return false;
+      }
 
-        const loopToken = accessTokenRef.current;
-        const loopDeviceId = deviceIdRef.current;
-        if (!loopToken || !loopDeviceId || !playerRef.current) {
-          setIsInitializing(false);
-          return false;
-        }
+      // Start playback at clip start position, explicitly targeting our device
+      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          uris: [clip.trackUri],
+          position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
+        })
+      });
 
-        // Transfer playback to our device first.
-        const transferResponse = await fetch('https://api.spotify.com/v1/me/player', {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${loopToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            device_ids: [loopDeviceId],
-            play: false
-          })
-        });
-
-        if (transferResponse.status === 401) {
-          setNeedsReauth(true);
-          setIsInitializing(false);
-          return false;
-        }
-
-        if (transferResponse.status === 403) {
-          setIsPremium(false);
-          setIsInitializing(false);
-          return false;
-        }
-
-        // Start playback at clip start position, explicitly targeting our device.
-        const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${loopDeviceId}`, {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${loopToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            uris: [clip.trackUri],
-            position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
-          })
-        });
-
-        if (response.ok) {
-          // We intentionally do NOT set isPlaying=true here.
-          // We wait for the SDK state event that confirms playback has actually begun.
-          log('Play command accepted; awaiting actual playback start');
-          return true;
-        }
-
-        // Retryable: device registration race
-        if (response.status === 404) {
-          const errorData = await response.json().catch(() => ({} as any));
-          const message = (errorData as any)?.error?.message as string | undefined;
-          const normalized = (message ?? '').toLowerCase();
-          const isDeviceNotFound = normalized.includes('device not found') || normalized.includes('no active device');
-
-          if (isDeviceNotFound && attempt < MAX_ATTEMPTS - 1) {
-            // Backoff: 250ms, 500ms, 750ms...
-            await sleep(250 * (attempt + 1));
-            continue;
-          }
-
-          console.error('Failed to start playback:', response.status, errorData);
-          setIsInitializing(false);
-          return false;
-        }
-
+      if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('Failed to start playback:', response.status, errorData);
 
@@ -343,15 +337,16 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         return false;
       }
 
-      console.error('Failed to start playback: device not found after retries');
-      setIsInitializing(false);
-      return false;
+      // We intentionally do NOT set isPlaying=true here.
+      // We wait for the SDK state event that confirms playback has actually begun.
+      log('Play command accepted; awaiting actual playback start');
+      return true;
     } catch (error) {
       console.error('Error starting playback:', error);
       setIsInitializing(false);
       return false;
     }
-  }, [clearClipTimers]);
+  }, [clearClipTimers, ensureDeviceActivated, getAccessToken]);
 
   // Core player initialization that does NOT await anything before creating the Player.
   // This allows us to create + activate the Spotify element inside the user's tap (mobile requirement).
@@ -506,22 +501,27 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         initPromiseRef.current = null;
         resolve(true);
 
-        // If there's a pending clip (from a user tap), start it after a brief delay.
-        // This gives Spotify's servers time to register the new device before we try to play.
-        const pendingClip = pendingClipRef.current;
-        if (pendingClip) {
-          pendingClipRef.current = null;
-          log('Playing pending clip after device registration delay:', pendingClip.entryId);
-          setTimeout(() => {
-            startClipPlayback(pendingClip);
-          }, 500);
-        }
+        // Explicitly transfer playback to this SDK device.
+        // /me/player/play must never happen before this succeeds.
+        void (async () => {
+          await ensureDeviceActivated();
+
+          // If there's a pending clip (from a user tap), start it now (gated by ensureDeviceActivated).
+          const pendingClip = pendingClipRef.current;
+          if (pendingClip) {
+            pendingClipRef.current = null;
+            log('Playing pending clip after explicit device transfer:', pendingClip.entryId);
+            await startClipPlayback(pendingClip);
+          }
+        })();
       });
 
       // Not Ready
       player.addListener('not_ready', ({ device_id }: { device_id: string }) => {
         log('Player not ready:', device_id);
         setIsReady(false);
+        deviceActivatedRef.current = false;
+        deviceActivationPromiseRef.current = null;
       });
 
       // Connect to Spotify
@@ -534,7 +534,23 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         }
       });
     });
-  }, [getAccessToken, startClipPlayback]);
+  }, [getAccessToken, ensureDeviceActivated, startClipPlayback]);
+
+  // Best-effort warmup after login: create the player + transfer to its device ASAP.
+  // This avoids the first user click racing Spotify's device registration lifecycle.
+  useEffect(() => {
+    if (!authState.user) return;
+
+    void (async () => {
+      try {
+        await loadSpotifySDK();
+        if (playerRef.current || initPromiseRef.current) return;
+        initPromiseRef.current = initializePlayerCore();
+      } catch {
+        // Best-effort only
+      }
+    })();
+  }, [authState.user, loadSpotifySDK, initializePlayerCore]);
 
   // Ensure player creation happens inside the user gesture when possible.
   // This is the key to preventing the "first tap" being wasted on mobile.
