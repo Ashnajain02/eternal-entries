@@ -249,7 +249,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // IMPORTANT: This does NOT schedule clip-end or progress yet.
   // Those start ONLY when we observe playback actually begin (player_state_changed: paused=false).
   const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
-    const token = accessTokenRef.current ?? (await getAccessToken());
+    const token = await getAccessToken();
     const currentDeviceId = deviceIdRef.current;
 
     if (!token || !currentDeviceId || !playerRef.current) {
@@ -345,7 +345,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         }
 
         // REQUIRED: never construct Spotify.Player until we have a valid access token.
-        const tokenForPlayer = accessTokenRef.current ?? (await getAccessToken());
+        // Do not use any cached token here—constructing the SDK device with a stale token
+        // can permanently wedge the device until refresh.
+        const tokenForPlayer = await getAccessToken();
         if (!tokenForPlayer) {
           setIsInitializing(false);
           initPromiseRef.current = null;
@@ -801,6 +803,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       playerTokenRef.current = null;
     }
 
+    // Critical: clear cached token so a new login cannot accidentally build a Player with a stale token.
+    accessTokenRef.current = null;
 
     if (audioContextRef.current) {
       audioContextRef.current.close().catch(() => {});
