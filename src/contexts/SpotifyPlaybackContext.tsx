@@ -457,12 +457,15 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         initPromiseRef.current = null;
         resolve(true);
 
-        // If there's a pending clip (from a user tap), start it now.
+        // If there's a pending clip (from a user tap), start it after a brief delay.
+        // This gives Spotify's servers time to register the new device before we try to play.
         const pendingClip = pendingClipRef.current;
         if (pendingClip) {
           pendingClipRef.current = null;
-          log('Playing pending clip:', pendingClip.entryId);
-          startClipPlayback(pendingClip);
+          log('Playing pending clip after device registration delay:', pendingClip.entryId);
+          setTimeout(() => {
+            startClipPlayback(pendingClip);
+          }, 500);
         }
       });
 
