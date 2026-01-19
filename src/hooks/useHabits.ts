@@ -228,15 +228,29 @@ export function useHabits() {
         setCompletions(prev => prev.filter(c => c.id !== existingCompletion.id));
         setAllCompletedToday(false);
       } else {
-        // Complete
+        // Complete - use upsert to handle race conditions gracefully
         const { data, error } = await supabase
           .from('habit_completions')
-          .insert({ user_id: user.id, habit_id: habitId, completed_date: today })
+          .upsert(
+            { user_id: user.id, habit_id: habitId, completed_date: today },
+            { onConflict: 'habit_id,completed_date', ignoreDuplicates: true }
+          )
           .select()
           .single();
 
-        if (error) throw error;
-        setCompletions(prev => [...prev, data]);
+        if (error && error.code !== '23505') throw error;
+        
+        // If we got data back, add it; otherwise refetch to sync state
+        if (data) {
+          setCompletions(prev => {
+            // Avoid duplicates in state
+            if (prev.some(c => c.habit_id === habitId)) return prev;
+            return [...prev, data];
+          });
+        } else {
+          // Duplicate existed, refetch to sync
+          await fetchTodayCompletions();
+        }
       }
     } catch (error) {
       console.error('Error toggling completion:', error);
