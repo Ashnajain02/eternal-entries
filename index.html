@@ -7,6 +7,12 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+    <!-- Spotify SDK: load as early as possible so first tap can activate the element -->
+    <link rel="dns-prefetch" href="https://sdk.scdn.co" />
+    <link rel="preconnect" href="https://sdk.scdn.co" crossorigin />
+    <script id="spotify-player-sdk" src="https://sdk.scdn.co/spotify-player.js" async></script>
+
     <title>Eternal Entries</title>
     <meta name="description" content="Your personal journal for capturing moments, moods, and memories" />
     <meta name="author" content="Lovable" />
