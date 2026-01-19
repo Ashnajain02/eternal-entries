@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
+import { encryptToken } from "../_shared/spotify-crypto.ts";
 
 // Standard CORS headers for all requests
 const corsHeaders = {
@@ -7,41 +8,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-
-// Encryption utility functions
-async function encryptToken(token: string): Promise<string> {
-  const encryptionKey = Deno.env.get("SPOTIFY_TOKEN_ENCRYPTION_KEY");
-  if (!encryptionKey) {
-    throw new Error("Encryption key not configured");
-  }
-
-  // Convert the encryption key to a CryptoKey
-  const keyData = new TextEncoder().encode(encryptionKey);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyData,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt"]
-  );
-
-  // Generate a random IV
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-
-  // Encrypt the token
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    new TextEncoder().encode(token)
-  );
-
-  // Combine IV and encrypted data, then base64 encode
-  const combined = new Uint8Array(iv.length + encrypted.byteLength);
-  combined.set(iv, 0);
-  combined.set(new Uint8Array(encrypted), iv.length);
-
-  return btoa(String.fromCharCode(...combined));
-}
 
 serve(async (req) => {
   console.log("Spotify Auth Function - Request received");

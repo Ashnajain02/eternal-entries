@@ -11,7 +11,6 @@ export const IntegrationsSettings: React.FC = () => {
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showPopupBlockedHelp, setShowPopupBlockedHelp] = useState(false);
-  const [spotifyAuthUrl, setSpotifyAuthUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -37,7 +36,6 @@ export const IntegrationsSettings: React.FC = () => {
 
   const handleConnectSpotify = async () => {
     setShowPopupBlockedHelp(false);
-    setSpotifyAuthUrl(null);
     
     const result = await initiateSpotifyAuth();
     

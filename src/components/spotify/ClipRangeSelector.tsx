@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Play, Pause, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSpotifyPlayback } from '@/contexts/SpotifyPlaybackContext';
+import { formatTime } from '@/utils/formatTime';
 
 interface ClipRangeSelectorProps {
   trackUri: string;
@@ -46,13 +47,6 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
   const playheadPosition = isPreviewActive 
     ? Math.min(100, Math.max(0, ((position - clipStartSeconds) / clipDuration) * 100))
     : 0;
-
-  // Format time as MM:SS
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // Convert pixel position to seconds
   const pxToSeconds = useCallback((px: number): number => {
@@ -206,7 +200,7 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
         pauseClip();
       }
     };
-  }, []);
+  }, [isPreviewPlaying, pauseClip]);
 
   const startPercent = secondsToPercent(clipStartSeconds);
   const endPercent = secondsToPercent(clipEndSeconds);
