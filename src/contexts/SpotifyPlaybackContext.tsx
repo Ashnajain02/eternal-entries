@@ -110,6 +110,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const playbackStartPerfMsRef = useRef<number | null>(null);
   const clipEndTimeoutRef = useRef<number | null>(null);
   const progressIntervalRef = useRef<number | null>(null);
+  
+  // Global audio unlock flag - once unlocked, stays unlocked for the session
+  const audioUnlockedRef = useRef(false);
 
   // Keep refs in sync with state for use in callbacks
   useEffect(() => {
@@ -150,7 +153,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, []);
 
-  // Load Spotify SDK script
+  // Load Spotify SDK script - can be called early to preload
   const loadSpotifySDK = useCallback((): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (sdkLoadedRef.current && window.Spotify) {
@@ -184,6 +187,13 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       document.body.appendChild(script);
     });
   }, []);
+
+  // Pre-load SDK on mount so it's ready when user taps
+  useEffect(() => {
+    loadSpotifySDK().catch(() => {
+      // Ignore preload errors - will retry on tap
+    });
+  }, [loadSpotifySDK]);
 
   // Clear any active timers/trackers for the currently playing clip
   const clearClipTimers = useCallback(() => {
@@ -311,6 +321,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       try {
         await loadSpotifySDK();
 
+        // CRITICAL: We need to create player inside a user gesture context.
+        // Since we've already broken the gesture chain by awaiting above,
+        // we prefetch the token but the Spotify Player uses getOAuthToken callback
+        // which can fetch async.
+        
+        // Prefetch token to have it ready (best-effort)
         const token = await getAccessToken();
         if (!token) {
           setIsInitializing(false);
@@ -322,13 +338,28 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
           const player = new window.Spotify.Player({
             name: 'Eternal Entries Journal',
             getOAuthToken: async (callback) => {
-              const freshToken = await getAccessToken();
-              if (freshToken) {
-                callback(freshToken);
+              // Use cached token first, then refresh if needed
+              if (accessTokenRef.current) {
+                callback(accessTokenRef.current);
+              } else {
+                const freshToken = await getAccessToken();
+                if (freshToken) {
+                  callback(freshToken);
+                }
               }
             },
             volume: 0.8
           });
+
+          // CRITICAL: Store player ref immediately and activate element
+          // This might help with mobile audio unlock even though we're async
+          playerRef.current = player;
+          try {
+            player.activateElement();
+            log('Called activateElement on new player');
+          } catch (e) {
+            log('activateElement not available');
+          }
 
           // Error handling
           player.addListener('initialization_error', ({ message }) => {
@@ -447,7 +478,6 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             setDeviceId(device_id);
             setIsReady(true);
             setIsInitializing(false);
-            playerRef.current = player;
             initPromiseRef.current = null;
             resolve(true);
 
@@ -488,21 +518,71 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     return initPromise;
   }, [isReady, loadSpotifySDK, getAccessToken, startClipPlayback]);
 
-  // CRITICAL: Activate audio context synchronously on user gesture
-  // This must be called SYNCHRONOUSLY within the click/tap handler
-  const activateAudioContext = useCallback(() => {
-    // Create or resume AudioContext to satisfy browser autoplay policy
+  // CRITICAL: Unlock browser audio SYNCHRONOUSLY within user gesture.
+  // This creates a standalone AudioContext and resumes it immediately.
+  // Must happen BEFORE any async operations (SDK loading, etc).
+  const unlockBrowserAudio = useCallback(() => {
+    if (audioUnlockedRef.current) {
+      log('Audio already unlocked for this session');
+      return;
+    }
+
+    log('Unlocking browser audio...');
+
+    // Create and resume AudioContext synchronously
     if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        log('Created AudioContext, state:', audioContextRef.current.state);
+      } catch (e) {
+        console.error('Failed to create AudioContext:', e);
+      }
     }
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume().catch(() => {});
+
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      // This MUST be called synchronously in the gesture handler
+      audioContextRef.current.resume().then(() => {
+        log('AudioContext resumed successfully');
+      }).catch((e) => {
+        console.error('Failed to resume AudioContext:', e);
+      });
     }
-    
-    // Also activate Spotify player element if it exists
+
+    // Play a silent buffer to fully unlock audio on iOS/Safari
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      try {
+        const buffer = audioContextRef.current.createBuffer(1, 1, 22050);
+        const source = audioContextRef.current.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContextRef.current.destination);
+        source.start(0);
+        log('Played silent buffer for iOS unlock');
+      } catch (e) {
+        // Ignore - best effort
+      }
+    }
+
+    // If Spotify player already exists, activate its element too
     if (playerRef.current) {
       try {
         playerRef.current.activateElement();
+        log('Activated existing Spotify player element');
+      } catch (e) {
+        // May not exist on all platforms
+      }
+    }
+
+    audioUnlockedRef.current = true;
+    log('Browser audio unlocked for session');
+  }, []);
+
+  // Activate Spotify player element - call this when player becomes ready
+  // if we have a pending clip from a user gesture
+  const activateSpotifyPlayer = useCallback(() => {
+    if (playerRef.current) {
+      try {
+        playerRef.current.activateElement();
+        log('Activated Spotify player element');
       } catch (e) {
         // May not exist on all platforms
       }
@@ -513,8 +593,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const playClip = useCallback((clip: ClipPlaybackInfo) => {
     log('playClip called:', clip.entryId);
 
-    // Critical: must be synchronous within the tap handler
-    activateAudioContext();
+    // CRITICAL: Unlock browser audio SYNCHRONOUSLY in this user gesture
+    // This MUST happen before any async operations
+    unlockBrowserAudio();
 
     // If a different clip is playing, pause it (best-effort). Also clear any existing timers.
     if (clipEndTimeoutRef.current) {
@@ -539,9 +620,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     setIsPlaying(false);
     setPosition(clip.clipStartSeconds);
 
-    // If player is ready, issue exactly one play command now.
+    // If player is ready, activate and issue exactly one play command now.
     if (isReady && playerRef.current && accessTokenRef.current && deviceIdRef.current) {
       pendingClipRef.current = null;
+      activateSpotifyPlayer();
       void startClipPlayback(clip);
       return;
     }
@@ -554,7 +636,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         setCurrentClip(null);
       }
     });
-  }, [isReady, activateAudioContext, initializePlayer, startClipPlayback]);
+  }, [isReady, unlockBrowserAudio, activateSpotifyPlayer, initializePlayer, startClipPlayback]);
 
   // Pause clip (single pause command + clear timers)
   const pauseClip = useCallback(async () => {
