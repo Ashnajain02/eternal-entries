@@ -5,6 +5,7 @@ import { Play, Pause, Music, AlertCircle } from 'lucide-react';
 import { useSpotifyPlayback } from '@/contexts/SpotifyPlaybackContext';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { formatTime } from '@/utils/formatTime';
 
 interface SpotifyClipPlayerProps {
   track: SpotifyTrack;
@@ -46,13 +47,6 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
   const clipProgress = isThisClipActive 
     ? Math.min(100, Math.max(0, ((position - clipStartSeconds) / clipDuration) * 100))
     : 0;
-
-  // Format time as MM:SS
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // Notify parent of play state changes
   useEffect(() => {

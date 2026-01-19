@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
+import { encryptToken, decryptToken } from "../_shared/spotify-crypto.ts";
 
-// Define SpotifyTrack type directly in this file instead of importing from frontend
+// Define SpotifyTrack type for edge function response
 interface SpotifyTrack {
   id: string;
   name: string;
@@ -18,64 +19,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Encryption/Decryption utility functions
-async function encryptToken(token: string): Promise<string> {
-  const encryptionKey = Deno.env.get("SPOTIFY_TOKEN_ENCRYPTION_KEY");
-  if (!encryptionKey) {
-    throw new Error("Encryption key not configured");
-  }
-
-  const keyData = new TextEncoder().encode(encryptionKey);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyData,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt"]
-  );
-
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    new TextEncoder().encode(token)
-  );
-
-  const combined = new Uint8Array(iv.length + encrypted.byteLength);
-  combined.set(iv, 0);
-  combined.set(new Uint8Array(encrypted), iv.length);
-
-  return btoa(String.fromCharCode(...combined));
-}
-
-async function decryptToken(encryptedToken: string): Promise<string> {
-  const encryptionKey = Deno.env.get("SPOTIFY_TOKEN_ENCRYPTION_KEY");
-  if (!encryptionKey) {
-    throw new Error("Encryption key not configured");
-  }
-
-  const keyData = new TextEncoder().encode(encryptionKey);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyData,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["decrypt"]
-  );
-
-  const combined = Uint8Array.from(atob(encryptedToken), c => c.charCodeAt(0));
-  const iv = combined.slice(0, 12);
-  const encrypted = combined.slice(12);
-
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
-    key,
-    encrypted
-  );
-
-  return new TextDecoder().decode(decrypted);
-}
-
 serve(async (req) => {
   console.log("Spotify Search Function - Request received");
   
@@ -84,7 +27,7 @@ serve(async (req) => {
     console.log("Handling CORS preflight request");
     return new Response(null, { 
       headers: corsHeaders,
-      status: 204 // Explicitly set 204 status for OPTIONS
+      status: 204
     });
   }
 
@@ -128,7 +71,6 @@ serve(async (req) => {
     }
     
     // Get user ID from JWT
-    let userId = null;
     const token = authHeader.replace(/^Bearer\s/, "");
     console.log("Getting user from token");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
@@ -141,7 +83,7 @@ serve(async (req) => {
       );
     }
     
-    userId = user.id;
+    const userId = user.id;
     console.log(`User authenticated: ${userId}`);
     
     // Get the user's Spotify token
@@ -182,7 +124,6 @@ serve(async (req) => {
     if (now >= expires_at) {
       console.log("Token expired, refreshing...");
       
-      // Refresh the token
       const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
       const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
       

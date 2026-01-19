@@ -2,7 +2,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 
-// Spotify Web Playback SDK types
+// Debug logging helper - set to false in production
+const DEBUG_PLAYBACK = true;
+const log = (...args: any[]) => DEBUG_PLAYBACK && console.log('[Spotify]', ...args);
 declare global {
   interface Window {
     Spotify: {
@@ -244,17 +246,16 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Play a clip - optimized for mobile gesture compliance
   const playClip = useCallback(async (clip: ClipPlaybackInfo) => {
-    console.log('[Mobile Debug] playClip called, deviceId:', deviceId, 'hasPlayer:', !!playerRef.current);
+    log('playClip called, deviceId:', deviceId, 'hasPlayer:', !!playerRef.current);
     
     // CRITICAL FOR MOBILE: Call activateElement SYNCHRONOUSLY in the gesture handler
     // This must happen BEFORE any async operations to satisfy mobile autoplay policies
     if (playerRef.current) {
       try {
-        // This is the key call that enables audio on mobile - must be first!
         playerRef.current.activateElement();
-        console.log('[Mobile Debug] activateElement called successfully');
+        log('activateElement called');
       } catch (e) {
-        console.log('[Mobile Debug] activateElement not available or failed:', e);
+        // activateElement may not be available on all platforms
       }
     }
 
@@ -263,8 +264,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     const currentDeviceId = deviceId;
     
     if (!token || !currentDeviceId || !playerRef.current) {
-      console.log('[Mobile Debug] No token/device/player, initializing...');
-      // Initialize player - this won't play immediately but prepares for next tap
+      log('Missing token/device/player, initializing...');
       await initializePlayer();
       return;
     }
@@ -288,9 +288,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     playerRef.current.setVolume(0.8).catch(() => {});
 
     try {
-      console.log('[Mobile Debug] Starting playback on device:', currentDeviceId);
+      log('Starting playback on device:', currentDeviceId);
       
-      // Transfer playback to our device - don't await, fire and continue
+      // Transfer playback to our device - fire and forget
       fetch(`https://api.spotify.com/v1/me/player`, {
         method: 'PUT',
         headers: {
@@ -318,9 +318,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('[Mobile Debug] Failed to start playback:', response.status, errorData);
+        console.error('Failed to start playback:', response.status, errorData);
         
-        // Reset state on failure
         setIsPlaying(false);
         setCurrentClip(null);
         
@@ -332,7 +331,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         return;
       }
 
-      console.log('[Mobile Debug] Playback API call succeeded');
+      log('Playback started successfully');
 
       // Start position tracking
       if (positionIntervalRef.current) {
@@ -346,7 +345,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             const currentPositionSec = Math.floor(state.position / 1000);
             setPosition(currentPositionSec);
 
-            // Auto-pause at clip end - inline to avoid circular dependency
+            // Auto-pause at clip end
             if (currentPositionSec >= clip.clipEndSeconds) {
               if (positionIntervalRef.current) {
                 clearInterval(positionIntervalRef.current);
@@ -354,13 +353,13 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
               }
               playerRef.current?.pause().catch(() => {});
               setIsPlaying(false);
-              console.log('[Mobile Debug] Auto-paused at clip end');
+              log('Auto-paused at clip end');
             }
           }
         }
       }, 500);
     } catch (error) {
-      console.error('[Mobile Debug] Error playing clip:', error);
+      console.error('Error playing clip:', error);
       setIsPlaying(false);
       setCurrentClip(null);
     }
