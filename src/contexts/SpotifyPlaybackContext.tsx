@@ -229,8 +229,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       // Set volume (best-effort)
       playerRef.current.setVolume(0.8).catch(() => {});
 
-      // Transfer playback to our device first (no timers/retries here)
-      await fetch('https://api.spotify.com/v1/me/player', {
+      // Transfer playback to our device first, then start playback with device_id specified.
+      // This ensures Spotify targets our SDK device even if no other device is active.
+      const transferResponse = await fetch('https://api.spotify.com/v1/me/player', {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -240,11 +241,15 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
           device_ids: [currentDeviceId],
           play: false
         })
-      }).catch(() => {});
+      });
 
-      // Start playback at clip start position.
-      // NOTE: avoid device_id query param to reduce "Device not found" flakiness.
-      const response = await fetch('https://api.spotify.com/v1/me/player/play', {
+      // If transfer fails with 404, the device isn't registered yet - proceed anyway with device_id in play request
+      if (!transferResponse.ok && transferResponse.status !== 404) {
+        log('Device transfer failed:', transferResponse.status);
+      }
+
+      // Start playback at clip start position, explicitly targeting our device
+      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
