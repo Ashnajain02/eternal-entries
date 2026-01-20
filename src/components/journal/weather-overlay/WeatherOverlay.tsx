@@ -13,7 +13,7 @@ interface WeatherOverlayProps {
 const PARTICLE_CONFIG = {
   rain: { count: 80, speed: 12, size: 2 },
   snow: { count: 100, speed: 1.5, size: 3 },
-  fog: { count: 4, speed: 0.4, size: 350 }, // Faster speed for visible drift
+  fog: { count: 5, speed: 0.3, size: 180 }, // Cloud patches
   clear: { count: 0, speed: 0, size: 0 },
 };
 
@@ -30,13 +30,13 @@ const BACKGROUND_TINTS = {
     twilight: 'rgba(200, 190, 210, 0.08)',
   },
   fog: {
-    day: 'rgba(200, 200, 210, 0.12)',
-    night: 'rgba(80, 85, 100, 0.1)',
-    twilight: 'rgba(180, 170, 190, 0.1)',
+    day: 'rgba(180, 185, 195, 0.08)',
+    night: 'rgba(20, 35, 70, 0.14)', // Navy base for fog at night
+    twilight: 'rgba(160, 150, 180, 0.08)',
   },
   clear: {
-    day: 'rgba(255, 250, 230, 0.05)',
-    night: 'rgba(25, 35, 65, 0.12)', // Navy tint, not gray
+    day: 'rgba(255, 248, 225, 0.06)', // Warm cream for sunny
+    night: 'rgba(12, 22, 50, 0.2)', // Strong navy tint - NOT gray
     twilight: 'rgba(255, 200, 150, 0.06)',
   },
 };
@@ -57,14 +57,14 @@ function createParticles(category: WeatherCategory): Particle[] {
   if (config.count === 0) return [];
   
   if (category === 'fog') {
-    // Create layered cloud bands for fog
+    // Create cloud patches (not bands) at varied positions
     return Array.from({ length: config.count }, (_, i) => ({
       id: i,
-      x: Math.random() * 140 - 20, // Start some off-screen left
-      y: 20 + (i * 15) + Math.random() * 10, // Distributed vertically
-      speed: config.speed * (0.5 + Math.random() * 0.5), // Varied speeds for parallax
-      opacity: 0.25 + Math.random() * 0.15, // More visible
-      size: config.size * (0.7 + Math.random() * 0.6),
+      x: Math.random() * 120 - 20, // Spread across and off-screen
+      y: 15 + Math.random() * 55, // Distributed vertically in middle area
+      speed: config.speed * (0.6 + Math.random() * 0.8), // Varied speeds for parallax
+      opacity: 0.2 + Math.random() * 0.12, // Visible but not overwhelming
+      size: config.size * (0.8 + Math.random() * 0.5), // Varied patch sizes
       layer: i,
     }));
   }
@@ -95,14 +95,14 @@ function createParticles(category: WeatherCategory): Particle[] {
 }
 
 function createStars(): Particle[] {
-  // Visible stars with gentle twinkle for night sky
-  return Array.from({ length: 80 }, (_, i) => ({
+  // Many tiny, bright, sharp stars for night sky (NOT snow-like)
+  return Array.from({ length: 150 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
-    y: Math.random() * 85, // Cover more vertical space
-    speed: 0.003 + Math.random() * 0.01, // Slow twinkle speed
-    opacity: 0.35 + Math.random() * 0.35, // Visible range (0.35-0.7)
-    size: 1.0 + Math.random() * 1.4, // Small but visible (1.0-2.4px)
+    y: Math.random() * 90,
+    speed: 0.0015 + Math.random() * 0.003, // Very slow twinkle
+    opacity: 0.4 + Math.random() * 0.45, // Bright range (0.4-0.85)
+    size: 0.6 + Math.random() * 0.8, // Tiny radius (0.6-1.4px) - sharp points
   }));
 }
 
@@ -218,77 +218,79 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           if (p.x < -5) p.x = 105;
         });
       } else if (category === 'fog') {
-        // Realistic cloud layers drifting left → right (no vertical bounce)
+        // Realistic cloud patches drifting left → right
         particlesRef.current.forEach(p => {
           const x = (p.x / 100) * canvas.width;
-          // Minimal vertical drift (1-2px, not oscillation)
-          const microDrift = Math.sin(Date.now() / 8000 + p.id) * 2;
+          // Minimal vertical micro-drift (1-2px, no bobbing)
+          const microDrift = Math.sin(Date.now() / 10000 + p.id * 3) * 1.5;
           const y = ((p.y) / 100) * canvas.height + microDrift;
           
-          // Wide, stretched cloud band
-          const cloudWidth = p.size * 2.0;
-          const cloudHeight = p.size * 0.3;
-          
-          // Soft radial gradient for organic cloud edges
-          const gradient = ctx.createRadialGradient(
-            x, y, 0,
-            x, y, cloudWidth
-          );
-          
+          // Create cloud patch using multiple overlapping blurred circles
+          const patchSize = p.size;
           const baseColor = timeOfDay === 'night' 
-            ? 'rgba(100, 110, 130,' 
-            : 'rgba(140, 145, 155,';
+            ? 'rgba(85, 95, 115,' 
+            : 'rgba(145, 150, 160,';
           
-          // Softer falloff for cloud-like appearance
-          gradient.addColorStop(0, `${baseColor} ${p.opacity * 0.8})`);
-          gradient.addColorStop(0.2, `${baseColor} ${p.opacity * 0.6})`);
-          gradient.addColorStop(0.5, `${baseColor} ${p.opacity * 0.3})`);
-          gradient.addColorStop(0.8, `${baseColor} ${p.opacity * 0.1})`);
-          gradient.addColorStop(1, `${baseColor} 0)`);
+          // Draw multiple soft blobs to form one cloud patch
+          const blobCount = 5;
+          for (let b = 0; b < blobCount; b++) {
+            const blobOffsetX = (b - 2) * (patchSize * 0.3);
+            const blobOffsetY = Math.sin(b * 1.5) * (patchSize * 0.1);
+            const blobRadius = patchSize * (0.35 + (b % 3) * 0.1);
+            
+            const gradient = ctx.createRadialGradient(
+              x + blobOffsetX, y + blobOffsetY, 0,
+              x + blobOffsetX, y + blobOffsetY, blobRadius
+            );
+            
+            const blobOpacity = p.opacity * (0.7 + b * 0.06);
+            gradient.addColorStop(0, `${baseColor} ${blobOpacity})`);
+            gradient.addColorStop(0.3, `${baseColor} ${blobOpacity * 0.55})`);
+            gradient.addColorStop(0.65, `${baseColor} ${blobOpacity * 0.2})`);
+            gradient.addColorStop(1, `${baseColor} 0)`);
+            
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x + blobOffsetX, y + blobOffsetY, blobRadius, 0, Math.PI * 2);
+            ctx.fill();
+          }
           
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = gradient;
-          
-          // Draw stretched ellipse for cloud band
-          ctx.beginPath();
-          ctx.ellipse(x, y, cloudWidth, cloudHeight, 0, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Steady left → right drift - VISIBLE motion (parallax via speed variation)
-          p.x += p.speed * 0.25; // Faster drift for perceptible motion
-          if (p.x > 130) {
-            p.x = -30; // Wraparound
+          // Steady left → right drift with visible speed
+          p.x += p.speed * 0.18;
+          if (p.x > 125) {
+            p.x = -25; // Seamless wraparound
           }
         });
       } else if (category === 'clear') {
-        // Night: navy tint + visible twinkling stars
+        // Night: navy tint + many tiny bright twinkling stars
         if (timeOfDay === 'night' || timeOfDay === 'twilight') {
-          // Navy/cool blue tint for night atmosphere (not gray)
+          // Navy/cool blue tint overlay (clearly night, NOT gray)
           if (timeOfDay === 'night') {
-            ctx.globalAlpha = 0.1;
-            ctx.fillStyle = 'rgba(20, 35, 70, 1)'; // Navy blue, not gray
+            ctx.globalAlpha = 0.14;
+            ctx.fillStyle = 'rgba(12, 22, 55, 1)'; // Deep navy
             ctx.fillRect(0, 0, canvas.width, canvas.height);
           }
           
-          // Visible stars with gentle twinkle (stationary)
+          // Many tiny sharp stars with gentle twinkle (stationary, NOT snow-like)
           starsRef.current.forEach(star => {
             const x = (star.x / 100) * canvas.width;
             const y = (star.y / 100) * canvas.height;
             
-            // Slow, gentle twinkle (sine-based alpha modulation)
-            const twinkle = 0.5 + 0.5 * Math.sin(Date.now() / 3000 + star.id * 2);
+            // Gentle slow twinkle (sine-based alpha, varied phase)
+            const twinkle = 0.55 + 0.45 * Math.sin(Date.now() * star.speed + star.id * 7);
             ctx.globalAlpha = star.opacity * twinkle;
             
-            // Star core with soft glow
-            const starGradient = ctx.createRadialGradient(x, y, 0, x, y, star.size * 2.5);
-            starGradient.addColorStop(0, 'rgba(240, 245, 255, 1)'); // Bright center
-            starGradient.addColorStop(0.3, 'rgba(220, 230, 250, 0.7)');
-            starGradient.addColorStop(0.6, 'rgba(200, 215, 240, 0.3)');
-            starGradient.addColorStop(1, 'rgba(180, 200, 230, 0)');
-            
-            ctx.fillStyle = starGradient;
+            // Sharp point star (no heavy glow, crisp dot)
+            ctx.fillStyle = 'rgba(240, 248, 255, 1)'; // Bright white-blue
             ctx.beginPath();
-            ctx.arc(x, y, star.size * 2, 0, Math.PI * 2);
+            ctx.arc(x, y, star.size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Very subtle halo (minimal, not snow-like)
+            ctx.globalAlpha = star.opacity * twinkle * 0.2;
+            ctx.beginPath();
+            ctx.arc(x, y, star.size * 1.8, 0, Math.PI * 2);
             ctx.fill();
           });
         }
