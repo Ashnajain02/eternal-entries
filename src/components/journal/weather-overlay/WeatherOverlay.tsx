@@ -1,11 +1,6 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { WeatherCategory, TimeOfDay } from './types';
 
-// ========== DEBUG MODE - SET TO TRUE FOR TESTING ==========
-const DEBUG_MODE = true;
-const FORCE_RAIN = true; // Force rain animation regardless of category
-// ===========================================================
-
 interface WeatherOverlayProps {
   category: WeatherCategory;
   timeOfDay: TimeOfDay;
@@ -63,7 +58,7 @@ function createParticles(category: WeatherCategory): Particle[] {
   return Array.from({ length: config.count }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
-    y: Math.random() * 100 - 20, // Start some above viewport
+    y: Math.random() * 100 - 20,
     speed: config.speed * (0.7 + Math.random() * 0.6),
     opacity: 0.15 + Math.random() * 0.25,
     size: config.size * (0.6 + Math.random() * 0.8),
@@ -71,12 +66,11 @@ function createParticles(category: WeatherCategory): Particle[] {
   }));
 }
 
-// Stars for clear night
 function createStars(): Particle[] {
   return Array.from({ length: 30 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
-    y: Math.random() * 60, // Upper portion only
+    y: Math.random() * 60,
     speed: 0.01 + Math.random() * 0.02,
     opacity: 0.1 + Math.random() * 0.2,
     size: 1 + Math.random() * 2,
@@ -84,22 +78,16 @@ function createStars(): Particle[] {
 }
 
 const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
-  category: propCategory,
+  category,
   timeOfDay,
-  isVisible: propIsVisible,
-  opacity: propOpacity,
+  isVisible,
+  opacity,
   phase,
 }) => {
-  // DEBUG: Force rain and always visible
-  const category = DEBUG_MODE && FORCE_RAIN ? 'rain' : propCategory;
-  const isVisible = DEBUG_MODE ? true : propIsVisible;
-  const opacity = DEBUG_MODE ? 1 : propOpacity;
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const particlesRef = useRef<Particle[]>([]);
   const starsRef = useRef<Particle[]>([]);
-  const frameCountRef = useRef(0);
   
   // Initialize particles
   const initialParticles = useMemo(() => createParticles(category), [category]);
@@ -117,17 +105,11 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
   
   // Animation loop
   useEffect(() => {
-    if (!isVisible || !canvasRef.current) {
-      if (DEBUG_MODE) console.log('[WeatherOverlay] Not visible or no canvas');
-      return;
-    }
+    if (!isVisible || !canvasRef.current) return;
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      if (DEBUG_MODE) console.log('[WeatherOverlay] No canvas context');
-      return;
-    }
+    if (!ctx) return;
     
     // Set canvas size
     const updateSize = () => {
@@ -135,62 +117,30 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
       if (rect) {
         canvas.width = rect.width;
         canvas.height = rect.height;
-        if (DEBUG_MODE) {
-          console.log(`[WeatherOverlay] Canvas size: ${canvas.width}x${canvas.height}`);
-        }
       }
     };
     updateSize();
     
-    if (DEBUG_MODE) {
-      console.log(`[WeatherOverlay] Starting animation - category: ${category}, particles: ${particlesRef.current.length}`);
-    }
-    
     const animate = () => {
       if (!ctx || !canvas.width || !canvas.height) return;
       
-      frameCountRef.current++;
-      
-      // DEBUG: Log once per second
-      if (DEBUG_MODE && frameCountRef.current % 60 === 0) {
-        console.log(`[WeatherOverlay] Animating frame ${frameCountRef.current}, particles: ${particlesRef.current.length}`);
-      }
-      
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // DEBUG: Draw border around canvas
-      if (DEBUG_MODE) {
-        ctx.strokeStyle = 'red';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw one large obvious raindrop in center
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 10;
-        ctx.beginPath();
-        ctx.moveTo(canvas.width / 2, 50);
-        ctx.lineTo(canvas.width / 2 - 5, 150);
-        ctx.stroke();
-      }
       
       // Draw weather particles
       if (category === 'rain') {
-        // DEBUG: Use high-contrast color for visibility
-        ctx.strokeStyle = DEBUG_MODE 
-          ? 'rgba(200, 220, 255, 0.8)' 
-          : (timeOfDay === 'night' 
-              ? 'rgba(150, 170, 200, 0.3)' 
-              : 'rgba(100, 120, 150, 0.25)');
-        ctx.lineWidth = DEBUG_MODE ? 3 : 1;
+        ctx.strokeStyle = timeOfDay === 'night' 
+          ? 'rgba(150, 170, 200, 0.4)' 
+          : 'rgba(100, 120, 150, 0.35)';
+        ctx.lineWidth = 1.5;
         
         particlesRef.current.forEach(p => {
           const x = (p.x / 100) * canvas.width;
           const y = (p.y / 100) * canvas.height;
           
-          ctx.globalAlpha = DEBUG_MODE ? 0.9 : p.opacity * opacity;
+          ctx.globalAlpha = p.opacity;
           ctx.beginPath();
           ctx.moveTo(x, y);
-          ctx.lineTo(x - 2, y + p.size * 4);
+          ctx.lineTo(x - 2, y + p.size * 5);
           ctx.stroke();
           
           // Update position
@@ -202,14 +152,14 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         });
       } else if (category === 'snow') {
         ctx.fillStyle = timeOfDay === 'night'
-          ? 'rgba(220, 230, 250, 0.4)'
-          : 'rgba(255, 255, 255, 0.5)';
+          ? 'rgba(220, 230, 250, 0.5)'
+          : 'rgba(255, 255, 255, 0.6)';
         
         particlesRef.current.forEach(p => {
           const x = (p.x / 100) * canvas.width;
           const y = (p.y / 100) * canvas.height;
           
-          ctx.globalAlpha = p.opacity * opacity;
+          ctx.globalAlpha = p.opacity;
           ctx.beginPath();
           ctx.arc(x, y, p.size, 0, Math.PI * 2);
           ctx.fill();
@@ -224,7 +174,6 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           }
         });
       } else if (category === 'fog') {
-        // Drifting fog clouds
         particlesRef.current.forEach(p => {
           const x = (p.x / 100) * canvas.width;
           const y = 30 + (p.id % 4) * 20 + Math.sin(Date.now() / 3000 + p.id) * 10;
@@ -234,7 +183,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           const baseColor = timeOfDay === 'night' 
             ? 'rgba(100, 110, 130,' 
             : 'rgba(180, 185, 195,';
-          gradient.addColorStop(0, `${baseColor} ${0.08 * opacity})`);
+          gradient.addColorStop(0, `${baseColor} 0.1)`);
           gradient.addColorStop(1, `${baseColor} 0)`);
           
           ctx.globalAlpha = 1;
@@ -250,14 +199,13 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
       } else if (category === 'clear') {
         // Draw stars for night/twilight
         if (timeOfDay === 'night' || timeOfDay === 'twilight') {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
           starsRef.current.forEach(star => {
             const x = (star.x / 100) * canvas.width;
             const y = (star.y / 100) * canvas.height;
             
-            // Gentle twinkle
             const twinkle = 0.5 + 0.5 * Math.sin(Date.now() / 1000 + star.id);
-            ctx.globalAlpha = star.opacity * opacity * twinkle;
+            ctx.globalAlpha = star.opacity * twinkle;
             ctx.beginPath();
             ctx.arc(x, y, star.size, 0, Math.PI * 2);
             ctx.fill();
@@ -267,7 +215,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         // Subtle ambient glow for day
         if (timeOfDay === 'day') {
           const pulse = 0.9 + 0.1 * Math.sin(Date.now() / 4000);
-          ctx.globalAlpha = 0.03 * opacity * pulse;
+          ctx.globalAlpha = 0.05 * pulse;
           const gradient = ctx.createRadialGradient(
             canvas.width * 0.7, 
             canvas.height * 0.2, 
@@ -294,34 +242,27 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isVisible, category, timeOfDay, opacity]);
+  }, [isVisible, category, timeOfDay]);
   
-  // DEBUG: Always render in debug mode
-  if (!DEBUG_MODE && !isVisible && phase === 'idle') return null;
+  // Don't render if not visible and idle
+  if (!isVisible && phase === 'idle') return null;
   
   const backgroundTint = BACKGROUND_TINTS[category][timeOfDay];
-  
-  // FIX: Use opacity prop directly instead of broken conditional logic
-  const containerOpacity = DEBUG_MODE ? 1 : opacity;
   
   return (
     <div
       className="absolute inset-0 pointer-events-none overflow-hidden rounded-md"
       style={{
-        opacity: containerOpacity,
+        opacity: opacity,
         transition: 'opacity 500ms ease-in-out',
         backgroundColor: backgroundTint,
         zIndex: 1,
-        // DEBUG: visible border
-        border: DEBUG_MODE ? '3px solid blue' : 'none',
       }}
     >
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
-        style={{ 
-          mixBlendMode: DEBUG_MODE ? 'normal' : 'multiply',
-        }}
+        style={{ mixBlendMode: 'multiply' }}
       />
     </div>
   );
