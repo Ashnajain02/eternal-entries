@@ -1,5 +1,4 @@
-
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType, Mood } from '@/types';
 import { cn } from '@/lib/utils';
@@ -15,6 +14,13 @@ import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  WeatherOverlay,
+  WeatherAnimationButton,
+  useWeatherAnimation,
+  deriveWeatherCategory,
+  deriveTimeOfDay,
+} from './journal/weather-overlay';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -49,6 +55,25 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const { authState } = useAuth();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef(entry.content);
+
+  // Weather overlay state - only for published entries in read mode
+  const hasWeatherData = Boolean(entry.weather?.description);
+  const weatherCategory = useMemo(
+    () => hasWeatherData ? deriveWeatherCategory(entry.weather!.description) : null,
+    [hasWeatherData, entry.weather?.description]
+  );
+  const timeOfDay = useMemo(
+    () => deriveTimeOfDay(entry.timestamp || entry.date),
+    [entry.timestamp, entry.date]
+  );
+  
+  const {
+    isPlaying: isWeatherPlaying,
+    isVisible: isWeatherVisible,
+    opacity: weatherOpacity,
+    phase: weatherPhase,
+    playAnimation: playWeatherAnimation,
+  } = useWeatherAnimation(entry.id);
 
   // Update local content when entry changes externally
   React.useEffect(() => {
@@ -194,10 +219,20 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
       className={cn(
-        "bg-card border border-border rounded-md overflow-hidden",
+        "bg-card border border-border rounded-md overflow-hidden relative",
         className
       )}
     >
+      {/* Weather Overlay - only renders when playing */}
+      {weatherCategory && (
+        <WeatherOverlay
+          category={weatherCategory}
+          timeOfDay={timeOfDay}
+          isVisible={isWeatherVisible}
+          opacity={weatherOpacity}
+          phase={weatherPhase}
+        />
+      )}
       {/* Header - Mobile Layout */}
       <div className="sm:hidden px-4 py-4 border-b border-border">
         <div className="flex items-start justify-between mb-2">
@@ -239,6 +274,18 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             )}
           </div>
         )}
+        
+        {/* Weather Animation Button - Mobile */}
+        {!isPreview && weatherCategory && (
+          <div className="mt-3">
+            <WeatherAnimationButton
+              category={weatherCategory}
+              timeOfDay={timeOfDay}
+              isPlaying={isWeatherPlaying}
+              onClick={playWeatherAnimation}
+            />
+          </div>
+        )}
       </div>
 
       {/* Header - Desktop Layout */}
@@ -277,6 +324,17 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
                 </>
               )}
             </div>
+            
+            {/* Weather Animation Button - Desktop */}
+            {!isPreview && weatherCategory && (
+              <WeatherAnimationButton
+                category={weatherCategory}
+                timeOfDay={timeOfDay}
+                isPlaying={isWeatherPlaying}
+                onClick={playWeatherAnimation}
+                className="ml-2"
+              />
+            )}
           </div>
           
           {/* Right: Actions */}
