@@ -14,22 +14,15 @@ export interface WeatherOverlayState {
 export function deriveWeatherCategory(description: string): WeatherCategory {
   const lower = description.toLowerCase();
   
-  // TEMPORARY: Log for mapping verification
-  console.log(`[WeatherMapping] Input: "${description}" → Lowercased: "${lower}"`);
-  
   if (lower.includes('rain') || lower.includes('drizzle') || lower.includes('shower') || lower.includes('thunderstorm')) {
-    console.log(`[WeatherMapping] → Resolved to: rain`);
     return 'rain';
   }
   if (lower.includes('snow') || lower.includes('sleet') || lower.includes('blizzard') || lower.includes('flurr')) {
-    console.log(`[WeatherMapping] → Resolved to: snow`);
     return 'snow';
   }
   if (lower.includes('fog') || lower.includes('mist') || lower.includes('haze') || lower.includes('cloud') || lower.includes('overcast')) {
-    console.log(`[WeatherMapping] → Resolved to: fog`);
     return 'fog';
   }
-  console.log(`[WeatherMapping] → Resolved to: clear (default)`);
   return 'clear';
 }
 
