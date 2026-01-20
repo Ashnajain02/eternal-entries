@@ -12,8 +12,8 @@ interface WeatherOverlayProps {
 // Particle configuration based on weather
 const PARTICLE_CONFIG = {
   rain: { count: 80, speed: 12, size: 2 },
-  snow: { count: 60, speed: 2, size: 4 },
-  fog: { count: 8, speed: 0.3, size: 200 },
+  snow: { count: 100, speed: 1.5, size: 3 }, // Increased count, adjusted speed/size
+  fog: { count: 5, speed: 0.15, size: 300 }, // Fewer, larger cloud layers
   clear: { count: 0, speed: 0, size: 0 },
 };
 
@@ -49,12 +49,40 @@ interface Particle {
   opacity: number;
   size: number;
   drift?: number;
+  layer?: number; // For fog parallax
 }
 
 function createParticles(category: WeatherCategory): Particle[] {
   const config = PARTICLE_CONFIG[category];
   if (config.count === 0) return [];
   
+  if (category === 'fog') {
+    // Create layered cloud bands for fog
+    return Array.from({ length: config.count }, (_, i) => ({
+      id: i,
+      x: Math.random() * 140 - 20, // Start some off-screen left
+      y: 20 + (i * 15) + Math.random() * 10, // Distributed vertically
+      speed: config.speed * (0.5 + Math.random() * 0.5), // Varied speeds for parallax
+      opacity: 0.25 + Math.random() * 0.15, // More visible
+      size: config.size * (0.7 + Math.random() * 0.6),
+      layer: i,
+    }));
+  }
+  
+  if (category === 'snow') {
+    // Create varied snowflakes
+    return Array.from({ length: config.count }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 120 - 20, // Some start above
+      speed: config.speed * (0.5 + Math.random() * 1.0), // More speed variation
+      opacity: 0.4 + Math.random() * 0.4, // Much more visible (0.4-0.8)
+      size: config.size * (0.4 + Math.random() * 1.2), // Size variation (small to medium)
+      drift: (Math.random() - 0.5) * 0.8, // Horizontal drift
+    }));
+  }
+  
+  // Rain and other weather types
   return Array.from({ length: config.count }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
@@ -62,7 +90,7 @@ function createParticles(category: WeatherCategory): Particle[] {
     speed: config.speed * (0.7 + Math.random() * 0.6),
     opacity: 0.15 + Math.random() * 0.25,
     size: config.size * (0.6 + Math.random() * 0.8),
-    drift: category === 'snow' ? (Math.random() - 0.5) * 0.5 : 0,
+    drift: 0,
   }));
 }
 
@@ -88,6 +116,13 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
   const animationRef = useRef<number | null>(null);
   const particlesRef = useRef<Particle[]>([]);
   const starsRef = useRef<Particle[]>([]);
+  
+  // TEMPORARY: Log category mapping for verification
+  useEffect(() => {
+    if (isVisible) {
+      console.log(`[WeatherOverlay] Category resolved: "${category}", TimeOfDay: "${timeOfDay}"`);
+    }
+  }, [category, timeOfDay, isVisible]);
   
   // Initialize particles
   const initialParticles = useMemo(() => createParticles(category), [category]);
@@ -151,50 +186,83 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           }
         });
       } else if (category === 'snow') {
-        ctx.fillStyle = timeOfDay === 'night'
-          ? 'rgba(220, 230, 250, 0.5)'
-          : 'rgba(255, 255, 255, 0.6)';
-        
+        // Enhanced snow: visible flakes with soft edges
         particlesRef.current.forEach(p => {
           const x = (p.x / 100) * canvas.width;
           const y = (p.y / 100) * canvas.height;
           
-          ctx.globalAlpha = p.opacity;
-          ctx.beginPath();
-          ctx.arc(x, y, p.size, 0, Math.PI * 2);
-          ctx.fill();
+          // Soft snowflake with gradient
+          const gradient = ctx.createRadialGradient(x, y, 0, x, y, p.size);
+          const baseColor = timeOfDay === 'night'
+            ? 'rgba(200, 210, 230,'
+            : 'rgba(180, 180, 190,'; // Muted for off-white bg
           
-          // Update position with drift
-          p.y += p.speed * 0.08;
-          p.x += (p.drift || 0) * 0.1;
-          
-          if (p.y > 110) {
-            p.y = -5;
-            p.x = Math.random() * 100;
-          }
-        });
-      } else if (category === 'fog') {
-        particlesRef.current.forEach(p => {
-          const x = (p.x / 100) * canvas.width;
-          const y = 30 + (p.id % 4) * 20 + Math.sin(Date.now() / 3000 + p.id) * 10;
-          const yPos = (y / 100) * canvas.height;
-          
-          const gradient = ctx.createRadialGradient(x, yPos, 0, x, yPos, p.size);
-          const baseColor = timeOfDay === 'night' 
-            ? 'rgba(100, 110, 130,' 
-            : 'rgba(180, 185, 195,';
-          gradient.addColorStop(0, `${baseColor} 0.1)`);
+          gradient.addColorStop(0, `${baseColor} ${p.opacity})`);
+          gradient.addColorStop(0.5, `${baseColor} ${p.opacity * 0.6})`);
           gradient.addColorStop(1, `${baseColor} 0)`);
           
           ctx.globalAlpha = 1;
           ctx.fillStyle = gradient;
           ctx.beginPath();
-          ctx.arc(x, yPos, p.size, 0, Math.PI * 2);
+          ctx.arc(x, y, p.size * 1.5, 0, Math.PI * 2);
           ctx.fill();
           
-          // Slow drift
-          p.x += p.speed * 0.02;
-          if (p.x > 120) p.x = -20;
+          // Update position with gentle fall and drift
+          p.y += p.speed * 0.12;
+          p.x += (p.drift || 0) * 0.15;
+          
+          // Slight oscillation for organic movement
+          p.x += Math.sin(Date.now() / 2000 + p.id) * 0.02;
+          
+          if (p.y > 110) {
+            p.y = -5;
+            p.x = Math.random() * 100;
+          }
+          // Wrap horizontally
+          if (p.x > 105) p.x = -5;
+          if (p.x < -5) p.x = 105;
+        });
+      } else if (category === 'fog') {
+        // Enhanced fog: layered cloud bands drifting left to right
+        particlesRef.current.forEach(p => {
+          const x = (p.x / 100) * canvas.width;
+          // Gentle vertical oscillation
+          const yOffset = Math.sin(Date.now() / 4000 + p.id * 2) * 15;
+          const y = ((p.y + yOffset) / 100) * canvas.height;
+          
+          // Create wide, soft cloud band
+          const cloudWidth = p.size * 1.5;
+          const cloudHeight = p.size * 0.4;
+          
+          // Horizontal gradient for soft edges
+          const gradient = ctx.createRadialGradient(
+            x, y, 0,
+            x, y, cloudWidth
+          );
+          
+          const baseColor = timeOfDay === 'night' 
+            ? 'rgba(120, 130, 150,' 
+            : 'rgba(160, 165, 175,'; // Visible but muted
+          
+          gradient.addColorStop(0, `${baseColor} ${p.opacity})`);
+          gradient.addColorStop(0.3, `${baseColor} ${p.opacity * 0.7})`);
+          gradient.addColorStop(0.6, `${baseColor} ${p.opacity * 0.3})`);
+          gradient.addColorStop(1, `${baseColor} 0)`);
+          
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = gradient;
+          
+          // Draw elongated ellipse for cloud band
+          ctx.beginPath();
+          ctx.ellipse(x, y, cloudWidth, cloudHeight, 0, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Slow drift left to right
+          p.x += p.speed * 0.08;
+          if (p.x > 130) {
+            p.x = -30;
+            p.y = 15 + Math.random() * 70; // Randomize vertical position
+          }
         });
       } else if (category === 'clear') {
         // Draw stars for night/twilight
@@ -262,7 +330,6 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
       <canvas
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
-        style={{ mixBlendMode: 'multiply' }}
       />
     </div>
   );
