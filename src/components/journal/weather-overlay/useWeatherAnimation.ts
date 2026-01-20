@@ -119,10 +119,28 @@ export function useWeatherAnimation(entryId: string) {
     };
   }, [entryId, clearAllTimeouts]);
   
+  // Opacity is the TARGET value for CSS transitions to animate TO
+  // - idle: 0 (hidden)
+  // - fading-in: 1 (transition will animate from 0 to 1)
+  // - playing: 1 (fully visible)
+  // - fading-out: 0 (transition will animate from 1 to 0)
+  const getOpacity = () => {
+    switch (state.phase) {
+      case 'fading-in':
+        return 1; // Target: fade TO 1
+      case 'playing':
+        return 1; // Stay at 1
+      case 'fading-out':
+        return 0; // Target: fade TO 0
+      default:
+        return 0; // idle
+    }
+  };
+
   return {
     ...state,
     playAnimation,
     stopAnimation,
-    opacity: state.phase === 'fading-in' ? 0 : state.phase === 'fading-out' ? 0 : state.isVisible ? 1 : 0,
+    opacity: getOpacity(),
   };
 }
