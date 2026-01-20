@@ -12,8 +12,8 @@ interface WeatherOverlayProps {
 // Particle configuration based on weather
 const PARTICLE_CONFIG = {
   rain: { count: 80, speed: 12, size: 2 },
-  snow: { count: 100, speed: 1.5, size: 3 }, // Increased count, adjusted speed/size
-  fog: { count: 5, speed: 0.15, size: 300 }, // Fewer, larger cloud layers
+  snow: { count: 100, speed: 1.5, size: 3 },
+  fog: { count: 4, speed: 0.4, size: 350 }, // Faster speed for visible drift
   clear: { count: 0, speed: 0, size: 0 },
 };
 
@@ -36,7 +36,7 @@ const BACKGROUND_TINTS = {
   },
   clear: {
     day: 'rgba(255, 250, 230, 0.05)',
-    night: 'rgba(20, 30, 50, 0.08)',
+    night: 'rgba(25, 35, 65, 0.12)', // Navy tint, not gray
     twilight: 'rgba(255, 200, 150, 0.06)',
   },
 };
@@ -95,14 +95,14 @@ function createParticles(category: WeatherCategory): Particle[] {
 }
 
 function createStars(): Particle[] {
-  // Create faint, understated stars for night sky
-  return Array.from({ length: 45 }, (_, i) => ({
+  // Visible stars with gentle twinkle for night sky
+  return Array.from({ length: 80 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
-    y: Math.random() * 70, // Cover more vertical space
-    speed: 0.005 + Math.random() * 0.015, // Very slow twinkle speed
-    opacity: 0.15 + Math.random() * 0.25, // Subtle but visible (0.15-0.4)
-    size: 0.8 + Math.random() * 1.5, // Small, delicate
+    y: Math.random() * 85, // Cover more vertical space
+    speed: 0.003 + Math.random() * 0.01, // Slow twinkle speed
+    opacity: 0.35 + Math.random() * 0.35, // Visible range (0.35-0.7)
+    size: 1.0 + Math.random() * 1.4, // Small but visible (1.0-2.4px)
   }));
 }
 
@@ -254,74 +254,77 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           ctx.ellipse(x, y, cloudWidth, cloudHeight, 0, 0, Math.PI * 2);
           ctx.fill();
           
-          // Steady left → right drift (parallax via speed variation)
-          p.x += p.speed * 0.06;
-          if (p.x > 140) {
-            p.x = -40;
+          // Steady left → right drift - VISIBLE motion (parallax via speed variation)
+          p.x += p.speed * 0.25; // Faster drift for perceptible motion
+          if (p.x > 130) {
+            p.x = -30; // Wraparound
           }
         });
       } else if (category === 'clear') {
-        // Night: subtle cool tint + faint twinkling stars
+        // Night: navy tint + visible twinkling stars
         if (timeOfDay === 'night' || timeOfDay === 'twilight') {
-          // Subtle cool bluish tint for night atmosphere
+          // Navy/cool blue tint for night atmosphere (not gray)
           if (timeOfDay === 'night') {
-            ctx.globalAlpha = 0.06;
-            ctx.fillStyle = 'rgba(30, 50, 80, 1)';
+            ctx.globalAlpha = 0.1;
+            ctx.fillStyle = 'rgba(20, 35, 70, 1)'; // Navy blue, not gray
             ctx.fillRect(0, 0, canvas.width, canvas.height);
           }
           
-          // Faint stars with gentle twinkle
+          // Visible stars with gentle twinkle (stationary)
           starsRef.current.forEach(star => {
             const x = (star.x / 100) * canvas.width;
             const y = (star.y / 100) * canvas.height;
             
-            // Very slow, gentle twinkle
-            const twinkle = 0.6 + 0.4 * Math.sin(Date.now() / 2000 + star.id * 1.5);
+            // Slow, gentle twinkle (sine-based alpha modulation)
+            const twinkle = 0.5 + 0.5 * Math.sin(Date.now() / 3000 + star.id * 2);
             ctx.globalAlpha = star.opacity * twinkle;
             
-            // Soft star glow
-            const starGradient = ctx.createRadialGradient(x, y, 0, x, y, star.size * 2);
-            starGradient.addColorStop(0, 'rgba(220, 225, 240, 1)');
-            starGradient.addColorStop(0.5, 'rgba(200, 210, 230, 0.5)');
-            starGradient.addColorStop(1, 'rgba(180, 190, 220, 0)');
+            // Star core with soft glow
+            const starGradient = ctx.createRadialGradient(x, y, 0, x, y, star.size * 2.5);
+            starGradient.addColorStop(0, 'rgba(240, 245, 255, 1)'); // Bright center
+            starGradient.addColorStop(0.3, 'rgba(220, 230, 250, 0.7)');
+            starGradient.addColorStop(0.6, 'rgba(200, 215, 240, 0.3)');
+            starGradient.addColorStop(1, 'rgba(180, 200, 230, 0)');
             
             ctx.fillStyle = starGradient;
             ctx.beginPath();
-            ctx.arc(x, y, star.size * 1.5, 0, Math.PI * 2);
+            ctx.arc(x, y, star.size * 2, 0, Math.PI * 2);
             ctx.fill();
           });
         }
         
-        // Sunny day: visible warm sun disc with soft glow
+        // Sunny day: large centered sun disc with warm glow
         if (timeOfDay === 'day') {
-          const sunX = canvas.width * 0.75;
-          const sunY = canvas.height * 0.15;
-          const sunRadius = Math.min(canvas.width, canvas.height) * 0.08;
+          const sunX = canvas.width * 0.5; // Centered horizontally
+          const sunY = canvas.height * 0.38; // Slightly above center
+          const sunRadius = Math.min(canvas.width, canvas.height) * 0.18; // Much larger
           
           // Gentle pulse
-          const pulse = 0.95 + 0.05 * Math.sin(Date.now() / 5000);
+          const pulse = 0.92 + 0.08 * Math.sin(Date.now() / 4000);
           
-          // Outer warm glow (larger, softer)
-          ctx.globalAlpha = 0.12 * pulse;
-          const outerGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius * 4);
-          outerGlow.addColorStop(0, 'rgba(255, 235, 180, 1)');
-          outerGlow.addColorStop(0.3, 'rgba(255, 230, 160, 0.6)');
-          outerGlow.addColorStop(0.6, 'rgba(255, 225, 140, 0.2)');
-          outerGlow.addColorStop(1, 'rgba(255, 220, 120, 0)');
+          // Outer warm glow (large, soft)
+          ctx.globalAlpha = 0.15 * pulse;
+          const outerGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius * 3);
+          outerGlow.addColorStop(0, 'rgba(255, 240, 190, 1)'); // Muted cream/yellow
+          outerGlow.addColorStop(0.25, 'rgba(255, 235, 170, 0.7)');
+          outerGlow.addColorStop(0.5, 'rgba(255, 228, 150, 0.35)');
+          outerGlow.addColorStop(0.75, 'rgba(255, 220, 130, 0.12)');
+          outerGlow.addColorStop(1, 'rgba(255, 215, 110, 0)');
           ctx.fillStyle = outerGlow;
           ctx.beginPath();
-          ctx.arc(sunX, sunY, sunRadius * 4, 0, Math.PI * 2);
+          ctx.arc(sunX, sunY, sunRadius * 3, 0, Math.PI * 2);
           ctx.fill();
           
-          // Inner sun disc (muted cream/yellow)
-          ctx.globalAlpha = 0.18 * pulse;
+          // Inner sun disc (muted warm cream)
+          ctx.globalAlpha = 0.22 * pulse;
           const sunDisc = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius);
-          sunDisc.addColorStop(0, 'rgba(255, 245, 210, 1)');
-          sunDisc.addColorStop(0.6, 'rgba(255, 235, 180, 0.8)');
+          sunDisc.addColorStop(0, 'rgba(255, 248, 220, 1)'); // Soft cream center
+          sunDisc.addColorStop(0.4, 'rgba(255, 240, 195, 0.85)');
+          sunDisc.addColorStop(0.7, 'rgba(255, 232, 170, 0.5)');
           sunDisc.addColorStop(1, 'rgba(255, 225, 150, 0)');
           ctx.fillStyle = sunDisc;
           ctx.beginPath();
-          ctx.arc(sunX, sunY, sunRadius * 1.5, 0, Math.PI * 2);
+          ctx.arc(sunX, sunY, sunRadius * 1.2, 0, Math.PI * 2);
           ctx.fill();
         }
       }
