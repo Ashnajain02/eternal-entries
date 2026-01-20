@@ -95,13 +95,14 @@ function createParticles(category: WeatherCategory): Particle[] {
 }
 
 function createStars(): Particle[] {
-  return Array.from({ length: 30 }, (_, i) => ({
+  // Create faint, understated stars for night sky
+  return Array.from({ length: 45 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
-    y: Math.random() * 60,
-    speed: 0.01 + Math.random() * 0.02,
-    opacity: 0.1 + Math.random() * 0.2,
-    size: 1 + Math.random() * 2,
+    y: Math.random() * 70, // Cover more vertical space
+    speed: 0.005 + Math.random() * 0.015, // Very slow twinkle speed
+    opacity: 0.15 + Math.random() * 0.25, // Subtle but visible (0.15-0.4)
+    size: 0.8 + Math.random() * 1.5, // Small, delicate
   }));
 }
 
@@ -117,12 +118,6 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
   const particlesRef = useRef<Particle[]>([]);
   const starsRef = useRef<Particle[]>([]);
   
-  // TEMPORARY: Log category mapping for verification
-  useEffect(() => {
-    if (isVisible) {
-      console.log(`[WeatherOverlay] Category resolved: "${category}", TimeOfDay: "${timeOfDay}"`);
-    }
-  }, [category, timeOfDay, isVisible]);
   
   // Initialize particles
   const initialParticles = useMemo(() => createParticles(category), [category]);
@@ -223,79 +218,111 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           if (p.x < -5) p.x = 105;
         });
       } else if (category === 'fog') {
-        // Enhanced fog: layered cloud bands drifting left to right
+        // Realistic cloud layers drifting left → right (no vertical bounce)
         particlesRef.current.forEach(p => {
           const x = (p.x / 100) * canvas.width;
-          // Gentle vertical oscillation
-          const yOffset = Math.sin(Date.now() / 4000 + p.id * 2) * 15;
-          const y = ((p.y + yOffset) / 100) * canvas.height;
+          // Minimal vertical drift (1-2px, not oscillation)
+          const microDrift = Math.sin(Date.now() / 8000 + p.id) * 2;
+          const y = ((p.y) / 100) * canvas.height + microDrift;
           
-          // Create wide, soft cloud band
-          const cloudWidth = p.size * 1.5;
-          const cloudHeight = p.size * 0.4;
+          // Wide, stretched cloud band
+          const cloudWidth = p.size * 2.0;
+          const cloudHeight = p.size * 0.3;
           
-          // Horizontal gradient for soft edges
+          // Soft radial gradient for organic cloud edges
           const gradient = ctx.createRadialGradient(
             x, y, 0,
             x, y, cloudWidth
           );
           
           const baseColor = timeOfDay === 'night' 
-            ? 'rgba(120, 130, 150,' 
-            : 'rgba(160, 165, 175,'; // Visible but muted
+            ? 'rgba(100, 110, 130,' 
+            : 'rgba(140, 145, 155,';
           
-          gradient.addColorStop(0, `${baseColor} ${p.opacity})`);
-          gradient.addColorStop(0.3, `${baseColor} ${p.opacity * 0.7})`);
-          gradient.addColorStop(0.6, `${baseColor} ${p.opacity * 0.3})`);
+          // Softer falloff for cloud-like appearance
+          gradient.addColorStop(0, `${baseColor} ${p.opacity * 0.8})`);
+          gradient.addColorStop(0.2, `${baseColor} ${p.opacity * 0.6})`);
+          gradient.addColorStop(0.5, `${baseColor} ${p.opacity * 0.3})`);
+          gradient.addColorStop(0.8, `${baseColor} ${p.opacity * 0.1})`);
           gradient.addColorStop(1, `${baseColor} 0)`);
           
           ctx.globalAlpha = 1;
           ctx.fillStyle = gradient;
           
-          // Draw elongated ellipse for cloud band
+          // Draw stretched ellipse for cloud band
           ctx.beginPath();
           ctx.ellipse(x, y, cloudWidth, cloudHeight, 0, 0, Math.PI * 2);
           ctx.fill();
           
-          // Slow drift left to right
-          p.x += p.speed * 0.08;
-          if (p.x > 130) {
-            p.x = -30;
-            p.y = 15 + Math.random() * 70; // Randomize vertical position
+          // Steady left → right drift (parallax via speed variation)
+          p.x += p.speed * 0.06;
+          if (p.x > 140) {
+            p.x = -40;
           }
         });
       } else if (category === 'clear') {
-        // Draw stars for night/twilight
+        // Night: subtle cool tint + faint twinkling stars
         if (timeOfDay === 'night' || timeOfDay === 'twilight') {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+          // Subtle cool bluish tint for night atmosphere
+          if (timeOfDay === 'night') {
+            ctx.globalAlpha = 0.06;
+            ctx.fillStyle = 'rgba(30, 50, 80, 1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+          
+          // Faint stars with gentle twinkle
           starsRef.current.forEach(star => {
             const x = (star.x / 100) * canvas.width;
             const y = (star.y / 100) * canvas.height;
             
-            const twinkle = 0.5 + 0.5 * Math.sin(Date.now() / 1000 + star.id);
+            // Very slow, gentle twinkle
+            const twinkle = 0.6 + 0.4 * Math.sin(Date.now() / 2000 + star.id * 1.5);
             ctx.globalAlpha = star.opacity * twinkle;
+            
+            // Soft star glow
+            const starGradient = ctx.createRadialGradient(x, y, 0, x, y, star.size * 2);
+            starGradient.addColorStop(0, 'rgba(220, 225, 240, 1)');
+            starGradient.addColorStop(0.5, 'rgba(200, 210, 230, 0.5)');
+            starGradient.addColorStop(1, 'rgba(180, 190, 220, 0)');
+            
+            ctx.fillStyle = starGradient;
             ctx.beginPath();
-            ctx.arc(x, y, star.size, 0, Math.PI * 2);
+            ctx.arc(x, y, star.size * 1.5, 0, Math.PI * 2);
             ctx.fill();
           });
         }
         
-        // Subtle ambient glow for day
+        // Sunny day: visible warm sun disc with soft glow
         if (timeOfDay === 'day') {
-          const pulse = 0.9 + 0.1 * Math.sin(Date.now() / 4000);
-          ctx.globalAlpha = 0.05 * pulse;
-          const gradient = ctx.createRadialGradient(
-            canvas.width * 0.7, 
-            canvas.height * 0.2, 
-            0,
-            canvas.width * 0.7, 
-            canvas.height * 0.2, 
-            canvas.width * 0.5
-          );
-          gradient.addColorStop(0, 'rgba(255, 240, 200, 1)');
-          gradient.addColorStop(1, 'rgba(255, 240, 200, 0)');
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          const sunX = canvas.width * 0.75;
+          const sunY = canvas.height * 0.15;
+          const sunRadius = Math.min(canvas.width, canvas.height) * 0.08;
+          
+          // Gentle pulse
+          const pulse = 0.95 + 0.05 * Math.sin(Date.now() / 5000);
+          
+          // Outer warm glow (larger, softer)
+          ctx.globalAlpha = 0.12 * pulse;
+          const outerGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius * 4);
+          outerGlow.addColorStop(0, 'rgba(255, 235, 180, 1)');
+          outerGlow.addColorStop(0.3, 'rgba(255, 230, 160, 0.6)');
+          outerGlow.addColorStop(0.6, 'rgba(255, 225, 140, 0.2)');
+          outerGlow.addColorStop(1, 'rgba(255, 220, 120, 0)');
+          ctx.fillStyle = outerGlow;
+          ctx.beginPath();
+          ctx.arc(sunX, sunY, sunRadius * 4, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Inner sun disc (muted cream/yellow)
+          ctx.globalAlpha = 0.18 * pulse;
+          const sunDisc = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius);
+          sunDisc.addColorStop(0, 'rgba(255, 245, 210, 1)');
+          sunDisc.addColorStop(0.6, 'rgba(255, 235, 180, 0.8)');
+          sunDisc.addColorStop(1, 'rgba(255, 225, 150, 0)');
+          ctx.fillStyle = sunDisc;
+          ctx.beginPath();
+          ctx.arc(sunX, sunY, sunRadius * 1.5, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
       
