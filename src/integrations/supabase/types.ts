@@ -216,7 +216,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_user_spotify_token: { Args: { user_id: string }; Returns: string }
       is_spotify_token_expired: { Args: { user_id: string }; Returns: boolean }
       update_profile_spotify_data:
         | {
