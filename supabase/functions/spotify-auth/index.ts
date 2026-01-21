@@ -2,7 +2,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
 import { encryptToken } from "../_shared/spotify-crypto.ts";
 
-// Standard CORS headers for all requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -12,46 +11,29 @@ const corsHeaders = {
 serve(async (req) => {
   console.log("Spotify Auth Function - Request received");
   
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("Parsing request body");
-
-    // Parse request body
     const requestData = await req.json();
     const { action, code, redirect_uri } = requestData;
     console.log(`Action requested: ${action}`);
     
-    // Create a Supabase client with the service role key for database operations
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    const supabase = createClient(
-      supabaseUrl ?? "",
-      supabaseKey ?? ""
-    );
+    const supabase = createClient(supabaseUrl ?? "", supabaseKey ?? "");
     
-    // Extract JWT token from Authorization header
+    // Extract and validate JWT from Authorization header
     const authHeader = req.headers.get("Authorization");
-    console.log(`Auth header present: ${Boolean(authHeader)}`);
+    let userId: string | null = null;
     
-    // Get user ID from JWT if Authorization header is present
-    let userId = null;
     if (authHeader) {
       try {
-        // Extract the JWT token (remove 'Bearer ' prefix if present)
         const token = authHeader.replace(/^Bearer\s/, "");
-        
-        // Use the admin client to verify the JWT token
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
         
-        if (userError) {
-          console.error("Error getting user from token:", userError);
-        } else if (user) {
+        if (!userError && user) {
           userId = user.id;
           console.log(`User authenticated: ${userId}`);
         }
@@ -60,302 +42,209 @@ serve(async (req) => {
       }
     }
 
-    // Handle different actions
-    if (action === "is_token_expired") {
-      return await isTokenExpired(supabase, userId);
-    } else if (action === "authorize") {
-      return await getAuthorizationUrl(redirect_uri);
-    } else if (action === "callback" && code) {
-      return await handleCallback(code, redirect_uri, supabase, userId);
-    } else if (action === "revoke") {
-      return await revokeAccess(supabase, userId);
+    // Route to appropriate handler
+    switch (action) {
+      case "authorize":
+        return getAuthorizationUrl(redirect_uri);
+      case "callback":
+        if (!code) {
+          return errorResponse("Missing authorization code", 400);
+        }
+        return handleCallback(code, redirect_uri, supabase, userId);
+      case "revoke":
+        return revokeAccess(supabase, userId);
+      default:
+        return errorResponse("Invalid action", 400);
     }
-
-    console.log("Invalid request action");
-    return new Response(
-      JSON.stringify({ error: "Invalid request" }),
-      { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
   } catch (error) {
     console.error("Error in Spotify Auth function:", error.message);
-    return new Response(
-      JSON.stringify({ error: "Server error" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    return errorResponse("Server error", 500);
   }
 });
 
-// Check if the Spotify token is expired
-async function isTokenExpired(supabase: any, user_id: string | null) {
-  console.log("Running isTokenExpired function");
-  try {
-    if (!user_id) {
-      return new Response(
-        JSON.stringify({ error: "User not authenticated" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    console.log(`Checking token expiration for user: ${user_id}`);
-    
-    // Call the RPC function to check if the token is expired
-    const { data, error } = await supabase.rpc("is_spotify_token_expired", {
-      user_id,
-    });
-
-    if (error) {
-      console.error("Error checking token expiration:", error);
-      return new Response(
-        JSON.stringify({ error: "Failed to check token expiration" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Return whether the token is expired
-    return new Response(
-      JSON.stringify({ expired: data }),
-      { headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  } catch (error) {
-    console.error("Error checking token expiration:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to check token expiration" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  }
+function errorResponse(message: string, status: number) {
+  return new Response(
+    JSON.stringify({ error: message }),
+    { status, headers: { "Content-Type": "application/json", ...corsHeaders } }
+  );
 }
 
-// Get Spotify authorization URL
-async function getAuthorizationUrl(redirect_uri: string) {
-  console.log("Running getAuthorizationUrl function");
-  try {
-    const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
-    console.log(`Spotify Client ID available: ${Boolean(SPOTIFY_CLIENT_ID)}`);
-
-    if (!SPOTIFY_CLIENT_ID) {
-      return new Response(
-        JSON.stringify({ error: "Missing Spotify client ID" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Generate a random state value for security
-    const state = Math.random().toString(36).substring(2, 15);
-    
-    // Required scopes for Spotify API including Web Playback SDK
-    const scopes = [
-      'user-read-private',
-      'user-read-email',
-      'user-top-read',
-      'user-read-recently-played',
-      'streaming',
-      'user-modify-playback-state',
-      'user-read-playback-state'
-    ];
-    
-    // Create the authorization URL
-    const params = new URLSearchParams({
-      client_id: SPOTIFY_CLIENT_ID,
-      response_type: 'code',
-      redirect_uri: redirect_uri,
-      scope: scopes.join(' '),
-      state: state,
-      show_dialog: 'true'
-    });
-    
-    const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
-    console.log(`Authorization URL created: ${authUrl}`);
-    
-    return new Response(
-      JSON.stringify({ url: authUrl }),
-      { headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  } catch (error) {
-    console.error("Error generating authorization URL:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to generate authorization URL" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  }
+function successResponse(data: object) {
+  return new Response(
+    JSON.stringify(data),
+    { headers: { "Content-Type": "application/json", ...corsHeaders } }
+  );
 }
 
-// Handle the OAuth callback
-async function handleCallback(code: string, redirect_uri: string, supabase: any, user_id: string | null) {
-  console.log("Running handleCallback function");
+// Generate Spotify authorization URL
+function getAuthorizationUrl(redirect_uri: string) {
+  console.log("Generating authorization URL");
   
-  try {
-    if (!user_id) {
-      return new Response(
-        JSON.stringify({ error: "User not authenticated" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
-    const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
-    console.log(`Spotify credentials available: ${Boolean(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET)}`);
-    
-    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-      return new Response(
-        JSON.stringify({ error: "Missing Spotify credentials" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    console.log(`Exchanging code for token with redirect URI: ${redirect_uri}`);
-    
-    // Exchange code for token
-    const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirect_uri,
-      }),
-    });
-    
-    const tokenData = await tokenResponse.json();
-    
-    if (tokenData.error) {
-      console.error("Spotify token error:", tokenData.error, tokenData.error_description);
-      
-      // Provide more specific error messages
-      let errorMessage = "Failed to get Spotify token";
-      if (tokenData.error === "invalid_grant") {
-        errorMessage = "Authorization code expired or already used. Please try connecting again.";
-      } else if (tokenData.error_description) {
-        errorMessage = tokenData.error_description;
-      }
-      
-      return new Response(
-        JSON.stringify({ error: errorMessage }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    console.log("Successfully obtained Spotify token");
-    
-    // Get user profile from Spotify
-    const profileResponse = await fetch("https://api.spotify.com/v1/me", {
-      headers: {
-        "Authorization": `Bearer ${tokenData.access_token}`,
-      },
-    });
-    
-    // Check if profile request was successful
-    if (!profileResponse.ok) {
-      const errorText = await profileResponse.text();
-      console.error("Spotify profile error:", profileResponse.status, errorText);
-      
-      // Common error: app is in development mode and user is not in allowlist
-      if (profileResponse.status === 403 || errorText.includes("Check settings")) {
-        return new Response(
-          JSON.stringify({ 
-            error: "Spotify app is in Development Mode. Ask the app owner to add your Spotify email as a test user in the Spotify Developer Dashboard, or request Extended Quota Mode." 
-          }),
-          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-      
-      return new Response(
-        JSON.stringify({ error: "Failed to get Spotify profile" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    const profileData = await profileResponse.json();
-    console.log(`Got Spotify profile for: ${profileData.display_name || profileData.id}`);
-    
-    // Calculate token expiration time
-    const expires_at = new Date();
-    expires_at.setSeconds(expires_at.getSeconds() + tokenData.expires_in);
-    
-    // Encrypt tokens before storing
-    console.log("Encrypting Spotify tokens");
-    const encryptedAccessToken = await encryptToken(tokenData.access_token);
-    const encryptedRefreshToken = await encryptToken(tokenData.refresh_token);
-    
-    // Store the encrypted tokens in the database
-    const { error } = await supabase.rpc("update_profile_spotify_data", {
-      p_user_id: user_id,
-      p_access_token: encryptedAccessToken,
-      p_refresh_token: encryptedRefreshToken,
-      p_expires_at: expires_at.toISOString(),
-      p_username: profileData.id,
-    });
-    
-    if (error) {
-      console.error("Database error:", error.message);
-      return new Response(
-        JSON.stringify({ error: "Failed to save Spotify data" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    console.log("Successfully stored Spotify data in database");
-    
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        display_name: profileData.display_name,
-      }),
-      { headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  } catch (error) {
-    console.error("Callback error:", error);
-    return new Response(
-      JSON.stringify({ error: "Callback failed" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+  const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
+  if (!SPOTIFY_CLIENT_ID) {
+    return errorResponse("Missing Spotify client ID", 500);
   }
+
+  const state = Math.random().toString(36).substring(2, 15);
+  const scopes = [
+    'user-read-private',
+    'user-read-email',
+    'user-top-read',
+    'user-read-recently-played',
+    'streaming',
+    'user-modify-playback-state',
+    'user-read-playback-state'
+  ];
+  
+  const params = new URLSearchParams({
+    client_id: SPOTIFY_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: redirect_uri,
+    scope: scopes.join(' '),
+    state: state,
+    show_dialog: 'true'
+  });
+  
+  const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`;
+  console.log("Authorization URL created");
+  
+  return successResponse({ url: authUrl });
 }
 
-// Revoke Spotify access
-async function revokeAccess(supabase: any, user_id: string | null) {
-  console.log("Running revokeAccess function");
-  try {
-    if (!user_id) {
-      return new Response(
-        JSON.stringify({ error: "User not authenticated" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    // Update the profile to remove Spotify data
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        spotify_access_token: null,
-        spotify_refresh_token: null,
-        spotify_token_expires_at: null,
-        spotify_username: null,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", user_id);
-    
-    if (error) {
-      console.error("Error revoking access:", error);
-      return new Response(
-        JSON.stringify({ error: "Failed to revoke access" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    console.log("Successfully revoked Spotify access");
-    
-    return new Response(
-      JSON.stringify({ success: true }),
-      { headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  } catch (error) {
-    console.error("Error revoking access:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to revoke access" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+// Handle OAuth callback - exchange code for tokens and store them
+async function handleCallback(
+  code: string, 
+  redirect_uri: string, 
+  supabase: any, 
+  userId: string | null
+) {
+  console.log("Processing OAuth callback");
+  
+  if (!userId) {
+    return errorResponse("User not authenticated", 401);
   }
+  
+  const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
+  const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
+  
+  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+    return errorResponse("Missing Spotify credentials", 500);
+  }
+  
+  // Exchange authorization code for tokens
+  const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Authorization": `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: redirect_uri,
+    }),
+  });
+  
+  const tokenData = await tokenResponse.json();
+  
+  if (tokenData.error) {
+    console.error("Spotify token error:", tokenData.error, tokenData.error_description);
+    
+    let errorMessage = "Failed to get Spotify token";
+    if (tokenData.error === "invalid_grant") {
+      errorMessage = "Authorization code expired or already used. Please try connecting again.";
+    } else if (tokenData.error_description) {
+      errorMessage = tokenData.error_description;
+    }
+    
+    return errorResponse(errorMessage, 400);
+  }
+  
+  console.log("Successfully obtained Spotify tokens");
+  
+  // Fetch user profile from Spotify (includes premium status)
+  const profileResponse = await fetch("https://api.spotify.com/v1/me", {
+    headers: { "Authorization": `Bearer ${tokenData.access_token}` },
+  });
+  
+  if (!profileResponse.ok) {
+    const errorText = await profileResponse.text();
+    console.error("Spotify profile error:", profileResponse.status, errorText);
+    
+    if (profileResponse.status === 403 || errorText.includes("Check settings")) {
+      return errorResponse(
+        "Spotify app is in Development Mode. Ask the app owner to add your Spotify email as a test user in the Spotify Developer Dashboard, or request Extended Quota Mode.",
+        403
+      );
+    }
+    
+    return errorResponse("Failed to get Spotify profile", 400);
+  }
+  
+  const profileData = await profileResponse.json();
+  console.log(`Got Spotify profile for: ${profileData.display_name || profileData.id}`);
+  
+  // Check premium status - stored once at connection time
+  const isPremium = profileData.product === "premium";
+  console.log(`User premium status: ${isPremium}`);
+  
+  // Calculate token expiration
+  const expiresAt = new Date();
+  expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
+  
+  // Encrypt tokens before storage
+  const encryptedAccessToken = await encryptToken(tokenData.access_token);
+  const encryptedRefreshToken = await encryptToken(tokenData.refresh_token);
+  
+  // Store encrypted tokens and premium status in database
+  const { error } = await supabase.rpc("update_profile_spotify_data", {
+    p_user_id: userId,
+    p_access_token: encryptedAccessToken,
+    p_refresh_token: encryptedRefreshToken,
+    p_expires_at: expiresAt.toISOString(),
+    p_username: profileData.id,
+    p_is_premium: isPremium,
+  });
+  
+  if (error) {
+    console.error("Database error:", error.message);
+    return errorResponse("Failed to save Spotify data", 500);
+  }
+  
+  console.log("Successfully stored Spotify data in database");
+  
+  return successResponse({ 
+    success: true,
+    display_name: profileData.display_name,
+    is_premium: isPremium,
+  });
+}
+
+// Revoke Spotify access - clear all Spotify data from profile
+async function revokeAccess(supabase: any, userId: string | null) {
+  console.log("Revoking Spotify access");
+  
+  if (!userId) {
+    return errorResponse("User not authenticated", 401);
+  }
+  
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      spotify_access_token: null,
+      spotify_refresh_token: null,
+      spotify_token_expires_at: null,
+      spotify_username: null,
+      spotify_is_premium: null,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", userId);
+  
+  if (error) {
+    console.error("Error revoking access:", error);
+    return errorResponse("Failed to revoke access", 500);
+  }
+  
+  console.log("Successfully revoked Spotify access");
+  return successResponse({ success: true });
 }

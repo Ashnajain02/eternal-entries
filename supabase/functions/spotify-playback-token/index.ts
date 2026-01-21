@@ -24,166 +24,168 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(supabaseUrl ?? "", supabaseKey ?? "");
 
-    // Get user from JWT
+    // Validate JWT from Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      return errorResponse("Unauthorized", 401);
     }
 
     const token = authHeader.replace(/^Bearer\s/, "");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      return errorResponse("Unauthorized", 401);
     }
 
     const userId = user.id;
     console.log(`User authenticated: ${userId}`);
 
     if (action === "get_token") {
-      // Fetch user's Spotify tokens
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("spotify_access_token, spotify_refresh_token, spotify_token_expires_at")
-        .eq("id", userId)
-        .single();
-
-      if (profileError || !profile?.spotify_access_token) {
-        console.log("No Spotify token found for user");
-        return new Response(
-          JSON.stringify({ needs_reauth: true, reason: "no_token" }),
-          { headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-
-      let accessToken: string;
-      const refreshToken = profile.spotify_refresh_token;
-
-      // Check if token is expired
-      const expiresAt = profile.spotify_token_expires_at 
-        ? new Date(profile.spotify_token_expires_at)
-        : new Date(0);
-      
-      const isExpired = expiresAt < new Date();
-
-      if (isExpired && refreshToken) {
-        console.log("Token expired, refreshing...");
-        
-        const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
-        const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
-
-        if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-          return new Response(
-            JSON.stringify({ error: "Spotify credentials not configured" }),
-            { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-          );
-        }
-
-        try {
-          const decryptedRefreshToken = await decryptToken(refreshToken);
-          
-          const refreshResponse = await fetch("https://accounts.spotify.com/api/token", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "Authorization": `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
-            },
-            body: new URLSearchParams({
-              grant_type: "refresh_token",
-              refresh_token: decryptedRefreshToken,
-            }),
-          });
-
-          const refreshData = await refreshResponse.json();
-
-          if (refreshData.error) {
-            console.error("Token refresh failed:", refreshData.error);
-            return new Response(
-              JSON.stringify({ needs_reauth: true, reason: "refresh_failed" }),
-              { headers: { "Content-Type": "application/json", ...corsHeaders } }
-            );
-          }
-
-          accessToken = refreshData.access_token;
-
-          // Update stored tokens
-          const newExpiresAt = new Date();
-          newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshData.expires_in);
-          
-          const encryptedAccessToken = await encryptToken(accessToken);
-          const encryptedRefreshToken = refreshData.refresh_token 
-            ? await encryptToken(refreshData.refresh_token)
-            : refreshToken;
-
-          await supabase
-            .from("profiles")
-            .update({
-              spotify_access_token: encryptedAccessToken,
-              spotify_refresh_token: encryptedRefreshToken,
-              spotify_token_expires_at: newExpiresAt.toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq("id", userId);
-
-          console.log("Token refreshed successfully");
-        } catch (error) {
-          console.error("Error refreshing token:", error);
-          return new Response(
-            JSON.stringify({ needs_reauth: true, reason: "refresh_error" }),
-            { headers: { "Content-Type": "application/json", ...corsHeaders } }
-          );
-        }
-      } else {
-        try {
-          accessToken = await decryptToken(profile.spotify_access_token);
-        } catch (error) {
-          console.error("Error decrypting token:", error);
-          return new Response(
-            JSON.stringify({ needs_reauth: true, reason: "decrypt_error" }),
-            { headers: { "Content-Type": "application/json", ...corsHeaders } }
-          );
-        }
-      }
-
-      // Check if user has premium by calling Spotify API
-      let isPremium = false;
-      try {
-        const meResponse = await fetch("https://api.spotify.com/v1/me", {
-          headers: { "Authorization": `Bearer ${accessToken}` }
-        });
-        
-        if (meResponse.ok) {
-          const meData = await meResponse.json();
-          isPremium = meData.product === "premium";
-        }
-      } catch (error) {
-        console.log("Could not check premium status:", error);
-      }
-
-      return new Response(
-        JSON.stringify({ 
-          access_token: accessToken,
-          is_premium: isPremium
-        }),
-        { headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      return await getToken(supabase, userId);
     }
 
-    return new Response(
-      JSON.stringify({ error: "Invalid action" }),
-      { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    if (action === "is_connected") {
+      return await isConnected(supabase, userId);
+    }
+
+    return errorResponse("Invalid action", 400);
   } catch (error) {
     console.error("Error:", error.message);
-    return new Response(
-      JSON.stringify({ error: "Server error" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    return errorResponse("Server error", 500);
   }
 });
+
+function errorResponse(message: string, status: number) {
+  return new Response(
+    JSON.stringify({ error: message }),
+    { status, headers: { "Content-Type": "application/json", ...corsHeaders } }
+  );
+}
+
+function successResponse(data: object) {
+  return new Response(
+    JSON.stringify(data),
+    { headers: { "Content-Type": "application/json", ...corsHeaders } }
+  );
+}
+
+// Check if user has a valid (non-expired) Spotify connection
+async function isConnected(supabase: any, userId: string) {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("spotify_access_token, spotify_token_expires_at")
+    .eq("id", userId)
+    .single();
+
+  if (error || !profile?.spotify_access_token) {
+    return successResponse({ connected: false });
+  }
+
+  // Check if token is expired
+  const expiresAt = profile.spotify_token_expires_at 
+    ? new Date(profile.spotify_token_expires_at)
+    : new Date(0);
+  
+  // If expired, we can still refresh, so consider connected
+  // Only "not connected" if no tokens at all
+  return successResponse({ connected: true });
+}
+
+// Get a valid access token, refreshing if needed
+async function getToken(supabase: any, userId: string) {
+  // Fetch user's Spotify tokens and premium status from DB
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("spotify_access_token, spotify_refresh_token, spotify_token_expires_at, spotify_is_premium")
+    .eq("id", userId)
+    .single();
+
+  if (profileError || !profile?.spotify_access_token) {
+    console.log("No Spotify token found for user");
+    return successResponse({ needs_reauth: true, reason: "no_token" });
+  }
+
+  let accessToken: string;
+  const refreshToken = profile.spotify_refresh_token;
+  const isPremium = profile.spotify_is_premium;
+
+  // Check if token is expired
+  const expiresAt = profile.spotify_token_expires_at 
+    ? new Date(profile.spotify_token_expires_at)
+    : new Date(0);
+  
+  const isExpired = expiresAt < new Date();
+
+  if (isExpired && refreshToken) {
+    console.log("Token expired, refreshing...");
+    
+    const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
+    const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
+
+    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+      return errorResponse("Spotify credentials not configured", 500);
+    }
+
+    try {
+      const decryptedRefreshToken = await decryptToken(refreshToken);
+      
+      const refreshResponse = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`,
+        },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: decryptedRefreshToken,
+        }),
+      });
+
+      const refreshData = await refreshResponse.json();
+
+      if (refreshData.error) {
+        console.error("Token refresh failed:", refreshData.error);
+        return successResponse({ needs_reauth: true, reason: "refresh_failed" });
+      }
+
+      accessToken = refreshData.access_token;
+
+      // Update stored tokens
+      const newExpiresAt = new Date();
+      newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshData.expires_in);
+      
+      const encryptedAccessToken = await encryptToken(accessToken);
+      const encryptedRefreshToken = refreshData.refresh_token 
+        ? await encryptToken(refreshData.refresh_token)
+        : refreshToken;
+
+      await supabase
+        .from("profiles")
+        .update({
+          spotify_access_token: encryptedAccessToken,
+          spotify_refresh_token: encryptedRefreshToken,
+          spotify_token_expires_at: newExpiresAt.toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", userId);
+
+      console.log("Token refreshed successfully");
+    } catch (error) {
+      console.error("Error refreshing token:", error);
+      return successResponse({ needs_reauth: true, reason: "refresh_error" });
+    }
+  } else {
+    try {
+      accessToken = await decryptToken(profile.spotify_access_token);
+    } catch (error) {
+      console.error("Error decrypting token:", error);
+      return successResponse({ needs_reauth: true, reason: "decrypt_error" });
+    }
+  }
+
+  // Return token and premium status (stored at connection time, no extra API call)
+  return successResponse({ 
+    access_token: accessToken,
+    is_premium: isPremium ?? false
+  });
+}

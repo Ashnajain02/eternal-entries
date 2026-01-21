@@ -171,6 +171,7 @@ export type Database = {
           id: string
           last_name: string | null
           spotify_access_token: string | null
+          spotify_is_premium: boolean | null
           spotify_refresh_token: string | null
           spotify_token_expires_at: string | null
           spotify_username: string | null
@@ -185,6 +186,7 @@ export type Database = {
           id: string
           last_name?: string | null
           spotify_access_token?: string | null
+          spotify_is_premium?: boolean | null
           spotify_refresh_token?: string | null
           spotify_token_expires_at?: string | null
           spotify_username?: string | null
@@ -199,6 +201,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           spotify_access_token?: string | null
+          spotify_is_premium?: boolean | null
           spotify_refresh_token?: string | null
           spotify_token_expires_at?: string | null
           spotify_username?: string | null
@@ -215,16 +218,28 @@ export type Database = {
     Functions: {
       get_user_spotify_token: { Args: { user_id: string }; Returns: string }
       is_spotify_token_expired: { Args: { user_id: string }; Returns: boolean }
-      update_profile_spotify_data: {
-        Args: {
-          p_access_token: string
-          p_expires_at: string
-          p_refresh_token: string
-          p_user_id: string
-          p_username: string
-        }
-        Returns: boolean
-      }
+      update_profile_spotify_data:
+        | {
+            Args: {
+              p_access_token: string
+              p_expires_at: string
+              p_refresh_token: string
+              p_user_id: string
+              p_username: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_access_token: string
+              p_expires_at: string
+              p_is_premium?: boolean
+              p_refresh_token: string
+              p_user_id: string
+              p_username: string
+            }
+            Returns: boolean
+          }
     }
     Enums: {
       [_ in never]: never
