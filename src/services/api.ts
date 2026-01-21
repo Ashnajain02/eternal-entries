@@ -1,12 +1,4 @@
-
-import { WeatherData } from "@/types";
-import { getWeatherForLocation } from "@/utils/weatherUtils";
 import { supabase } from "@/integrations/supabase/client";
-
-// Fetch weather data using actual coordinates
-export const fetchWeatherData = async (lat: number, lon: number): Promise<WeatherData> => {
-  return await getWeatherForLocation(lat, lon);
-};
 
 /**
  * Generate multiple reflection questions for a journal entry using the AI
