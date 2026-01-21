@@ -6,6 +6,7 @@ import { useAuthProvider } from '@/hooks/useAuthProvider';
 
 const AuthContext = createContext<{
   authState: AuthState;
+  authReady: boolean;
   signUp: (email: string, password: string, metadata?: SignUpMetadata) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -13,6 +14,7 @@ const AuthContext = createContext<{
   updatePassword: (password: string, accessToken?: string | null, refreshToken?: string | null) => Promise<void>;
 }>({
   authState: { session: null, user: null, loading: true },
+  authReady: false,
   signUp: async () => {},
   signIn: async () => {},
   signOut: async () => {},
