@@ -22,6 +22,7 @@ export interface SpotifyTrack {
   album: string;
   albumArt: string;
   uri: string;
+  durationMs?: number;
   clipStartSeconds?: number;
   clipEndSeconds?: number;
 }
