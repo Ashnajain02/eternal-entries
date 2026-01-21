@@ -1,9 +1,10 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Clock, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSpotifyPlayback } from '@/contexts/SpotifyPlaybackContext';
 import { formatTime } from '@/utils/formatTime';
+import { useDragHandler, MIN_CLIP_DURATION } from '@/hooks/useDragHandler';
 
 interface ClipRangeSelectorProps {
   trackUri: string;
@@ -25,13 +26,8 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
   entryId = 'editor-preview'
 }) => {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState<'start' | 'end' | 'range' | null>(null);
-  const [dragStartX, setDragStartX] = useState(0);
-  const [initialStart, setInitialStart] = useState(clipStartSeconds);
-  const [initialEnd, setInitialEnd] = useState(clipEndSeconds);
 
   const {
-    isReady,
     isInitializing,
     isPlaying,
     currentClip,
@@ -62,126 +58,19 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
     return (seconds / maxDuration) * 100;
   };
 
-  // Handle mouse down on handles or range
-  const handleMouseDown = useCallback((e: React.MouseEvent, type: 'start' | 'end' | 'range') => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(type);
-    setDragStartX(e.clientX);
-    setInitialStart(clipStartSeconds);
-    setInitialEnd(clipEndSeconds);
-  }, [clipStartSeconds, clipEndSeconds]);
-
-  // Handle mouse move
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!trackRef.current) return;
-      
-      const deltaX = e.clientX - dragStartX;
-      const deltaSeconds = pxToSeconds(deltaX);
-      const minClipDuration = 5;
-
-      if (isDragging === 'start') {
-        const newStart = Math.max(0, Math.min(initialStart + deltaSeconds, initialEnd - minClipDuration));
-        onStartChange(newStart);
-      } else if (isDragging === 'end') {
-        const newEnd = Math.max(initialStart + minClipDuration, Math.min(initialEnd + deltaSeconds, maxDuration));
-        onEndChange(newEnd);
-      } else if (isDragging === 'range') {
-        const rangeDuration = initialEnd - initialStart;
-        let newStart = initialStart + deltaSeconds;
-        let newEnd = initialEnd + deltaSeconds;
-        
-        if (newStart < 0) {
-          newStart = 0;
-          newEnd = rangeDuration;
-        }
-        if (newEnd > maxDuration) {
-          newEnd = maxDuration;
-          newStart = maxDuration - rangeDuration;
-        }
-        
-        onStartChange(newStart);
-        onEndChange(newEnd);
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(null);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, dragStartX, initialStart, initialEnd, pxToSeconds, maxDuration, onStartChange, onEndChange]);
-
-  // Touch support
-  const handleTouchStart = useCallback((e: React.TouchEvent, type: 'start' | 'end' | 'range') => {
-    e.stopPropagation();
-    const touch = e.touches[0];
-    setIsDragging(type);
-    setDragStartX(touch.clientX);
-    setInitialStart(clipStartSeconds);
-    setInitialEnd(clipEndSeconds);
-  }, [clipStartSeconds, clipEndSeconds]);
-
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!trackRef.current) return;
-      const touch = e.touches[0];
-      
-      const deltaX = touch.clientX - dragStartX;
-      const deltaSeconds = pxToSeconds(deltaX);
-      const minClipDuration = 5;
-
-      if (isDragging === 'start') {
-        const newStart = Math.max(0, Math.min(initialStart + deltaSeconds, initialEnd - minClipDuration));
-        onStartChange(newStart);
-      } else if (isDragging === 'end') {
-        const newEnd = Math.max(initialStart + minClipDuration, Math.min(initialEnd + deltaSeconds, maxDuration));
-        onEndChange(newEnd);
-      } else if (isDragging === 'range') {
-        const rangeDuration = initialEnd - initialStart;
-        let newStart = initialStart + deltaSeconds;
-        let newEnd = initialEnd + deltaSeconds;
-        
-        if (newStart < 0) {
-          newStart = 0;
-          newEnd = rangeDuration;
-        }
-        if (newEnd > maxDuration) {
-          newEnd = maxDuration;
-          newStart = maxDuration - rangeDuration;
-        }
-        
-        onStartChange(newStart);
-        onEndChange(newEnd);
-      }
-    };
-
-    const handleTouchEnd = () => {
-      setIsDragging(null);
-    };
-
-    document.addEventListener('touchmove', handleTouchMove, { passive: false });
-    document.addEventListener('touchend', handleTouchEnd);
-
-    return () => {
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [isDragging, dragStartX, initialStart, initialEnd, pxToSeconds, maxDuration, onStartChange, onEndChange]);
+  // Use consolidated drag handler hook
+  const { isDragging, handleMouseDown, handleTouchStart } = useDragHandler({
+    clipStartSeconds,
+    clipEndSeconds,
+    maxDuration,
+    onStartChange,
+    onEndChange,
+    pxToSeconds
+  });
 
   // CRITICAL: This handler must be synchronous for mobile gesture chain
   const handlePlayPause = useCallback(() => {
+    console.log('[ClipRangeSelector] handlePlayPause called, isPreviewPlaying:', isPreviewPlaying);
     if (isPreviewPlaying) {
       pauseClip(); // Fire and forget
     } else {

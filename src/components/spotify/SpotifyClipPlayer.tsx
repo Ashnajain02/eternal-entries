@@ -66,9 +66,19 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
 
   // CRITICAL: This handler must be synchronous for mobile gesture chain
   const handlePlayPause = useCallback(() => {
+    console.log('[SpotifyClipPlayer] handlePlayPause called:', {
+      entryId,
+      isThisClipPlaying,
+      trackUri: track.uri,
+      clipStart: clipStartSeconds,
+      clipEnd: effectiveClipEnd
+    });
+    
     if (isThisClipPlaying) {
+      console.log('[SpotifyClipPlayer] Pausing...');
       pauseClip(); // Fire and forget
     } else {
+      console.log('[SpotifyClipPlayer] Playing...');
       // playClip is synchronous - it activates audio context immediately
       playClip({
         entryId,
