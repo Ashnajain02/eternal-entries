@@ -629,14 +629,22 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   }, [clearClipTimers, detachPlayer]);
 
   // ========== PROACTIVE INITIALIZATION ON AUTH READY ==========
-  // Initialize Spotify SDK + player exactly ONCE when authReady becomes true
-  // This ensures player is ready before first play attempt
+  // Initialize Spotify SDK + player when authReady becomes true
+  // Cleanup when authReady becomes false (logout)
   useEffect(() => {
+    // When logged out (authReady false), do nothing - don't touch SDK
     if (!authReady) {
-      log('⏳ Waiting for authReady...');
+      // If we were previously initialized, cleanup
+      if (initAttemptedRef.current) {
+        log('🔐 AUTH_READY false: Cleaning up Spotify...');
+        cleanup();
+        initAttemptedRef.current = false;
+        sdkLoadedRef.current = false;
+      }
       return;
     }
 
+    // Already initializing or initialized
     if (initAttemptedRef.current) {
       log('🔄 Init already attempted, skipping');
       return;
@@ -646,17 +654,18 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     initAttemptedRef.current = true;
 
     const initSpotify = async () => {
-      // 1. Load SDK if needed
-      log('🔧 INIT: Loading SDK...');
+      // 1. Wait for SDK (loaded in index.html)
+      log('🔧 INIT: Waiting for SDK...');
       await waitForSDK();
       
       if (!window.Spotify?.Player) {
         log('🔧 INIT: SDK not available after wait');
         return;
       }
+      sdkLoadedRef.current = true;
       log('🔧 INIT: SDK ready ✓');
 
-      // 2. Get token
+      // 2. Get token - this only happens when authenticated
       const token = await getAccessToken();
       if (!token) {
         log('🔧 INIT: No token available (user may not have Spotify connected)');
@@ -669,6 +678,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       const player = new window.Spotify.Player({
         name: 'Eternal Entries Journal',
         getOAuthToken: async (callback) => {
+          // Only fetch token if we're authenticated
+          if (!authReady) {
+            log('🔧 getOAuthToken: Not authenticated, skipping');
+            return;
+          }
           const t = accessTokenRef.current ?? (await getAccessToken());
           if (t) callback(t);
         },
@@ -804,7 +818,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     initSpotify().catch((err) => {
       console.error('🔧 INIT: Error during proactive init', err);
     });
-  }, [authReady, waitForSDK, getAccessToken, clearClipTimers]);
+  }, [authReady, waitForSDK, getAccessToken, clearClipTimers, cleanup]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -812,13 +826,6 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       cleanup();
     };
   }, [cleanup]);
-
-  // Cleanup when user logs out
-  useEffect(() => {
-    if (!authState.user) {
-      cleanup();
-    }
-  }, [authState.user, cleanup]);
 
   const value: SpotifyPlaybackContextType = {
     isReady,

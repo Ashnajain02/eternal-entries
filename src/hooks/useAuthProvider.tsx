@@ -14,7 +14,6 @@ const initialState: AuthState = {
 export const useAuthProvider = () => {
   const [authState, setAuthState] = useState<AuthState>(initialState);
   const [authReady, setAuthReady] = useState(false);
-  const authReadySetRef = useRef(false); // Ensures authReady only flips to true ONCE
   const { toast } = useToast();
 
   const forceClearSupabaseAuthStorage = () => {
@@ -59,13 +58,18 @@ export const useAuthProvider = () => {
           loading: false,
         });
         
-        // authReady becomes true ONLY ONCE after auth has fully settled with a valid session
-        // This happens on INITIAL_SESSION (page load with existing session) or SIGNED_IN (fresh login)
-        // Once true, it NEVER flips back to false
-        if (!authReadySetRef.current && session?.access_token) {
-          console.log('🔐 AUTH_READY: Auth fully settled with access_token');
-          authReadySetRef.current = true;
-          setAuthReady(true);
+        // authReady = true when we have a valid session with access_token
+        // authReady = false when session is null (logged out)
+        if (session?.access_token) {
+          if (!authReady) {
+            console.log('🔐 AUTH_READY: true (session with access_token)');
+            setAuthReady(true);
+          }
+        } else {
+          if (authReady || event === 'SIGNED_OUT') {
+            console.log('🔐 AUTH_READY: false (no session)');
+            setAuthReady(false);
+          }
         }
         
         if (event === 'PASSWORD_RECOVERY') {
@@ -80,7 +84,7 @@ export const useAuthProvider = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [toast]);
+  }, [toast, authReady]);
 
   const signUp = async (email: string, password: string, metadata?: SignUpMetadata) => {
     try {
