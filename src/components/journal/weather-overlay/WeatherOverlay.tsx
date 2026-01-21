@@ -42,7 +42,7 @@ const BACKGROUND_TINTS = {
   },
   clear: {
     morning: 'rgba(180, 210, 240, 0.1)', // Light blue (muted, airy)
-    evening: 'rgba(255, 220, 180, 0.12)', // Warm golden/cream
+    evening: 'rgba(255, 195, 145, 0.18)', // Enhanced warm golden/amber - more intense
     night: 'rgba(12, 22, 55, 0.22)', // Navy/cool - clearly night, NOT gray
   },
 };
@@ -342,17 +342,17 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                 discAlpha: 0.38,   // Much more visible
               }
             : {
-                outerStart: 'rgba(255, 210, 140, 1)',     // Warm golden
-                outerMid1: 'rgba(255, 195, 120, 0.65)',
-                outerMid2: 'rgba(255, 180, 100, 0.35)',
-                outerMid3: 'rgba(255, 165, 85, 0.12)',
-                outerEnd: 'rgba(255, 150, 70, 0)',
-                innerStart: 'rgba(255, 230, 180, 1)',     // Warm cream center
-                innerMid1: 'rgba(255, 215, 150, 0.85)',
-                innerMid2: 'rgba(255, 200, 130, 0.5)',
-                innerEnd: 'rgba(255, 185, 110, 0)',
-                glowAlpha: 0.18,
-                discAlpha: 0.25,
+                outerStart: 'rgba(255, 180, 100, 1)',     // Deeper golden amber
+                outerMid1: 'rgba(255, 165, 90, 0.7)',
+                outerMid2: 'rgba(255, 145, 75, 0.4)',
+                outerMid3: 'rgba(255, 125, 60, 0.18)',
+                outerEnd: 'rgba(255, 110, 50, 0)',
+                innerStart: 'rgba(255, 210, 150, 1)',     // Rich golden center
+                innerMid1: 'rgba(255, 190, 120, 0.85)',
+                innerMid2: 'rgba(255, 170, 100, 0.55)',
+                innerEnd: 'rgba(255, 150, 85, 0)',
+                glowAlpha: 0.32,   // Much more visible evening glow
+                discAlpha: 0.38,   // More visible disc
               };
           
           // Outer warm glow (large, soft)
