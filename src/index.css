@@ -256,13 +256,67 @@
   font-family: var(--font-body);
 }
 
-/* Interactive Content - Task List / Checklist Styles */
+/* TipTap Editor & Interactive Content - Shared Styles */
+.tiptap,
+.interactive-content {
+  outline: none;
+  caret-color: hsl(var(--foreground));
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap p,
+.interactive-content p {
+  margin: 0.5em 0;
+}
+
+.tiptap img,
+.interactive-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+  margin: 1rem 0;
+}
+
+.tiptap ul:not([data-type="taskList"]),
+.interactive-content ul:not([data-type="taskList"]) {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.tiptap ol,
+.interactive-content ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.tiptap li,
+.interactive-content li {
+  margin: 0.25rem 0;
+}
+
+.tiptap li p,
+.interactive-content li p {
+  margin: 0;
+}
+
+/* Task List / Checklist Styles */
+.tiptap ul[data-type="taskList"],
 .interactive-content ul[data-type="taskList"] {
   list-style: none;
   padding-left: 0;
   margin: 0.5rem 0;
 }
 
+.tiptap ul[data-type="taskList"] li,
 .interactive-content ul[data-type="taskList"] li[data-type="taskItem"] {
   display: flex;
   align-items: flex-start;
@@ -270,6 +324,7 @@
   margin: 0.25rem 0;
 }
 
+.tiptap ul[data-type="taskList"] li > label,
 .interactive-content ul[data-type="taskList"] li[data-type="taskItem"] > label {
   display: flex;
   align-items: center;
@@ -278,6 +333,7 @@
   user-select: none;
 }
 
+.tiptap ul[data-type="taskList"] li > label input[type="checkbox"],
 .interactive-content ul[data-type="taskList"] li[data-type="taskItem"] > label input[type="checkbox"] {
   width: 1rem;
   height: 1rem;
@@ -286,16 +342,27 @@
   border-radius: 0.25rem;
 }
 
+.tiptap ul[data-type="taskList"] li > div,
 .interactive-content ul[data-type="taskList"] li[data-type="taskItem"] > div {
   flex: 1;
   min-width: 0;
+  caret-color: hsl(var(--foreground));
 }
 
+.tiptap ul[data-type="taskList"] li > div p,
 .interactive-content ul[data-type="taskList"] li[data-type="taskItem"] > div p {
   margin: 0;
 }
 
+.tiptap ul[data-type="taskList"] li[data-checked="true"] > div,
 .interactive-content ul[data-type="taskList"] li[data-type="taskItem"][data-checked="true"] > div {
   text-decoration: line-through;
   opacity: 0.6;
+}
+
+/* Ensure cursor is always visible in task items */
+.tiptap [data-type="taskItem"],
+.tiptap [data-type="taskItem"] > div,
+.tiptap [data-type="taskItem"] p {
+  caret-color: hsl(var(--foreground));
 }
