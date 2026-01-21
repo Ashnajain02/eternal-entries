@@ -42,7 +42,7 @@ const BACKGROUND_TINTS = {
   },
   clear: {
     morning: 'rgba(180, 210, 240, 0.1)', // Light blue (muted, airy)
-    evening: 'rgba(255, 195, 145, 0.18)', // Enhanced warm golden/amber - more intense
+    evening: 'rgba(235, 220, 200, 0.14)', // Muted warm beige / soft dusk - better text readability
     night: 'rgba(12, 22, 55, 0.22)', // Navy/cool - clearly night, NOT gray
   },
 };
@@ -88,26 +88,26 @@ function createParticles(category: WeatherCategory): Particle[] {
     }));
   }
   
-  // Rain and other weather types
+  // Rain - thicker, more visible cool blue drops
   return Array.from({ length: config.count }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
     y: Math.random() * 100 - 20,
     speed: config.speed * (0.7 + Math.random() * 0.6),
-    opacity: 0.15 + Math.random() * 0.25,
-    size: config.size * (0.6 + Math.random() * 0.8),
+    opacity: 0.25 + Math.random() * 0.3, // More visible (0.25-0.55)
+    size: config.size * (0.9 + Math.random() * 0.8), // Thicker drops (0.9-1.7x)
     drift: 0,
   }));
 }
 
 function createStars(): Particle[] {
-  // Many tiny, BRIGHT, sharp stars for night sky (visible, NOT snow-like)
+  // Many tiny, soft muted yellow stars for night sky
   return Array.from({ length: 150 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
     y: Math.random() * 90,
     speed: 0.0012 + Math.random() * 0.002, // Slow twinkle
-    opacity: 0.4 + Math.random() * 0.45, // Bright range (0.4-0.85)
+    opacity: 0.35 + Math.random() * 0.4, // Slightly softer range (0.35-0.75)
     size: 1.0 + Math.random() * 1.4, // Bigger stars (1.0-2.4px) - VISIBLE
   }));
 }
@@ -165,10 +165,11 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
       
       // Draw weather particles
       if (category === 'rain') {
+        // Cool blue rain color - elegant and muted but noticeable
         ctx.strokeStyle = timeOfDay === 'night' 
-          ? 'rgba(150, 170, 200, 0.4)' 
-          : 'rgba(100, 120, 150, 0.35)';
-        ctx.lineWidth = 1.5;
+          ? 'rgba(120, 160, 210, 0.5)' // Cooler blue at night
+          : 'rgba(90, 140, 190, 0.45)'; // Muted cool blue during day
+        ctx.lineWidth = 2.2; // Thicker raindrops
         
         particlesRef.current.forEach(p => {
           const x = (p.x / 100) * canvas.width;
@@ -177,7 +178,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           ctx.globalAlpha = p.opacity;
           ctx.beginPath();
           ctx.moveTo(x, y);
-          ctx.lineTo(x - 2, y + p.size * 5);
+          ctx.lineTo(x - 2, y + p.size * 6); // Longer drops
           ctx.stroke();
           
           // Update position
@@ -280,7 +281,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           ctx.fillStyle = 'rgba(12, 22, 55, 1)'; // Deep navy
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           
-          // Render stars: stationary, twinkle via alpha, bigger + brighter
+          // Render stars: stationary, twinkle via alpha, soft muted yellow
           starsRef.current.forEach(star => {
             const x = (star.x / 100) * canvas.width;
             const y = (star.y / 100) * canvas.height;
@@ -289,14 +290,15 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             const twinkle = 0.5 + 0.5 * Math.sin(Date.now() * star.speed + star.id * 7);
             ctx.globalAlpha = star.opacity * twinkle;
             
-            // Sharp bright star point (crisp, not blurry)
-            ctx.fillStyle = 'rgba(245, 250, 255, 1)'; // Bright white
+            // Soft muted yellow star point
+            ctx.fillStyle = 'rgba(255, 245, 200, 1)'; // Soft muted yellow
             ctx.beginPath();
             ctx.arc(x, y, star.size, 0, Math.PI * 2);
             ctx.fill();
             
-            // Minimal subtle halo for glow (not snow-like)
-            ctx.globalAlpha = star.opacity * twinkle * 0.15;
+            // Minimal subtle warm halo for glow
+            ctx.globalAlpha = star.opacity * twinkle * 0.12;
+            ctx.fillStyle = 'rgba(255, 240, 180, 1)'; // Warmer yellow halo
             ctx.beginPath();
             ctx.arc(x, y, star.size * 2, 0, Math.PI * 2);
             ctx.fill();
@@ -342,17 +344,17 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                 discAlpha: 0.38,   // Much more visible
               }
             : {
-                outerStart: 'rgba(255, 180, 100, 1)',     // Deeper golden amber
-                outerMid1: 'rgba(255, 165, 90, 0.7)',
-                outerMid2: 'rgba(255, 145, 75, 0.4)',
-                outerMid3: 'rgba(255, 125, 60, 0.18)',
-                outerEnd: 'rgba(255, 110, 50, 0)',
-                innerStart: 'rgba(255, 210, 150, 1)',     // Rich golden center
-                innerMid1: 'rgba(255, 190, 120, 0.85)',
-                innerMid2: 'rgba(255, 170, 100, 0.55)',
-                innerEnd: 'rgba(255, 150, 85, 0)',
-                glowAlpha: 0.32,   // Much more visible evening glow
-                discAlpha: 0.38,   // More visible disc
+                outerStart: 'rgba(255, 210, 160, 1)',     // Softer golden - less orange
+                outerMid1: 'rgba(255, 200, 150, 0.6)',
+                outerMid2: 'rgba(255, 190, 140, 0.35)',
+                outerMid3: 'rgba(255, 180, 130, 0.15)',
+                outerEnd: 'rgba(255, 170, 120, 0)',
+                innerStart: 'rgba(255, 230, 190, 1)',     // Lighter golden center
+                innerMid1: 'rgba(255, 220, 170, 0.8)',
+                innerMid2: 'rgba(255, 210, 155, 0.5)',
+                innerEnd: 'rgba(255, 200, 140, 0)',
+                glowAlpha: 0.26,   // Slightly reduced for better readability
+                discAlpha: 0.32,   // Slightly reduced for better readability
               };
           
           // Outer warm glow (large, soft)
