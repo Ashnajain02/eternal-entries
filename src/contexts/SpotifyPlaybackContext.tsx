@@ -119,6 +119,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const isPrimedRef = useRef(false);
   const isPlayingRef = useRef(false); // Track if we're actively playing (not just primed)
   
+  // Cold-start tracking: timestamp when auth became ready after being false
+  const coldStartTimestampRef = useRef<number | null>(null);
+  // Track if device was ever confirmed in /me/player/devices
+  const deviceConfirmedRef = useRef(false);
+  
   // Clip timers
   const clipEndTimeoutRef = useRef<number | null>(null);
   const progressIntervalRef = useRef<number | null>(null);
@@ -226,7 +231,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   }, []);
 
   // ========== PHASE B: TRANSFER ==========
-  const transferPlayback = useCallback(async (token: string, targetDeviceId: string): Promise<boolean> => {
+  // Returns { success: boolean, was404: boolean } to indicate if we should use extended confirm
+  const transferPlayback = useCallback(async (token: string, targetDeviceId: string): Promise<{ success: boolean; was404: boolean }> => {
     log('📡 TRANSFER: Sending to device', targetDeviceId);
     try {
       const response = await fetch('https://api.spotify.com/v1/me/player', {
@@ -239,13 +245,22 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       });
       
       // 204 = success, 202 = accepted (async processing)
-      // 404 = NOT treated as success (no active device - transfer may have failed)
-      const success = response.status === 204 || response.status === 202;
-      log('📡 TRANSFER:', response.status, success ? '✓' : '(no active playback)');
-      return success || response.status === 404; // Allow 404 but log it differently
+      // 404 = no active playback context - NOT a hard failure, proceed to confirm
+      if (response.status === 204 || response.status === 202) {
+        log('📡 TRANSFER:', response.status, '✓');
+        return { success: true, was404: false };
+      }
+      
+      if (response.status === 404) {
+        log('📡 TRANSFER: 404 (no active playback) - proceeding to confirm anyway');
+        return { success: true, was404: true };
+      }
+      
+      log('📡 TRANSFER: Unexpected status', response.status);
+      return { success: false, was404: false };
     } catch (e) {
       log('📡 TRANSFER: Failed', e);
-      return false;
+      return { success: false, was404: false };
     }
   }, []);
 
@@ -287,13 +302,21 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     log('👟 KICK: Complete ✓');
   }, []);
 
-  // ========== PHASE C: CONFIRM_ACTIVE (relaxed) ==========
+  // ========== PHASE C: CONFIRM_ACTIVE (with extended window for cold starts) ==========
   // Bounded polling: success if device is PRESENT (even if not active)
-  // Only fail if deviceId never appears at all
-  const confirmDevicePresent = useCallback(async (token: string, targetDeviceId: string): Promise<{ present: boolean; active: boolean }> => {
-    log('🔍 CONFIRM: Starting bounded poll for device presence', targetDeviceId);
-    const maxAttempts = 8; // 250ms * 8 = 2 seconds
+  // Extended confirm window (8-10s) used in cold-start cases or after transfer 404
+  const confirmDevicePresent = useCallback(async (
+    token: string, 
+    targetDeviceId: string,
+    useExtendedWindow: boolean = false
+  ): Promise<{ present: boolean; active: boolean }> => {
+    // Normal: 8 attempts * 250ms = 2s
+    // Extended (cold-start): 32 attempts * 250ms = 8s
+    const maxAttempts = useExtendedWindow ? 32 : 8;
     const pollInterval = 250;
+    const windowLabel = useExtendedWindow ? 'EXTENDED (8s)' : 'NORMAL (2s)';
+    
+    log('🔍 CONFIRM: Starting', windowLabel, 'poll for device presence', targetDeviceId);
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -316,10 +339,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         if (ourDevice) {
           const isActive = ourDevice.is_active === true;
           log('🔍 CONFIRM: Device PRESENT, active=' + isActive, '(attempt', attempt + ')');
-          // SUCCESS: device is present (we proceed even if not active)
+          // Mark device as confirmed - important for primed logic
+          deviceConfirmedRef.current = true;
           return { present: true, active: isActive };
         } else {
-          log('🔍 CONFIRM: Device not in list (attempt', attempt + ')');
+          log('🔍 CONFIRM: Device not in list (attempt', attempt + '/' + maxAttempts + ')');
         }
       } catch (e) {
         log('🔍 CONFIRM: Poll error', e);
@@ -330,7 +354,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       }
     }
     
-    log('🔍 CONFIRM: Device never appeared after 2s ✗');
+    const failLabel = useExtendedWindow ? '8s' : '2s';
+    log('🔍 CONFIRM: Device never appeared after', failLabel, '✗');
     return { present: false, active: false };
   }, []);
 
@@ -414,15 +439,35 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, []);
 
+  // ========== COLD START DETECTION ==========
+  // Cold start = within 15 seconds after a sign-out → sign-in transition
+  const isColdStart = useCallback((): boolean => {
+    if (!coldStartTimestampRef.current) return false;
+    const elapsed = Date.now() - coldStartTimestampRef.current;
+    const isCold = elapsed < 15000; // 15 seconds
+    if (isCold) {
+      log('❄️ COLD START: Within', Math.round(elapsed / 1000), 's of auth transition');
+    }
+    return isCold;
+  }, []);
+
   // ========== PHASE A: PRIME (for mobile 2-tap flow) ==========
   // Uses the already-initialized player, just activates element and transfers
-  const primePlayer = useCallback(async (): Promise<boolean> => {
+  // Does NOT set primed=true until device is confirmed in /me/player/devices
+  const primePlayer = useCallback(async (): Promise<{ primed: boolean; needsExtendedConfirm: boolean }> => {
     log('🔌 PRIME: Starting...');
     
-    // Already primed and ready?
-    if (isPrimedRef.current && playerRef.current && deviceIdRef.current && accessTokenRef.current) {
-      log('🔌 PRIME: Already primed ✓');
-      return true;
+    // Already primed AND device was confirmed? Only then skip
+    if (isPrimedRef.current && deviceConfirmedRef.current && playerRef.current && deviceIdRef.current && accessTokenRef.current) {
+      log('🔌 PRIME: Already primed + device confirmed ✓');
+      return { primed: true, needsExtendedConfirm: false };
+    }
+    
+    // If primed but device never confirmed, reset primed state
+    if (isPrimedRef.current && !deviceConfirmedRef.current) {
+      log('🔌 PRIME: Was primed but device never confirmed - resetting');
+      isPrimedRef.current = false;
+      setIsPrimed(false);
     }
 
     // Check if proactive init completed
@@ -439,11 +484,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       
       if (!playerRef.current || !deviceIdRef.current) {
         log('🔌 PRIME: Player still not ready ✗');
-        return false;
+        return { primed: false, needsExtendedConfirm: false };
       }
     }
 
     setIsInitializing(true);
+    let needsExtendedConfirm = isColdStart();
 
     try {
       // Get fresh token if needed
@@ -452,7 +498,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         if (!token) {
           log('🔌 PRIME: No token ✗');
           setIsInitializing(false);
-          return false;
+          return { primed: false, needsExtendedConfirm: false };
         }
         log('🔌 PRIME: Token acquired ✓');
       }
@@ -472,26 +518,29 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       const token = accessTokenRef.current;
       const devId = deviceIdRef.current;
       if (token && devId) {
-        const transferSuccess = await transferPlayback(token, devId);
-        if (!transferSuccess) {
+        const transferResult = await transferPlayback(token, devId);
+        if (!transferResult.success) {
           log('🔌 PRIME: Transfer failed ✗');
           setIsInitializing(false);
-          return false;
+          return { primed: false, needsExtendedConfirm: false };
+        }
+        // If transfer returned 404, use extended confirm
+        if (transferResult.was404) {
+          needsExtendedConfirm = true;
         }
       }
 
-      // Mark as primed
-      setIsPrimed(true);
-      isPrimedRef.current = true;
+      // DO NOT mark as fully primed yet - wait for device confirmation in playClip flow
+      // Just mark that prime phase completed (activation + transfer done)
       setIsInitializing(false);
-      log('🔌 PRIME: Complete ✓');
-      return true;
+      log('🔌 PRIME: Activation + transfer done ✓ (awaiting device confirmation)');
+      return { primed: true, needsExtendedConfirm };
     } catch (error) {
       console.error('🔌 PRIME: Error', error);
       setIsInitializing(false);
-      return false;
+      return { primed: false, needsExtendedConfirm: false };
     }
-  }, [getAccessToken, transferPlayback]);
+  }, [getAccessToken, transferPlayback, isColdStart]);
 
   // ========== MAIN ENTRY: playClip ==========
   const playClip = useCallback((clip: ClipPlaybackInfo) => {
@@ -514,12 +563,13 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     setPosition(clip.clipStartSeconds);
     setIsPlaying(false);
 
-    // MOBILE: 2-tap strategy
+    // MOBILE: 2-tap strategy - only skip if truly primed AND device confirmed
     if (isMobile && !isPrimedRef.current) {
       log('📱 MOBILE: Not primed - priming only (tap again to play)');
-      void primePlayer().then((primed) => {
-        if (primed) {
-          log('📱 MOBILE: Primed ✓ - tap play again');
+      void primePlayer().then((result) => {
+        if (result.primed) {
+          // Don't set isPrimed here - wait for device confirmation
+          log('📱 MOBILE: Prime phase done ✓ - tap play again');
         } else {
           log('📱 MOBILE: Prime failed');
         }
@@ -531,15 +581,20 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     const runFullFlow = async () => {
       setIsInitializing(true);
       const isMobileDevice = isMobileBrowser();
+      let useExtendedConfirm = isColdStart(); // Start with cold-start check
 
       // A) Prime if needed (DESKTOP only - mobile already primed)
-      if (!isPrimedRef.current) {
+      if (!isPrimedRef.current || !deviceConfirmedRef.current) {
         log('🖥️ DESKTOP: Priming...');
-        const primed = await primePlayer();
-        if (!primed) {
+        const primeResult = await primePlayer();
+        if (!primeResult.primed) {
           log('🖥️ DESKTOP: Prime failed');
           setIsInitializing(false);
           return;
+        }
+        // If prime says extended confirm needed (404 or cold-start), use it
+        if (primeResult.needsExtendedConfirm) {
+          useExtendedConfirm = true;
         }
         // primePlayer already called transferPlayback, skip to CONFIRM
       }
@@ -554,24 +609,35 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
       // B) Transfer - only if ALREADY PRIMED (mobile second tap, or desktop second play)
       // Skip if we just called primePlayer() which already transferred
-      if (isPrimedRef.current && !isMobileDevice) {
+      if (isPrimedRef.current && deviceConfirmedRef.current && !isMobileDevice) {
         // Desktop subsequent play - no need to transfer again, device should still be active
-        log('📡 TRANSFER: Skipping (already primed, desktop)');
+        log('📡 TRANSFER: Skipping (already primed + confirmed, desktop)');
       } else if (isMobileDevice) {
         // Mobile second tap - do transfer
         log('📡 TRANSFER: Mobile second tap');
-        await transferPlayback(token, devId);
+        const transferResult = await transferPlayback(token, devId);
+        if (transferResult.was404) {
+          useExtendedConfirm = true;
+        }
         
         // B2) KICK step (mobile only) - wake up SDK device
         await kickPlayer();
       }
 
-      // C) Confirm device is PRESENT (relaxed - not requiring is_active)
-      const confirmResult = await confirmDevicePresent(token, devId);
+      // C) Confirm device is PRESENT (use extended window if cold-start or 404)
+      log('🔍 Using', useExtendedConfirm ? 'EXTENDED' : 'NORMAL', 'confirm window');
+      const confirmResult = await confirmDevicePresent(token, devId, useExtendedConfirm);
       if (!confirmResult.present) {
         log('❌ CONFIRM: Device never appeared - user must tap again');
         setIsInitializing(false);
         return;
+      }
+      
+      // Device confirmed! NOW we can set primed = true
+      if (!isPrimedRef.current) {
+        log('✓ Device confirmed - setting primed = true');
+        setIsPrimed(true);
+        isPrimedRef.current = true;
       }
       log('✓ CONFIRM: Device present, active=' + confirmResult.active + ' - proceeding to PLAY');
 
@@ -585,7 +651,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     };
 
     void runFullFlow();
-  }, [clearClipTimers, primePlayer, transferPlayback, kickPlayer, confirmDevicePresent, executePlayAndConfirm]);
+  }, [clearClipTimers, primePlayer, transferPlayback, kickPlayer, confirmDevicePresent, executePlayAndConfirm, isColdStart]);
 
   // Pause clip - with explicit reason
   const pauseClip = useCallback(async (reason: PauseReason) => {
@@ -604,9 +670,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, [clearClipTimers]);
 
-  // Cleanup
+  // Cleanup - FULL reset of all Spotify state (critical for auth transitions)
   const cleanup = useCallback(() => {
-    log('🧹 Cleanup');
+    log('🧹 Cleanup: Full Spotify reset');
     isPlayingRef.current = false;
     clearClipTimers('CLEANUP');
     
@@ -615,31 +681,40 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       playerRef.current = null;
     }
 
+    // Clear ALL refs - nothing should survive to next login
     accessTokenRef.current = null;
     initAttemptedRef.current = false;
     isPrimedRef.current = false;
+    deviceIdRef.current = null;
+    deviceConfirmedRef.current = false; // Critical: reset device confirmed state
+    coldStartTimestampRef.current = null;
 
+    // Clear all state
     setIsReady(false);
     setIsInitializing(false);
     setIsPlaying(false);
     setIsPrimed(false);
     setCurrentClip(null);
     setDeviceId(null);
-    deviceIdRef.current = null;
+    setNeedsReauth(false);
+    setIsPremium(null);
+    
+    log('🧹 Cleanup: Complete - all state cleared');
   }, [clearClipTimers, detachPlayer]);
 
   // ========== PROACTIVE INITIALIZATION ON AUTH READY ==========
   // Initialize Spotify SDK + player when authReady becomes true
   // Cleanup when authReady becomes false (logout)
   useEffect(() => {
-    // When logged out (authReady false), do nothing - don't touch SDK
+    // When logged out (authReady false), perform FULL cleanup
     if (!authReady) {
-      // If we were previously initialized, cleanup
+      // If we were previously initialized, cleanup completely
       if (initAttemptedRef.current) {
-        log('🔐 AUTH_READY false: Cleaning up Spotify...');
+        log('🔐 AUTH_READY false: FULL Spotify cleanup (logout detected)');
         cleanup();
         initAttemptedRef.current = false;
         sdkLoadedRef.current = false;
+        // Note: coldStartTimestampRef cleared in cleanup()
       }
       return;
     }
@@ -650,7 +725,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       return;
     }
 
-    log('🚀 AUTH_READY: Starting proactive Spotify initialization');
+    // COLD START: Mark timestamp when auth becomes ready after being false
+    // This enables extended confirm window for the next ~15 seconds
+    coldStartTimestampRef.current = Date.now();
+    log('❄️ COLD START: Auth transition detected, timestamp set');
+
+    log('🚀 AUTH_READY: Starting proactive Spotify initialization (cold start)');
     initAttemptedRef.current = true;
 
     const initSpotify = async () => {
