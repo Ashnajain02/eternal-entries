@@ -67,6 +67,9 @@ interface ClipPlaybackInfo {
   clipEndSeconds: number;
 }
 
+// Allowed pause reasons - for logging and debugging
+type PauseReason = 'USER' | 'CLIP_END' | 'SWITCH_CLIP' | 'CLEANUP';
+
 interface SpotifyPlaybackContextType {
   isReady: boolean;
   isInitializing: boolean;
@@ -78,7 +81,7 @@ interface SpotifyPlaybackContextType {
   deviceId: string | null;
   needsReauth: boolean;
   playClip: (clip: ClipPlaybackInfo) => void;
-  pauseClip: () => Promise<void>;
+  pauseClip: (reason: PauseReason) => Promise<void>;
   cleanup: () => void;
 }
 
@@ -114,6 +117,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const initAttemptedRef = useRef(false);
   const currentClipRef = useRef<ClipPlaybackInfo | null>(null);
   const isPrimedRef = useRef(false);
+  const isPlayingRef = useRef(false); // Track if we're actively playing (not just primed)
   
   // Clip timers
   const clipEndTimeoutRef = useRef<number | null>(null);
@@ -189,9 +193,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     });
   }, []);
 
-  // Clear clip timers
-  const clearClipTimers = useCallback(() => {
+  // Clear clip timers with logging
+  const clearClipTimers = useCallback((reason?: string) => {
     if (clipEndTimeoutRef.current) {
+      log('⏱️ Clearing clip-end timer', reason ? `(${reason})` : '');
       window.clearTimeout(clipEndTimeoutRef.current);
       clipEndTimeoutRef.current = null;
     }
@@ -475,11 +480,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
           console.error('Spotify playback error:', message);
         });
 
-        // Simple state handler - no retries
+        // Simple state handler - ONLY reports state, does NOT pause
+        // Pausing is handled ONLY by: USER, CLIP_END timer, SWITCH_CLIP, CLEANUP
         player.addListener('player_state_changed', (state: SpotifyPlaybackState | null) => {
           if (!state) {
             log('🎧 STATE: null');
-            setIsPlaying(false);
+            // Don't clear timers or change state - null can happen transiently
             return;
           }
 
@@ -492,9 +498,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
           log('🎧 STATE:', state.paused ? 'PAUSED' : 'PLAYING', 'pos:', state.position);
 
           if (!state.paused) {
-            // Playback started
-            if (!playbackStartTimeRef.current) {
+            // Playback started - set up timer ONCE
+            if (!isPlayingRef.current) {
               log('🎵 Playback started');
+              isPlayingRef.current = true;
               playbackStartTimeRef.current = performance.now();
               setIsInitializing(false);
               setIsPlaying(true);
@@ -511,25 +518,32 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
                 setPosition(newPos);
               }, 200);
 
-              // Clip end timer
+              // Clip end timer - THE ONLY mechanism for clip-end pause
               const durationMs = (clip.clipEndSeconds - clip.clipStartSeconds) * 1000;
-              log('⏱️ Clip end scheduled in', durationMs, 'ms');
               if (clipEndTimeoutRef.current) {
+                log('⏱️ Clearing old clip-end timer before scheduling new');
                 window.clearTimeout(clipEndTimeoutRef.current);
               }
+              log('⏱️ Scheduling clip-end timer in', durationMs, 'ms');
               clipEndTimeoutRef.current = window.setTimeout(() => {
-                log('⏹️ Clip ended');
+                log('⏹️ CLIP_END: Timer fired, pausing');
+                isPlayingRef.current = false;
                 player.pause().catch(() => {});
-                clearClipTimers();
+                clearClipTimers('CLIP_END');
                 setIsPlaying(false);
               }, durationMs);
             }
           } else {
-            // Paused - just report it, no retries
-            log('⏸️ Paused');
-            clearClipTimers();
-            setIsPlaying(false);
-            setIsInitializing(false);
+            // Paused - ONLY update UI state, do NOT take any pause action
+            // The pause was already triggered by USER, CLIP_END, SWITCH_CLIP, or CLEANUP
+            if (isPlayingRef.current) {
+              log('🎧 STATE: External pause detected (was playing)');
+              isPlayingRef.current = false;
+              clearClipTimers('external pause');
+              setIsPlaying(false);
+              setIsInitializing(false);
+            }
+            // If not isPlayingRef.current, ignore - this is just a transient paused state (e.g., after transfer)
           }
         });
 
@@ -623,10 +637,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     log('📱 Platform:', isMobile ? 'MOBILE' : 'DESKTOP');
     
     // Clear existing playback
-    clearClipTimers();
+    clearClipTimers('new play request');
+    isPlayingRef.current = false;
     
-    // Stop other clip
+    // Stop other clip with reason
     if (currentClipRef.current && currentClipRef.current.entryId !== clip.entryId && playerRef.current) {
+      log('⏸️ SWITCH_CLIP: Pausing previous clip');
       playerRef.current.pause().catch(() => {});
     }
 
@@ -653,7 +669,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       setIsInitializing(true);
       const isMobileDevice = isMobileBrowser();
 
-      // A) Prime if needed
+      // A) Prime if needed (DESKTOP only - mobile already primed)
       if (!isPrimedRef.current) {
         log('🖥️ DESKTOP: Priming...');
         const primed = await primePlayer();
@@ -662,6 +678,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
           setIsInitializing(false);
           return;
         }
+        // primePlayer already called transferPlayback, skip to CONFIRM
       }
 
       const token = accessTokenRef.current;
@@ -672,11 +689,17 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         return;
       }
 
-      // B) Transfer
-      await transferPlayback(token, devId);
-
-      // B2) KICK step (mobile only) - wake up SDK device
-      if (isMobileDevice) {
+      // B) Transfer - only if ALREADY PRIMED (mobile second tap, or desktop second play)
+      // Skip if we just called primePlayer() which already transferred
+      if (isPrimedRef.current && !isMobileDevice) {
+        // Desktop subsequent play - no need to transfer again, device should still be active
+        log('📡 TRANSFER: Skipping (already primed, desktop)');
+      } else if (isMobileDevice) {
+        // Mobile second tap - do transfer
+        log('📡 TRANSFER: Mobile second tap');
+        await transferPlayback(token, devId);
+        
+        // B2) KICK step (mobile only) - wake up SDK device
         await kickPlayer();
       }
 
@@ -701,10 +724,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     void runFullFlow();
   }, [clearClipTimers, primePlayer, transferPlayback, kickPlayer, confirmDevicePresent, executePlayAndConfirm]);
 
-  // Pause clip
-  const pauseClip = useCallback(async () => {
-    log('⏸️ pauseClip');
-    clearClipTimers();
+  // Pause clip - with explicit reason
+  const pauseClip = useCallback(async (reason: PauseReason) => {
+    log('⏸️ pauseClip reason:', reason);
+    isPlayingRef.current = false;
+    clearClipTimers(reason);
     setIsPlaying(false);
     setIsInitializing(false);
 
@@ -720,7 +744,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // Cleanup
   const cleanup = useCallback(() => {
     log('🧹 Cleanup');
-    clearClipTimers();
+    isPlayingRef.current = false;
+    clearClipTimers('CLEANUP');
     
     if (playerRef.current) {
       detachPlayer(playerRef.current);

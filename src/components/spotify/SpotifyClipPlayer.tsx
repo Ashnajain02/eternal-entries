@@ -59,7 +59,7 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
     return () => {
       // Only pause if this specific clip is playing when unmounting
       if (isThisClipPlaying) {
-        pauseClip();
+        pauseClip('CLEANUP');
       }
     };
   }, [isThisClipPlaying, pauseClip]);
@@ -76,7 +76,7 @@ const SpotifyClipPlayer: React.FC<SpotifyClipPlayerProps> = ({
     
     if (isThisClipPlaying) {
       console.log('[SpotifyClipPlayer] Pausing...');
-      pauseClip(); // Fire and forget
+      pauseClip('USER'); // Fire and forget
     } else {
       console.log('[SpotifyClipPlayer] Playing...');
       // playClip is synchronous - it activates audio context immediately
