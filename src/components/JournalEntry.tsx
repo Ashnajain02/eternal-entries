@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { JournalEntry as JournalEntryType, Mood } from '@/types';
 import { cn } from '@/lib/utils';
@@ -55,6 +55,9 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const { authState } = useAuth();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef(entry.content);
+  const articleRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentAreaBounds, setContentAreaBounds] = useState<{ top: number; bottom: number } | undefined>(undefined);
 
   // Weather overlay state - only for published entries in read mode
   const hasWeatherData = Boolean(entry.weather?.description);
@@ -74,6 +77,23 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     phase: weatherPhase,
     playAnimation: playWeatherAnimation,
   } = useWeatherAnimation(entry.id);
+
+  // Calculate content area bounds when weather overlay is visible
+  useEffect(() => {
+    if (!isWeatherVisible || !articleRef.current || !contentRef.current) {
+      setContentAreaBounds(undefined);
+      return;
+    }
+    
+    const articleRect = articleRef.current.getBoundingClientRect();
+    const contentRect = contentRef.current.getBoundingClientRect();
+    
+    // Calculate content area bounds as percentage of the article height
+    const top = ((contentRect.top - articleRect.top) / articleRect.height) * 100;
+    const bottom = ((contentRect.bottom - articleRect.top) / articleRect.height) * 100;
+    
+    setContentAreaBounds({ top, bottom });
+  }, [isWeatherVisible]);
 
   // Update local content when entry changes externally
   React.useEffect(() => {
@@ -215,6 +235,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
 
   return (
     <motion.article 
+      ref={articleRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
@@ -231,6 +252,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           isVisible={isWeatherVisible}
           opacity={weatherOpacity}
           phase={weatherPhase}
+          contentAreaBounds={contentAreaBounds}
         />
       )}
       {/* Header - Mobile Layout */}
@@ -365,6 +387,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       {/* Content */}
       <div className="relative">
         <div
+          ref={contentRef}
           className="px-6 py-6"
           style={{
             filter: entry.track && !hasClickedToPlay ? 'blur(4px)' : 'blur(0px)',
