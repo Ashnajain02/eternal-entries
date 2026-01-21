@@ -111,39 +111,32 @@ export const getLocationNameFromCoordinates = async (lat: number, lon: number): 
 
 /**
  * Fetch weather data for the given coordinates
- * @param lat Latitude
- * @param lon Longitude
- * @returns Promise resolving to weather data
+ * Fetches weather and location name in parallel for better performance
  */
 export const getWeatherForLocation = async (lat: number, lon: number): Promise<WeatherData> => {
-  try {
-    // Fetch current weather data from Open-Meteo API
-    const weatherResponse = await fetch(
+  // Fetch weather and location name in parallel
+  const [weatherResult, locationName] = await Promise.all([
+    fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&temperature_unit=celsius`
-    );
-    
-    if (!weatherResponse.ok) {
-      throw new Error(`Failed to fetch weather data: ${weatherResponse.status}`);
-    }
-    
-    const weatherData = await weatherResponse.json();
-    
-    // Get location name
-    const locationName = await getLocationNameFromCoordinates(lat, lon);
-    
-    // Map the weather code to description and icon
-    const { description, icon } = mapWeatherCode(weatherData.current.weather_code);
-    
-    return {
-      temperature: weatherData.current.temperature_2m,
-      description,
-      icon,
-      location: locationName || ''
-    };
-  } catch (error) {
-    console.error('Error fetching weather data:', error);
-    throw error;
-  }
+    ).then(async (res) => {
+      if (!res.ok) throw new Error(`Weather API error: ${res.status}`);
+      return res.json();
+    }),
+    // Location fetch is non-critical — gracefully return null on failure
+    getLocationNameFromCoordinates(lat, lon).catch((err) => {
+      console.warn('Location name fetch failed, continuing without it:', err);
+      return null;
+    })
+  ]);
+
+  const { description, icon } = mapWeatherCode(weatherResult.current.weather_code);
+
+  return {
+    temperature: weatherResult.current.temperature_2m,
+    description,
+    icon,
+    location: locationName || ''
+  };
 };
 
 /**
