@@ -2,8 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 
-// Debug logging - can be disabled in production
-const DEBUG = false;
+// Debug logging - ENABLED to diagnose mobile playback issues
+const DEBUG = true;
 const log = (...args: any[]) => DEBUG && console.log('[Spotify]', ...args);
 
 // Spotify Web Playback SDK types
@@ -246,8 +246,16 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // IMPORTANT: This does NOT schedule clip-end or progress yet.
   // Those start ONLY when we observe playback actually begin (player_state_changed: paused=false).
   const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
+    log('🚀 startClipPlayback called:', clip.entryId);
+    
     const token = await getAccessToken();
     const currentDeviceId = deviceIdRef.current;
+
+    log('startClipPlayback prerequisites:', {
+      hasToken: !!token,
+      deviceId: currentDeviceId,
+      hasPlayer: !!playerRef.current
+    });
 
     if (!token || !currentDeviceId || !playerRef.current) {
       log('Cannot start playback - missing token/device/player', {
@@ -275,38 +283,47 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
 
       const sendPlay = async (): Promise<Response> => {
-        return fetch(`https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`, {
+        const playUrl = `https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`;
+        const playBody = {
+          uris: [clip.trackUri],
+          position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
+        };
+        log('Sending play request:', { url: playUrl, body: playBody });
+        
+        return fetch(playUrl, {
           method: 'PUT',
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            uris: [clip.trackUri],
-            position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
-          })
+          body: JSON.stringify(playBody)
         });
       };
 
       // First-play must be allowed immediately after SDK ready.
       // If Spotify returns 404 (Device not found) on the very first attempt, retry ONCE shortly.
       let response = await sendPlay();
+      log('First play response:', response.status, response.statusText);
 
       if (!response.ok && response.status === 404 && !playbackActivatedRef.current) {
+        log('Got 404 on first play - retrying after 400ms...');
         await response.json().catch(() => ({})); // drain body (best-effort)
         await sleep(400);
         response = await sendPlay();
+        log('Retry play response:', response.status, response.statusText);
       }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to start playback:', response.status, errorData);
+        console.error('[Spotify] Failed to start playback:', response.status, errorData);
 
         setIsInitializing(false);
 
         if (response.status === 401) {
+          log('401 - needs reauth');
           setNeedsReauth(true);
         } else if (response.status === 403) {
+          log('403 - not premium');
           setIsPremium(false);
         }
         return false;
@@ -317,10 +334,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
       // We intentionally do NOT set isPlaying=true here.
       // We wait for the SDK state event that confirms playback has actually begun.
-      log('Play command accepted; awaiting actual playback start');
+      log('✅ Play command accepted (HTTP 2xx); awaiting player_state_changed event');
       return true;
     } catch (error) {
-      console.error('Error starting playback:', error);
+      console.error('[Spotify] Error starting playback:', error);
       setIsInitializing(false);
       return false;
     }
@@ -408,21 +425,37 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       // - one clip-end timeout
       // - one progress timer
       player.addListener('player_state_changed', (state: SpotifyPlaybackState | null) => {
+        log('player_state_changed event received:', state ? {
+          paused: state.paused,
+          position: state.position,
+          track: state.track_window?.current_track?.name
+        } : 'null state');
+
         if (!state) {
           // No state usually means not playing on this device.
+          log('No state - setting isPlaying=false, isInitializing=false');
           setIsPlaying(false);
           setIsInitializing(false);
           return;
         }
 
         const clip = requestedClipRef.current;
-        if (!clip) return;
+        if (!clip) {
+          log('No requestedClip ref - ignoring state change');
+          return;
+        }
 
         const isTrackMatch = state.track_window?.current_track?.uri === clip.trackUri;
+        log('Track match check:', { 
+          currentUri: state.track_window?.current_track?.uri, 
+          requestedUri: clip.trackUri, 
+          matches: isTrackMatch 
+        });
         if (!isTrackMatch) return;
 
         // Playback has ACTUALLY begun (first reliable moment to start timers)
         if (!state.paused && !playbackStartedRef.current) {
+          log('🎵 Playback ACTUALLY started - setting up timers');
           playbackStartedRef.current = true;
           playbackStartPerfMsRef.current = performance.now();
 
@@ -447,7 +480,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             window.clearTimeout(clipEndTimeoutRef.current);
           }
           const durationMs = Math.max(0, (clip.clipEndSeconds - clip.clipStartSeconds) * 1000);
+          log('Scheduling clip-end timeout for', durationMs, 'ms');
           clipEndTimeoutRef.current = window.setTimeout(() => {
+            log('Clip-end timeout fired - pausing');
             // Single pause command per clip
             player.pause().catch(() => {});
 
@@ -470,6 +505,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
         // If Spotify reports paused while we thought we were playing, reflect it and stop timers.
         if (state.paused && playbackStartedRef.current) {
+          log('⏸️ Spotify reported PAUSED unexpectedly - clearing timers');
+          log('This is the mobile bug - Spotify auto-paused after play command');
           if (clipEndTimeoutRef.current) {
             window.clearTimeout(clipEndTimeoutRef.current);
             clipEndTimeoutRef.current = null;
@@ -633,6 +670,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // This creates a standalone AudioContext and resumes it immediately.
   // Must happen BEFORE any async operations (SDK loading, etc).
   const unlockBrowserAudio = useCallback(() => {
+    log('unlockBrowserAudio called, already unlocked:', audioUnlockedRef.current);
+    
     if (audioUnlockedRef.current) {
       log('Audio already unlocked for this session');
       return;
@@ -646,16 +685,17 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
         log('Created AudioContext, state:', audioContextRef.current.state);
       } catch (e) {
-        console.error('Failed to create AudioContext:', e);
+        console.error('[Spotify] Failed to create AudioContext:', e);
       }
     }
 
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      log('AudioContext is suspended, resuming...');
       // This MUST be called synchronously in the gesture handler
       audioContextRef.current.resume().then(() => {
-        log('AudioContext resumed successfully');
+        log('AudioContext resumed successfully, new state:', audioContextRef.current?.state);
       }).catch((e) => {
-        console.error('Failed to resume AudioContext:', e);
+        console.error('[Spotify] Failed to resume AudioContext:', e);
       });
     }
 
@@ -669,7 +709,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         source.start(0);
         log('Played silent buffer for iOS unlock');
       } catch (e) {
-        // Ignore - best effort
+        console.error('[Spotify] Silent buffer error:', e);
       }
     }
 
@@ -679,7 +719,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         playerRef.current.activateElement();
         log('Activated existing Spotify player element');
       } catch (e) {
-        // May not exist on all platforms
+        log('activateElement failed (may not exist on platform):', e);
       }
     }
 
@@ -702,7 +742,18 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Play a clip - SYNCHRONOUS entry point for mobile gesture chain
   const playClip = useCallback((clip: ClipPlaybackInfo) => {
-    log('playClip called:', clip.entryId);
+    log('▶️ playClip called:', clip.entryId, {
+      trackUri: clip.trackUri,
+      clipStart: clip.clipStartSeconds,
+      clipEnd: clip.clipEndSeconds
+    });
+    log('Current state:', {
+      isReady,
+      hasPlayer: !!playerRef.current,
+      hasToken: !!accessTokenRef.current,
+      deviceId: deviceIdRef.current,
+      audioUnlocked: audioUnlockedRef.current
+    });
 
     // CRITICAL: Unlock browser audio SYNCHRONOUSLY in this user gesture
     // This MUST happen before any async operations
@@ -710,6 +761,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
     // CRITICAL: If the SDK is already loaded, create + activate the Spotify Player
     // INSIDE this same tap so mobile browsers won't immediately pause.
+    log('Calling startPlayerInitializationInGesture...');
     startPlayerInitializationInGesture();
 
     // If a different clip is playing, pause it (best-effort). Also clear any existing timers.
@@ -725,6 +777,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     playbackStartPerfMsRef.current = null;
 
     if (currentClipRef.current && currentClipRef.current.entryId !== clip.entryId && playerRef.current) {
+      log('Pausing previous clip:', currentClipRef.current.entryId);
       playerRef.current.pause().catch(() => {});
     }
 
@@ -737,6 +790,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
     // If player is ready, activate and issue exactly one play command now.
     if (isReady && playerRef.current && accessTokenRef.current && deviceIdRef.current) {
+      log('Player ready - starting playback immediately');
       pendingClipRef.current = null;
       activateSpotifyPlayer();
       void startClipPlayback(clip);
@@ -744,8 +798,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     }
 
     // Otherwise, initialize; when ready, it will start the pending clip once.
+    log('Player not ready - initializing...');
     void initializePlayer().then((success) => {
+      log('initializePlayer resolved:', success);
       if (!success && pendingClipRef.current?.entryId === clip.entryId) {
+        log('Initialization failed - clearing pending clip');
         pendingClipRef.current = null;
         setIsInitializing(false);
         setCurrentClip(null);
