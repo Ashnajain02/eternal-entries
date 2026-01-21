@@ -260,38 +260,54 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         <div className="flex items-start justify-between mb-2">
           <div>
             <h3 className="font-display text-2xl font-semibold leading-tight text-foreground">{formattedDate}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm text-muted-foreground">{formattedYear}</span>
-              {formattedTime && (
-                <>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="text-sm text-muted-foreground">{formattedTime}</span>
-                </>
-              )}
-            </div>
+            <p className="text-sm text-muted-foreground">{formattedYear}</p>
           </div>
-          
-          {/* Right side: Mood + Weather chips + Actions */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground border border-border">
-                {moodLabels[entry.mood] || entry.mood}
-              </span>
-              {entry.weather && (
-                <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground border border-border">
-                  {formatTemperature(entry.weather.temperature)}
-                  {entry.weather.description && ` · ${entry.weather.description}`}
-                </span>
-              )}
-            </div>
-            {!isPreview && (
-              <EntryActions
-                onEdit={() => setIsEditing(true)}
-                onDelete={handleDelete}
-              />
+          {!isPreview && (
+            <EntryActions
+              onEdit={() => setIsEditing(true)}
+              onDelete={handleDelete}
+            />
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2 text-sm mt-3">
+          {formattedTime && (
+            <span className="text-muted-foreground">{formattedTime}</span>
+          )}
+          <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
+            {moodLabels[entry.mood] || entry.mood}
+          </span>
+        </div>
+        
+        {entry.weather && (
+          <div className="flex items-center gap-2 text-sm mt-2 text-muted-foreground">
+            <span>{formatTemperature(entry.weather.temperature)}</span>
+            {entry.weather.description && (
+              <>
+                <span>·</span>
+                <span className="capitalize">{entry.weather.description}</span>
+              </>
+            )}
+            {entry.weather.location && (
+              <>
+                <span>·</span>
+                <span>{entry.weather.location}</span>
+              </>
             )}
           </div>
-        </div>
+        )}
+        
+        {/* Weather Animation Button - Mobile */}
+        {!isPreview && weatherCategory && (
+          <div className="mt-3">
+            <WeatherAnimationButton
+              category={weatherCategory}
+              timeOfDay={timeOfDay}
+              isPlaying={isWeatherPlaying}
+              onClick={playWeatherAnimation}
+            />
+          </div>
+        )}
       </div>
 
       {/* Header - Desktop Layout */}
@@ -308,28 +324,48 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
                   <span className="text-sm text-muted-foreground">{formattedTime}</span>
                 </>
               )}
-            </div>
-          </div>
-          
-          {/* Right: Mood + Weather chips + Actions */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground border border-border">
+              <span className="px-2.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
                 {moodLabels[entry.mood] || entry.mood}
               </span>
               {entry.weather && (
-                <span className="px-2.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground border border-border capitalize">
-                  {formatTemperature(entry.weather.temperature)} · {entry.weather.description}
-                </span>
+                <>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-sm text-muted-foreground">{formatTemperature(entry.weather.temperature)}</span>
+                  {entry.weather.description && (
+                    <>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-sm text-muted-foreground capitalize">{entry.weather.description}</span>
+                    </>
+                  )}
+                  {entry.weather.location && (
+                    <>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-sm text-muted-foreground">{entry.weather.location}</span>
+                    </>
+                  )}
+                </>
               )}
             </div>
-            {!isPreview && (
-              <EntryActions
-                onEdit={() => setIsEditing(true)}
-                onDelete={handleDelete}
+            
+            {/* Weather Animation Button - Desktop */}
+            {!isPreview && weatherCategory && (
+              <WeatherAnimationButton
+                category={weatherCategory}
+                timeOfDay={timeOfDay}
+                isPlaying={isWeatherPlaying}
+                onClick={playWeatherAnimation}
+                className="ml-2"
               />
             )}
           </div>
+          
+          {/* Right: Actions */}
+          {!isPreview && (
+            <EntryActions
+              onEdit={() => setIsEditing(true)}
+              onDelete={handleDelete}
+            />
+          )}
         </div>
       </div>
 
@@ -374,20 +410,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           </div>
         )}
       </div>
-      
-      {/* View Weather Button - in content area */}
-      {!isPreview && weatherCategory && (
-        <div className="px-6 pb-4">
-          <WeatherAnimationButton
-            category={weatherCategory}
-            timeOfDay={timeOfDay}
-            isPlaying={isWeatherPlaying}
-            onClick={playWeatherAnimation}
-            hasSong={!!entry.track}
-            isSongPlayed={hasClickedToPlay}
-          />
-        </div>
-      )}
 
       {/* Reflection & Comments */}
       {!isPreview && (
