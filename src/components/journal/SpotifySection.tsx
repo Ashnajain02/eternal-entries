@@ -30,11 +30,15 @@ const SpotifySection: React.FC<SpotifySectionProps> = ({
   };
 
   const handleTrackSelect = (track: SpotifyTrack) => {
-    // Set default clip timestamps when selecting a new track
+    // Calculate default clip end based on actual track duration
+    // Default to 30 seconds or full track if shorter
+    const trackDurationSeconds = track.durationMs ? Math.floor(track.durationMs / 1000) : 30;
+    const defaultClipEnd = Math.min(30, trackDurationSeconds);
+    
     onTrackSelect({
       ...track,
       clipStartSeconds: 0,
-      clipEndSeconds: 30
+      clipEndSeconds: defaultClipEnd
     });
   };
 
@@ -56,6 +60,11 @@ const SpotifySection: React.FC<SpotifySectionProps> = ({
     }
   };
 
+  // Calculate actual track duration in seconds
+  const trackDurationSeconds = selectedTrack?.durationMs 
+    ? Math.floor(selectedTrack.durationMs / 1000) 
+    : 300; // Fallback to 5 min if no duration
+
   return (
     <div className="space-y-4">
       {selectedTrack ? (
@@ -70,6 +79,7 @@ const SpotifySection: React.FC<SpotifySectionProps> = ({
             clipEndSeconds={selectedTrack.clipEndSeconds ?? 30}
             onStartChange={handleClipStartChange}
             onEndChange={handleClipEndChange}
+            maxDuration={trackDurationSeconds}
           />
         </>
       ) : (

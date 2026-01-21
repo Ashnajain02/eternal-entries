@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
-import { encryptToken, decryptToken } from "../_shared/spotify-crypto.ts";
+import { getValidSpotifyToken } from "../_shared/spotify-tokens.ts";
 
 // Define SpotifyTrack type for edge function response
 interface SpotifyTrack {
@@ -10,6 +10,7 @@ interface SpotifyTrack {
   album: string;
   albumArt: string;
   uri: string;
+  durationMs: number;
 }
 
 // Standard CORS headers for all requests
@@ -24,16 +25,10 @@ serve(async (req) => {
   
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    console.log("Handling CORS preflight request");
-    return new Response(null, { 
-      headers: corsHeaders,
-      status: 204
-    });
+    return new Response(null, { headers: corsHeaders, status: 204 });
   }
 
   try {
-    console.log("Parsing request body");
-
     // Parse request body
     const requestData = await req.json();
     const { query, type = 'track', limit = 10 } = requestData;
@@ -57,13 +52,11 @@ serve(async (req) => {
       );
     }
 
-    console.log("Creating Supabase client");
     const supabase = createClient(supabaseUrl, supabaseKey);
     
     // Extract JWT token from Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      console.error("No Authorization header present");
       return new Response(
         JSON.stringify({ error: "Authorization header missing" }),
         { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -72,7 +65,6 @@ serve(async (req) => {
     
     // Get user ID from JWT
     const token = authHeader.replace(/^Bearer\s/, "");
-    console.log("Getting user from token");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
     if (userError || !user) {
@@ -86,98 +78,14 @@ serve(async (req) => {
     const userId = user.id;
     console.log(`User authenticated: ${userId}`);
     
-    // Get the user's Spotify token
-    console.log("Fetching user profile");
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("spotify_access_token, spotify_refresh_token, spotify_token_expires_at")
-      .eq("id", userId)
-      .single();
+    // Get valid Spotify token (handles refresh automatically)
+    const tokenResult = await getValidSpotifyToken(userId, supabase);
     
-    if (profileError || !profileData) {
-      console.error("Error getting user profile:", profileError);
+    if (!tokenResult.success || !tokenResult.accessToken) {
       return new Response(
-        JSON.stringify({ error: "Failed to retrieve user profile" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-    
-    const { spotify_access_token, spotify_refresh_token, spotify_token_expires_at } = profileData;
-    
-    if (!spotify_access_token || !spotify_refresh_token) {
-      console.error("Spotify not connected for user");
-      return new Response(
-        JSON.stringify({ error: "Spotify not connected" }),
+        JSON.stringify({ error: tokenResult.error || "Failed to get Spotify token" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
-    }
-    
-    // Decrypt the tokens
-    console.log("Decrypting Spotify tokens");
-    let accessToken = await decryptToken(spotify_access_token);
-    const refreshToken = await decryptToken(spotify_refresh_token);
-    
-    // Check if token is expired and refresh if needed
-    const now = new Date();
-    const expires_at = new Date(spotify_token_expires_at);
-    
-    if (now >= expires_at) {
-      console.log("Token expired, refreshing...");
-      
-      const SPOTIFY_CLIENT_ID = Deno.env.get("SPOTIFY_CLIENT_ID");
-      const SPOTIFY_CLIENT_SECRET = Deno.env.get("SPOTIFY_CLIENT_SECRET");
-      
-      if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-        console.error("Missing Spotify credentials");
-        return new Response(
-          JSON.stringify({ error: "Server configuration error" }),
-          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-      
-      console.log("Refreshing Spotify token");
-      const refreshResponse = await fetch("https://accounts.spotify.com/api/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Authorization": `Basic ${btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`)}`
-        },
-        body: new URLSearchParams({
-          grant_type: "refresh_token",
-          refresh_token: refreshToken
-        })
-      });
-      
-      const refreshData = await refreshResponse.json();
-      
-      if (refreshData.error) {
-        console.error("Error refreshing token:", refreshData.error);
-        return new Response(
-          JSON.stringify({ error: "Failed to refresh Spotify token" }),
-          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-      
-      // Update token in database (encrypt the new token)
-      console.log("Updating token in database");
-      const newExpiresAt = new Date();
-      newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshData.expires_in);
-      
-      const encryptedNewToken = await encryptToken(refreshData.access_token);
-      
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          spotify_access_token: encryptedNewToken,
-          spotify_token_expires_at: newExpiresAt.toISOString()
-        })
-        .eq("id", userId);
-      
-      if (updateError) {
-        console.error("Error updating tokens:", updateError);
-      }
-      
-      accessToken = refreshData.access_token;
     }
     
     // Search Spotify API
@@ -190,7 +98,7 @@ serve(async (req) => {
     
     const searchResponse = await fetch(`https://api.spotify.com/v1/search?${searchParams.toString()}`, {
       headers: {
-        "Authorization": `Bearer ${accessToken}`
+        "Authorization": `Bearer ${tokenResult.accessToken}`
       }
     });
     
@@ -220,10 +128,10 @@ serve(async (req) => {
       artist: track.artists.map((artist: any) => artist.name).join(", "),
       album: track.album.name,
       albumArt: track.album.images[1]?.url || track.album.images[0]?.url || '',
-      uri: track.uri
+      uri: track.uri,
+      durationMs: track.duration_ms
     }));
     
-    console.log("Search completed successfully");
     return new Response(
       JSON.stringify({ tracks: formattedTracks }),
       { headers: { "Content-Type": "application/json", ...corsHeaders } }
