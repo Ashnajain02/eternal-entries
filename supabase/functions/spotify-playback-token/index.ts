@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.21.0";
-import { getValidSpotifyToken } from "../_shared/spotify-tokens.ts";
+import { getValidSpotifyToken, hasSpotifyCredentials } from "../_shared/spotify-tokens.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +27,7 @@ serve(async (req) => {
       return errorResponse("Server configuration error", 500);
     }
     
+    // Use service role to access the secure spotify_credentials table
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Validate JWT from Authorization header
@@ -74,19 +75,10 @@ function successResponse(data: object) {
   );
 }
 
-// Check if user has Spotify tokens stored
+// Check if user has Spotify credentials stored in the SECURE table
 async function isConnected(supabase: ReturnType<typeof createClient>, userId: string) {
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("spotify_access_token")
-    .eq("id", userId)
-    .single();
-
-  if (error || !profile?.spotify_access_token) {
-    return successResponse({ connected: false });
-  }
-
-  return successResponse({ connected: true });
+  const connected = await hasSpotifyCredentials(userId, supabase);
+  return successResponse({ connected });
 }
 
 // Get a valid access token using shared utility (handles refresh automatically)
