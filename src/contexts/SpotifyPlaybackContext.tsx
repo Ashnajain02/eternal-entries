@@ -242,10 +242,49 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, []);
 
-  // ========== PHASE C: CONFIRM_ACTIVE ==========
-  // Bounded polling: every 250ms for up to 2 seconds
-  const confirmDeviceActive = useCallback(async (token: string, targetDeviceId: string): Promise<boolean> => {
-    log('🔍 CONFIRM_ACTIVE: Starting bounded poll for device', targetDeviceId);
+  // ========== PHASE B2: KICK (mobile only) ==========
+  // Wake up the SDK device before confirming
+  const kickPlayer = useCallback(async (): Promise<void> => {
+    const player = playerRef.current;
+    if (!player) {
+      log('👟 KICK: No player');
+      return;
+    }
+
+    log('👟 KICK: Activating element + resume/togglePlay...');
+    
+    // 1. activateElement (best effort)
+    try {
+      await player.activateElement();
+      log('👟 KICK: activateElement ✓');
+    } catch {
+      log('👟 KICK: activateElement (ignored)');
+    }
+
+    // 2. resume() preferred, togglePlay() fallback
+    try {
+      await player.resume();
+      log('👟 KICK: resume() called ✓');
+    } catch {
+      try {
+        await player.togglePlay();
+        log('👟 KICK: togglePlay() called (fallback) ✓');
+      } catch {
+        log('👟 KICK: resume/togglePlay failed (ignored)');
+      }
+    }
+
+    // 3. Fixed delay to let SDK wake up
+    log('👟 KICK: Waiting 300ms...');
+    await new Promise(r => setTimeout(r, 300));
+    log('👟 KICK: Complete ✓');
+  }, []);
+
+  // ========== PHASE C: CONFIRM_ACTIVE (relaxed) ==========
+  // Bounded polling: success if device is PRESENT (even if not active)
+  // Only fail if deviceId never appears at all
+  const confirmDevicePresent = useCallback(async (token: string, targetDeviceId: string): Promise<{ present: boolean; active: boolean }> => {
+    log('🔍 CONFIRM: Starting bounded poll for device presence', targetDeviceId);
     const maxAttempts = 8; // 250ms * 8 = 2 seconds
     const pollInterval = 250;
     
@@ -256,7 +295,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         });
         
         if (!response.ok) {
-          log('🔍 CONFIRM_ACTIVE: API error', response.status);
+          log('🔍 CONFIRM: API error', response.status);
+          if (attempt < maxAttempts) {
+            await new Promise(r => setTimeout(r, pollInterval));
+          }
           continue;
         }
         
@@ -265,17 +307,15 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         const ourDevice = devices.find((d: any) => d.id === targetDeviceId);
         
         if (ourDevice) {
-          if (ourDevice.is_active) {
-            log('🔍 CONFIRM_ACTIVE: Device active ✓ (attempt', attempt + ')');
-            return true;
-          } else {
-            log('🔍 CONFIRM_ACTIVE: Device found but not active (attempt', attempt + ')');
-          }
+          const isActive = ourDevice.is_active === true;
+          log('🔍 CONFIRM: Device PRESENT, active=' + isActive, '(attempt', attempt + ')');
+          // SUCCESS: device is present (we proceed even if not active)
+          return { present: true, active: isActive };
         } else {
-          log('🔍 CONFIRM_ACTIVE: Device not in list (attempt', attempt + ')');
+          log('🔍 CONFIRM: Device not in list (attempt', attempt + ')');
         }
       } catch (e) {
-        log('🔍 CONFIRM_ACTIVE: Poll error', e);
+        log('🔍 CONFIRM: Poll error', e);
       }
       
       if (attempt < maxAttempts) {
@@ -283,14 +323,15 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       }
     }
     
-    log('🔍 CONFIRM_ACTIVE: Timeout - device not active after 2s');
-    return false;
+    log('🔍 CONFIRM: Device never appeared after 2s ✗');
+    return { present: false, active: false };
   }, []);
 
-  // ========== PHASE D: PLAY ONCE ==========
-  const executePlay = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
+  // ========== PHASE D: PLAY ONCE + CONFIRM PROGRESS ==========
+  const executePlayAndConfirm = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
     const token = accessTokenRef.current;
     const currentDeviceId = deviceIdRef.current;
+    const player = playerRef.current;
 
     if (!token || !currentDeviceId) {
       log('▶️ PLAY: Missing token or deviceId');
@@ -321,11 +362,45 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         } else if (response.status === 403) {
           setIsPremium(false);
         }
+        log('▶️ PLAY: Command failed ✗');
         return false;
       }
 
-      log('▶️ PLAY: Command accepted ✓');
-      return true;
+      log('▶️ PLAY: Command accepted ✓ - waiting up to 1s for playback...');
+
+      // Wait up to 1000ms for playback to actually start
+      // Check player state periodically
+      const startTime = Date.now();
+      const maxWait = 1000;
+      const checkInterval = 100;
+
+      while (Date.now() - startTime < maxWait) {
+        await new Promise(r => setTimeout(r, checkInterval));
+        
+        if (!player) break;
+        
+        try {
+          const state = await player.getCurrentState();
+          if (state) {
+            const isTrackMatch = state.track_window?.current_track?.uri === clip.trackUri;
+            if (isTrackMatch) {
+              if (!state.paused) {
+                log('▶️ PLAY: Confirmed playing ✓ (paused=false)');
+                return true;
+              }
+              if (state.position > clip.clipStartSeconds * 1000 + 50) {
+                log('▶️ PLAY: Confirmed playing ✓ (position advancing)');
+                return true;
+              }
+            }
+          }
+        } catch {
+          // ignore getCurrentState errors
+        }
+      }
+
+      log('▶️ PLAY: Playback did not start within 1s; user can tap again');
+      return false;
     } catch (error) {
       console.error('▶️ PLAY: Error', error);
       return false;
@@ -576,6 +651,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     // DESKTOP or ALREADY PRIMED: full flow
     const runFullFlow = async () => {
       setIsInitializing(true);
+      const isMobileDevice = isMobileBrowser();
 
       // A) Prime if needed
       if (!isPrimedRef.current) {
@@ -596,30 +672,34 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         return;
       }
 
-      // B) Transfer (already done in prime, but ensure it's fresh)
+      // B) Transfer
       await transferPlayback(token, devId);
 
-      // C) Confirm device is active (bounded polling)
-      const isActive = await confirmDeviceActive(token, devId);
-      if (!isActive) {
-        log('❌ CONFIRM_ACTIVE failed - device not active');
-        log('📱 User must tap play again');
-        setIsInitializing(false);
-        // Stay primed so next tap can try play directly
-        return;
+      // B2) KICK step (mobile only) - wake up SDK device
+      if (isMobileDevice) {
+        await kickPlayer();
       }
 
-      // D) Play
-      const played = await executePlay(clip);
-      if (!played) {
-        log('❌ PLAY command failed');
+      // C) Confirm device is PRESENT (relaxed - not requiring is_active)
+      const confirmResult = await confirmDevicePresent(token, devId);
+      if (!confirmResult.present) {
+        log('❌ CONFIRM: Device never appeared - user must tap again');
+        setIsInitializing(false);
+        return;
+      }
+      log('✓ CONFIRM: Device present, active=' + confirmResult.active + ' - proceeding to PLAY');
+
+      // D) Play + confirm progress
+      const started = await executePlayAndConfirm(clip);
+      if (!started) {
+        log('⚠️ Playback may not have started; user can tap again');
         setIsInitializing(false);
       }
       // State changes handled by player_state_changed listener
     };
 
     void runFullFlow();
-  }, [clearClipTimers, primePlayer, transferPlayback, confirmDeviceActive, executePlay]);
+  }, [clearClipTimers, primePlayer, transferPlayback, kickPlayer, confirmDevicePresent, executePlayAndConfirm]);
 
   // Pause clip
   const pauseClip = useCallback(async () => {
