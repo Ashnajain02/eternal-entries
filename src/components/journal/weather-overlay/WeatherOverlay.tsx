@@ -326,20 +326,20 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           // Different sun colors for morning vs evening
           const isMorning = timeOfDay === 'morning';
           
-          // Morning: lighter cream/yellow | Evening: darker golden yellow
+          // Morning: brighter yellow sun | Evening: darker golden yellow
           const sunColors = isMorning
             ? {
-                outerStart: 'rgba(255, 245, 210, 1)',     // Light cream
-                outerMid1: 'rgba(255, 240, 195, 0.6)',
-                outerMid2: 'rgba(255, 235, 180, 0.3)',
-                outerMid3: 'rgba(255, 230, 165, 0.1)',
-                outerEnd: 'rgba(255, 225, 150, 0)',
-                innerStart: 'rgba(255, 250, 230, 1)',     // Very light center
-                innerMid1: 'rgba(255, 245, 210, 0.8)',
-                innerMid2: 'rgba(255, 240, 190, 0.45)',
-                innerEnd: 'rgba(255, 235, 170, 0)',
-                glowAlpha: 0.14,
-                discAlpha: 0.2,
+                outerStart: 'rgba(255, 235, 140, 1)',     // Warm yellow
+                outerMid1: 'rgba(255, 225, 120, 0.7)',
+                outerMid2: 'rgba(255, 215, 100, 0.4)',
+                outerMid3: 'rgba(255, 205, 85, 0.15)',
+                outerEnd: 'rgba(255, 195, 70, 0)',
+                innerStart: 'rgba(255, 245, 180, 1)',     // Bright warm center
+                innerMid1: 'rgba(255, 235, 150, 0.85)',
+                innerMid2: 'rgba(255, 220, 120, 0.55)',
+                innerEnd: 'rgba(255, 210, 100, 0)',
+                glowAlpha: 0.28,   // Much more visible
+                discAlpha: 0.38,   // Much more visible
               }
             : {
                 outerStart: 'rgba(255, 210, 140, 1)',     // Warm golden
