@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { format, formatDistanceToNow } from 'date-fns';
 import { FileText, Trash2, Edit } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getPlainTextContent } from '@/utils/journalEntryMapper';
 
 interface DraftsListProps {
   drafts: JournalEntry[];
@@ -43,7 +44,7 @@ const DraftsList: React.FC<DraftsListProps> = ({
       </h3>
       <div className="space-y-2">
         {drafts.map((draft) => {
-          const textContent = draft.content?.replace(/<[^>]*>/g, '').trim() || '';
+          const textContent = getPlainTextContent(draft.content);
           const preview = textContent.substring(0, 80) || 'Empty draft';
           const timeAgo = draft.updatedAt 
             ? formatDistanceToNow(new Date(draft.updatedAt), { addSuffix: true })
