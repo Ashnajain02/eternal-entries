@@ -8,9 +8,21 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-    <!-- Spotify SDK: load as early as possible so first tap can activate the element -->
+    <!-- Spotify SDK: define callback BEFORE loading script to avoid "not defined" error -->
     <link rel="dns-prefetch" href="https://sdk.scdn.co" />
     <link rel="preconnect" href="https://sdk.scdn.co" crossorigin />
+    <script>
+      // CRITICAL: Define the callback BEFORE the SDK script loads.
+      // The SDK calls this immediately when ready, so it must exist.
+      window.__spotifySDKReadyPromiseResolvers = [];
+      window.onSpotifyWebPlaybackSDKReady = function() {
+        console.log('[Spotify] SDK ready callback fired (from index.html)');
+        window.__spotifySDKReady = true;
+        // Resolve all waiting promises
+        window.__spotifySDKReadyPromiseResolvers.forEach(function(resolve) { resolve(); });
+        window.__spotifySDKReadyPromiseResolvers = [];
+      };
+    </script>
     <script id="spotify-player-sdk" src="https://sdk.scdn.co/spotify-player.js" async></script>
 
     <title>Eternal Entries</title>

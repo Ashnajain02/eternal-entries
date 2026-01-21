@@ -13,6 +13,8 @@ declare global {
       Player: new (options: SpotifyPlayerOptions) => SpotifyPlayerInstance;
     };
     onSpotifyWebPlaybackSDKReady: () => void;
+    __spotifySDKReady?: boolean;
+    __spotifySDKReadyPromiseResolvers?: Array<() => void>;
   }
 }
 
@@ -95,6 +97,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [needsReauth, setNeedsReauth] = useState(false);
   const [tokenEpoch, setTokenEpoch] = useState(0);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
   
   const playerRef = useRef<SpotifyPlayerInstance | null>(null);
   const accessTokenRef = useRef<string | null>(null);
@@ -105,6 +108,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const deviceIdRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const initPromiseRef = useRef<Promise<boolean> | null>(null);
+  const earlyInitAttemptedRef = useRef(false);
 
   // Playback activation:
   // Spotify may not expose a Web Playback SDK device to the Web API until the first successful
@@ -122,6 +126,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   
   // Global audio unlock flag - once unlocked, stays unlocked for the session
   const audioUnlockedRef = useRef(false);
+
+  // Auto-pause recovery: track last confirmed playing state for retry logic
+  const lastPlayingStateRef = useRef<{ position: number; timestamp: number } | null>(null);
+  const autoPauseRetryUsedRef = useRef(false); // Max 1 retry per gesture/command
+  const currentCommandIdRef = useRef<string | null>(null);
 
   // Keep refs in sync with state for use in callbacks
   useEffect(() => {
@@ -156,6 +165,11 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         accessTokenRef.current = nextToken;
         // Premium status is stored at connection time, use from response
         setIsPremium(data.is_premium ?? false);
+        
+        // Mark Spotify as connected when we get a valid token
+        if (!spotifyConnected) {
+          setSpotifyConnected(true);
+        }
 
         // Track token changes so we can rebuild the SDK Player if needed
         if (prevToken && prevToken !== nextToken) {
@@ -170,40 +184,60 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       console.error('Error getting access token:', error);
       return null;
     }
-  }, []);
+  }, [spotifyConnected]);
 
 
-  // Load Spotify SDK script - can be called early to preload
+  // Load Spotify SDK script - uses the callback defined in index.html
+  // SINGLE LOADER PATH: The script is already in index.html, we just wait for ready
   const loadSpotifySDK = useCallback((): Promise<void> => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
+      // Already loaded and ready
       if (sdkLoadedRef.current && window.Spotify) {
         resolve();
         return;
       }
 
+      // SDK already ready (callback fired before we mounted)
+      if (window.__spotifySDKReady && window.Spotify) {
+        log('SDK was already ready before mount');
+        sdkLoadedRef.current = true;
+        resolve();
+        return;
+      }
+
+      // Script exists but SDK not ready yet - wait for callback
       if (document.getElementById('spotify-player-sdk')) {
         if (window.Spotify) {
           sdkLoadedRef.current = true;
           resolve();
         } else {
-          window.onSpotifyWebPlaybackSDKReady = () => {
+          // Register to be notified when SDK is ready
+          if (!window.__spotifySDKReadyPromiseResolvers) {
+            window.__spotifySDKReadyPromiseResolvers = [];
+          }
+          window.__spotifySDKReadyPromiseResolvers.push(() => {
             sdkLoadedRef.current = true;
             resolve();
-          };
+          });
         }
         return;
       }
 
-      window.onSpotifyWebPlaybackSDKReady = () => {
+      // Fallback: script not in DOM (shouldn't happen, but safety)
+      log('SDK script not found - injecting dynamically');
+      
+      if (!window.__spotifySDKReadyPromiseResolvers) {
+        window.__spotifySDKReadyPromiseResolvers = [];
+      }
+      window.__spotifySDKReadyPromiseResolvers.push(() => {
         sdkLoadedRef.current = true;
         resolve();
-      };
+      });
 
       const script = document.createElement('script');
       script.id = 'spotify-player-sdk';
       script.src = 'https://sdk.scdn.co/spotify-player.js';
       script.async = true;
-      script.onerror = () => reject(new Error('Failed to load Spotify SDK'));
       document.body.appendChild(script);
     });
   }, []);
@@ -387,9 +421,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       // When initializePlayerCore is called from playClip, that's exactly what happens.
       try {
         void player.activateElement();
-        log('Called activateElement on player');
-      } catch {
-        // Not supported on all platforms
+        log('✅ activateElement succeeded on player');
+      } catch (e) {
+        log('❌ activateElement failed:', e);
       }
 
       // Error handling
@@ -458,6 +492,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
           log('🎵 Playback ACTUALLY started - setting up timers');
           playbackStartedRef.current = true;
           playbackStartPerfMsRef.current = performance.now();
+          
+          // Track this playing state for auto-pause recovery detection
+          lastPlayingStateRef.current = { 
+            position: state.position, 
+            timestamp: performance.now() 
+          };
 
           setIsInitializing(false);
           setIsPlaying(true);
@@ -497,16 +537,68 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
             }
             playbackStartedRef.current = false;
             playbackStartPerfMsRef.current = null;
+            lastPlayingStateRef.current = null;
             setIsPlaying(false);
           }, durationMs);
 
           return;
         }
 
-        // If Spotify reports paused while we thought we were playing, reflect it and stop timers.
+        // If Spotify reports paused while we thought we were playing, check for auto-pause bug
         if (state.paused && playbackStartedRef.current) {
-          log('⏸️ Spotify reported PAUSED unexpectedly - clearing timers');
-          log('This is the mobile bug - Spotify auto-paused after play command');
+          const lastPlaying = lastPlayingStateRef.current;
+          const timeSinceStart = lastPlaying ? performance.now() - lastPlaying.timestamp : Infinity;
+          const positionUnchanged = lastPlaying ? Math.abs(state.position - lastPlaying.position) < 1000 : false;
+          
+          log('⏸️ Spotify reported PAUSED unexpectedly:', {
+            timeSinceStartMs: Math.round(timeSinceStart),
+            position: state.position,
+            lastPosition: lastPlaying?.position,
+            positionUnchanged,
+            retryUsed: autoPauseRetryUsedRef.current,
+            commandId: currentCommandIdRef.current
+          });
+
+          // AUTO-PAUSE RECOVERY: If paused within 500ms at same position, and we haven't retried yet
+          if (timeSinceStart < 500 && positionUnchanged && !autoPauseRetryUsedRef.current && clip) {
+            log('🔄 AUTO-PAUSE RECOVERY: Detected iOS auto-pause bug, issuing ONE retry');
+            autoPauseRetryUsedRef.current = true;
+            
+            // Don't clear timers or update UI - just retry the play command silently
+            const token = accessTokenRef.current;
+            const currentDeviceId = deviceIdRef.current;
+            
+            if (token && currentDeviceId) {
+              const playUrl = `https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`;
+              const playBody = {
+                uris: [clip.trackUri],
+                position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
+              };
+              
+              log('🔄 Retry play request:', { position_ms: playBody.position_ms });
+              
+              fetch(playUrl, {
+                method: 'PUT',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(playBody)
+              }).then(response => {
+                log('🔄 Auto-pause retry response:', response.status);
+              }).catch(err => {
+                log('🔄 Auto-pause retry failed:', err);
+              });
+              
+              // Reset playback tracking so we can detect the new play
+              playbackStartedRef.current = false;
+              lastPlayingStateRef.current = null;
+              return; // Don't update UI or clear timers - wait for retry result
+            }
+          }
+          
+          // Not a recoverable auto-pause, or retry already used - accept the pause
+          log('This is the mobile bug - Spotify auto-paused after play command (no retry available)');
           if (clipEndTimeoutRef.current) {
             window.clearTimeout(clipEndTimeoutRef.current);
             clipEndTimeoutRef.current = null;
@@ -517,6 +609,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
           }
           playbackStartedRef.current = false;
           playbackStartPerfMsRef.current = null;
+          lastPlayingStateRef.current = null;
           setIsPlaying(false);
           setIsInitializing(false);
         }
@@ -557,7 +650,9 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
 
         // Connect to Spotify
+        log('Calling player.connect()...');
         player.connect().then((connected) => {
+          log('player.connect() resolved:', connected);
           if (!connected) {
             console.error('Failed to connect Spotify player');
             setIsInitializing(false);
@@ -597,22 +692,35 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     }
   }, [tokenEpoch, initializePlayerCore]);
 
-  // Best-effort warmup after login: create the player + transfer to its device ASAP.
-  // This avoids the first user click racing Spotify's device registration lifecycle.
+  // EARLY PLAYER INITIALIZATION: Create player as soon as auth + Spotify connected
+  // This ensures the player exists BEFORE the user taps play, avoiding first-tap issues
   useEffect(() => {
-
     if (!authState.user) return;
+    if (earlyInitAttemptedRef.current) return;
+    if (playerRef.current || initPromiseRef.current) return;
 
     void (async () => {
       try {
+        // First check if Spotify is connected by trying to get a token
+        const token = await getAccessToken();
+        if (!token) {
+          log('Early init: No Spotify token available (not connected yet)');
+          return;
+        }
+        
+        log('Early init: Spotify connected, initializing player proactively');
+        earlyInitAttemptedRef.current = true;
+        
         await loadSpotifySDK();
         if (playerRef.current || initPromiseRef.current) return;
+        
+        log('Early init: SDK loaded, creating player (NO auto-play)');
         initPromiseRef.current = initializePlayerCore();
-      } catch {
-        // Best-effort only
+      } catch (e) {
+        log('Early init failed (best-effort):', e);
       }
     })();
-  }, [authState.user, loadSpotifySDK, initializePlayerCore]);
+  }, [authState.user, spotifyConnected, loadSpotifySDK, initializePlayerCore, getAccessToken]);
 
   // Ensure player creation happens inside the user gesture when possible.
   // This is the key to preventing the "first tap" being wasted on mobile.
@@ -742,10 +850,17 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Play a clip - SYNCHRONOUS entry point for mobile gesture chain
   const playClip = useCallback((clip: ClipPlaybackInfo) => {
+    // Generate a unique command ID for this play gesture (used for retry gating)
+    const commandId = `${clip.entryId}-${Date.now()}`;
+    currentCommandIdRef.current = commandId;
+    autoPauseRetryUsedRef.current = false; // Reset retry flag for new command
+    lastPlayingStateRef.current = null;
+    
     log('▶️ playClip called:', clip.entryId, {
       trackUri: clip.trackUri,
       clipStart: clip.clipStartSeconds,
-      clipEnd: clip.clipEndSeconds
+      clipEnd: clip.clipEndSeconds,
+      commandId
     });
     log('Current state:', {
       isReady,
@@ -755,12 +870,21 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       audioUnlocked: audioUnlockedRef.current
     });
 
-    // CRITICAL: Unlock browser audio SYNCHRONOUSLY in this user gesture
-    // This MUST happen before any async operations
+    // STEP 1: SYNCHRONOUS - Activate Spotify player element IMMEDIATELY if it exists
+    // This preserves the user gesture chain for mobile browsers
+    if (playerRef.current) {
+      try {
+        playerRef.current.activateElement();
+        log('✅ activateElement called (player exists)');
+      } catch (e) {
+        log('❌ activateElement failed:', e);
+      }
+    }
+
+    // STEP 2: SYNCHRONOUS - Unlock browser audio (AudioContext + silent buffer)
     unlockBrowserAudio();
 
-    // CRITICAL: If the SDK is already loaded, create + activate the Spotify Player
-    // INSIDE this same tap so mobile browsers won't immediately pause.
+    // STEP 3: SYNCHRONOUS - If SDK loaded but player doesn't exist, create it NOW
     log('Calling startPlayerInitializationInGesture...');
     startPlayerInitializationInGesture();
 
