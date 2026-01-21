@@ -270,13 +270,18 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           )}
         </div>
         
-        <div className="flex items-center gap-2 text-sm mt-3">
-          {formattedTime && (
-            <span className="text-muted-foreground">{formattedTime}</span>
-          )}
+        {/* Mood tag + View weather button grouped together */}
+        <div className="flex items-center gap-2 mt-3">
           <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
             {moodLabels[entry.mood] || entry.mood}
           </span>
+          {!isPreview && weatherCategory && (
+            <WeatherAnimationButton
+              isPlaying={isWeatherPlaying}
+              onClick={playWeatherAnimation}
+              disabled={Boolean(entry.track && !hasClickedToPlay)}
+            />
+          )}
         </div>
         
         {entry.weather && (
@@ -296,24 +301,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             )}
           </div>
         )}
-        
-        {/* Weather Animation Button - Mobile */}
-        {!isPreview && weatherCategory && (
-          <div className="mt-3">
-            <WeatherAnimationButton
-              category={weatherCategory}
-              timeOfDay={timeOfDay}
-              isPlaying={isWeatherPlaying}
-              onClick={playWeatherAnimation}
-            />
-          </div>
-        )}
       </div>
 
       {/* Header - Desktop Layout */}
       <div className="hidden sm:block px-6 py-5 border-b border-border">
         <div className="flex items-start justify-between">
-          {/* Left: Date, Year, Time */}
+          {/* Left: Date, Year, Time, Weather info */}
           <div>
             <h3 className="font-display text-2xl font-semibold leading-tight text-foreground">{formattedDate}</h3>
             <div className="flex items-center gap-3 mt-1">
@@ -324,9 +317,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
                   <span className="text-sm text-muted-foreground">{formattedTime}</span>
                 </>
               )}
-              <span className="px-2.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
-                {moodLabels[entry.mood] || entry.mood}
-              </span>
               {entry.weather && (
                 <>
                   <span className="text-muted-foreground">·</span>
@@ -347,16 +337,19 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
               )}
             </div>
             
-            {/* Weather Animation Button - Desktop */}
-            {!isPreview && weatherCategory && (
-              <WeatherAnimationButton
-                category={weatherCategory}
-                timeOfDay={timeOfDay}
-                isPlaying={isWeatherPlaying}
-                onClick={playWeatherAnimation}
-                className="ml-2"
-              />
-            )}
+            {/* Mood tag + View weather button grouped together */}
+            <div className="flex items-center gap-2 mt-2">
+              <span className="px-2.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
+                {moodLabels[entry.mood] || entry.mood}
+              </span>
+              {!isPreview && weatherCategory && (
+                <WeatherAnimationButton
+                  isPlaying={isWeatherPlaying}
+                  onClick={playWeatherAnimation}
+                  disabled={Boolean(entry.track && !hasClickedToPlay)}
+                />
+              )}
+            </div>
           </div>
           
           {/* Right: Actions */}
