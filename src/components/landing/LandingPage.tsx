@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { ArrowRight, Calendar, Sparkles } from 'lucide-react';
+import { ArrowRight, Music, Cloud, ListChecks } from 'lucide-react';
 import AnimatedDemo from './AnimatedDemo';
 
 const LandingPage = () => {
@@ -86,13 +85,10 @@ const LandingPage = () => {
                 initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.3 }}
-                className="font-display text-4xl md:text-5xl lg:text-6xl leading-[1.1] tracking-tight mb-6"
+                className="font-display text-5xl md:text-6xl lg:text-7xl leading-[1.05] tracking-tight mb-8"
               >
-                Write today.
-                <br />
-                <span className="text-muted-foreground">Revisit tomorrow.</span>
-                <br />
-                <span className="italic">Grow forever.</span>
+                <span className="block">Eternal</span>
+                <span className="block text-muted-foreground">Entries</span>
               </motion.h1>
 
               <motion.p
@@ -101,9 +97,12 @@ const LandingPage = () => {
                 transition={{ duration: 0.8, delay: 0.5 }}
                 className="text-base md:text-lg text-muted-foreground max-w-md mb-8 leading-relaxed"
               >
-                Eternal Entries is more than a journal—it's a mirror that reflects your growth. 
-                See what you wrote on this exact day in years past. Watch patterns emerge. 
-                Celebrate how far you've come.
+                A journal you don't just write in—you return to.
+                <br className="hidden sm:block" />
+                <span className="mt-2 block">
+                  Pair your entries with the song playing and the weather outside.
+                  When you revisit them, you don't just read—you feel.
+                </span>
               </motion.p>
 
               {/* Key feature callouts */}
@@ -114,12 +113,16 @@ const LandingPage = () => {
                 className="flex flex-col gap-3 mb-10"
               >
                 <div className="flex items-center gap-3 text-sm">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-foreground">"On this day" memories from previous years</span>
+                  <Music className="h-4 w-4 text-primary" />
+                  <span className="text-foreground">Attach song clips to capture the moment</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <span className="text-foreground">Watch your personal evolution unfold</span>
+                  <Cloud className="h-4 w-4 text-primary" />
+                  <span className="text-foreground">Weather preserved with every entry</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <ListChecks className="h-4 w-4 text-primary" />
+                  <span className="text-foreground">Built-in habit tracker for daily rituals</span>
                 </div>
               </motion.div>
 
@@ -180,8 +183,7 @@ const LandingPage = () => {
                 </div>
                 <h3 className="font-display text-xl">Write</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Capture your thoughts, moods, and the music you're listening to. 
-                  Make each moment memorable.
+                  Capture your thoughts with the music you're hearing and the weather you're feeling.
                 </p>
               </motion.div>
 
@@ -197,8 +199,8 @@ const LandingPage = () => {
                 </div>
                 <h3 className="font-display text-xl">Revisit</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  "On this day" memories surface automatically, showing you 
-                  where you were mentally in years past.
+                  Experience past entries—not just read them. Play the song. See the weather. 
+                  Remember how it felt.
                 </p>
               </motion.div>
 
@@ -214,8 +216,8 @@ const LandingPage = () => {
                 </div>
                 <h3 className="font-display text-xl">Grow</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Watch your evolution unfold. Celebrate progress. 
-                  Learn from patterns you couldn't see before.
+                  Track daily habits. Watch patterns emerge. 
+                  Celebrate how far you've come.
                 </p>
               </motion.div>
             </div>
