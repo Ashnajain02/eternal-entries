@@ -68,9 +68,9 @@ const LandingPage = () => {
 
         {/* Hero Section */}
         <main className="container py-16 lg:py-24">
-          <div className="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center">
-            {/* Left: Text */}
-            <div>
+          <div className="flex flex-col items-center gap-12 lg:gap-16">
+            {/* Text Content */}
+            <div className="max-w-2xl text-center">
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -87,18 +87,17 @@ const LandingPage = () => {
                 transition={{ duration: 0.8, delay: 0.3 }}
                 className="font-display text-5xl md:text-6xl lg:text-7xl leading-[1.05] tracking-tight mb-8"
               >
-                <span className="block">Eternal</span>
-                <span className="block text-muted-foreground">Entries</span>
+                <span className="text-foreground">Eternal </span>
+                <span className="text-muted-foreground">Entries</span>
               </motion.h1>
 
               <motion.p
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.5 }}
-                className="text-base md:text-lg text-muted-foreground max-w-md mb-8 leading-relaxed"
+                className="text-base md:text-lg text-muted-foreground max-w-lg mx-auto mb-8 leading-relaxed"
               >
                 A journal you don't just write in—you return to.
-                <br className="hidden sm:block" />
                 <span className="mt-2 block">
                   Pair your entries with the song playing and the weather outside.
                   When you revisit them, you don't just read—you feel.
@@ -110,19 +109,19 @@ const LandingPage = () => {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.6 }}
-                className="flex flex-col gap-3 mb-10"
+                className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6 mb-10 text-sm"
               >
-                <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center justify-center gap-2">
                   <Music className="h-4 w-4 text-primary" />
-                  <span className="text-foreground">Attach song clips to capture the moment</span>
+                  <span className="text-foreground">Song clips</span>
                 </div>
-                <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center justify-center gap-2">
                   <Cloud className="h-4 w-4 text-primary" />
-                  <span className="text-foreground">Weather preserved with every entry</span>
+                  <span className="text-foreground">Weather context</span>
                 </div>
-                <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center justify-center gap-2">
                   <ListChecks className="h-4 w-4 text-primary" />
-                  <span className="text-foreground">Built-in habit tracker for daily rituals</span>
+                  <span className="text-foreground">Habit tracking</span>
                 </div>
               </motion.div>
 
@@ -130,7 +129,6 @@ const LandingPage = () => {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.7 }}
-                className="flex flex-col sm:flex-row gap-4"
               >
                 <Button 
                   asChild 
@@ -145,8 +143,8 @@ const LandingPage = () => {
               </motion.div>
             </div>
 
-            {/* Right: Animated Demo */}
-            <div className="order-first lg:order-last">
+            {/* Animated Demo - Below text */}
+            <div className="w-full max-w-lg">
               <AnimatedDemo />
             </div>
           </div>
