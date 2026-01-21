@@ -132,6 +132,38 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const autoPauseRetryUsedRef = useRef(false); // Max 1 retry per gesture/command
   const currentCommandIdRef = useRef<string | null>(null);
 
+  // Proactive init run tracking (should run exactly once per session, once Spotify connected)
+  const proactiveInitRunCountRef = useRef(0);
+
+  // Stabilization logic: only mark playback started once it's stable
+  const stablePlaybackTimeoutRef = useRef<number | null>(null);
+  const pendingStabilityRef = useRef<
+    | {
+        commandId: string;
+        clip: ClipPlaybackInfo;
+        firstUnpausedPerfMs: number;
+        firstUnpausedPositionMs: number;
+      }
+    | null
+  >(null);
+  const stabilizationRetryRef = useRef<
+    | {
+        commandId: string;
+        attempts: number; // retries used (max 3)
+        timeoutId: number | null;
+      }
+    | null
+  >(null);
+
+  // Device activation handshake caching
+  const deviceActivationCacheRef = useRef<
+    | {
+        deviceId: string;
+        activeUntilPerfMs: number;
+      }
+    | null
+  >(null);
+
   // Keep refs in sync with state for use in callbacks
   useEffect(() => {
     currentClipRef.current = currentClip;
@@ -271,6 +303,130 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     playbackStartPerfMsRef.current = null;
   }, []);
 
+  const STABLE_UNPAUSED_MS = 500;
+  const STABLE_POSITION_ADVANCE_MS = 250;
+  const AUTO_PAUSE_WINDOW_MS = 700;
+  const STABILIZATION_RETRY_BACKOFF_MS = [150, 300, 600];
+  const DEVICE_HANDSHAKE_TIMEOUT_MS = 3000;
+  const DEVICE_HANDSHAKE_POLL_MS = 250;
+  const DEVICE_ACTIVE_CACHE_MS = 8000;
+
+  const clearStabilization = useCallback(() => {
+    if (stablePlaybackTimeoutRef.current) {
+      window.clearTimeout(stablePlaybackTimeoutRef.current);
+      stablePlaybackTimeoutRef.current = null;
+    }
+    if (stabilizationRetryRef.current?.timeoutId) {
+      window.clearTimeout(stabilizationRetryRef.current.timeoutId);
+    }
+    stabilizationRetryRef.current = null;
+    pendingStabilityRef.current = null;
+  }, []);
+
+  const detachPlayer = useCallback((player: SpotifyPlayerInstance | null, reason: string) => {
+    if (!player) return;
+    try {
+      // Best-effort: remove all listeners for known events (prevents duplicates)
+      player.removeListener('initialization_error');
+      player.removeListener('authentication_error');
+      player.removeListener('account_error');
+      player.removeListener('playback_error');
+      player.removeListener('player_state_changed');
+      player.removeListener('ready');
+      player.removeListener('not_ready');
+    } catch {
+      // ignore
+    }
+    try {
+      player.disconnect();
+      log('Detached Spotify player:', reason);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const fetchDevices = useCallback(async (token: string): Promise<any | null> => {
+    try {
+      const resp = await fetch('https://api.spotify.com/v1/me/player/devices', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!resp.ok) return null;
+      return resp.json();
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const ensureDeviceActive = useCallback(
+    async (token: string, sdkDeviceId: string): Promise<boolean> => {
+      const cached = deviceActivationCacheRef.current;
+      const nowPerf = performance.now();
+      if (cached && cached.deviceId === sdkDeviceId && nowPerf < cached.activeUntilPerfMs) {
+        log('Device handshake: using cached active device', { sdkDeviceId });
+        return true;
+      }
+
+      const deadline = nowPerf + DEVICE_HANDSHAKE_TIMEOUT_MS;
+      let lastPresent = false;
+      let lastActive = false;
+      let transferAttempted = false;
+
+      while (performance.now() < deadline) {
+        const data = await fetchDevices(token);
+        const devices: Array<any> = data?.devices ?? [];
+        const sdkDevice = devices.find((d) => d?.id === sdkDeviceId);
+
+        if (!sdkDevice) {
+          lastPresent = false;
+          await new Promise((r) => window.setTimeout(r, DEVICE_HANDSHAKE_POLL_MS));
+          continue;
+        }
+
+        lastPresent = true;
+        lastActive = !!sdkDevice.is_active;
+        if (sdkDevice.is_active) break;
+
+        // Transfer playback to this device (no autoplay)
+        if (!transferAttempted) {
+          transferAttempted = true;
+          log('Device handshake: SDK device present but inactive; transferring (play:false)', { sdkDeviceId });
+          try {
+            await fetch('https://api.spotify.com/v1/me/player', {
+              method: 'PUT',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ device_ids: [sdkDeviceId], play: false })
+            });
+          } catch {
+            // ignore
+          }
+        }
+
+        await new Promise((r) => window.setTimeout(r, DEVICE_HANDSHAKE_POLL_MS));
+      }
+
+      log('Device handshake result:', {
+        sdkDeviceId,
+        present: lastPresent,
+        active: lastActive,
+        timeoutMs: DEVICE_HANDSHAKE_TIMEOUT_MS
+      });
+
+      if (lastPresent && lastActive) {
+        deviceActivationCacheRef.current = {
+          deviceId: sdkDeviceId,
+          activeUntilPerfMs: performance.now() + DEVICE_ACTIVE_CACHE_MS
+        };
+        return true;
+      }
+
+      return false;
+    },
+    [fetchDevices]
+  );
+
   // NOTE (device registration race):
   // We intentionally do NOT gate first playback on /v1/me/player/devices or is_active.
   // Some Spotify accounts/environments only surface the SDK device to /devices AFTER the first
@@ -279,7 +435,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // Start playback of a specific clip.
   // IMPORTANT: This does NOT schedule clip-end or progress yet.
   // Those start ONLY when we observe playback actually begin (player_state_changed: paused=false).
-  const startClipPlayback = useCallback(async (clip: ClipPlaybackInfo): Promise<boolean> => {
+  const startClipPlayback = useCallback(async (
+    clip: ClipPlaybackInfo,
+    opts?: { skipReset?: boolean; reason?: string; commandId?: string }
+  ): Promise<boolean> => {
     log('🚀 startClipPlayback called:', clip.entryId);
     
     const token = await getAccessToken();
@@ -301,15 +460,22 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     }
 
     try {
-      log('Starting playback for clip:', clip.entryId);
+      log('Starting playback for clip:', clip.entryId, {
+        reason: opts?.reason,
+        skipReset: !!opts?.skipReset,
+        commandId: opts?.commandId ?? currentCommandIdRef.current
+      });
 
-      // Single owner reset
-      clearClipTimers();
-      requestedClipRef.current = clip;
-      playbackStartedRef.current = false;
-      setIsPlaying(false);
-      setPosition(clip.clipStartSeconds);
-      setIsInitializing(true);
+      if (!opts?.skipReset) {
+        // Single owner reset
+        clearClipTimers();
+        clearStabilization();
+        requestedClipRef.current = clip;
+        playbackStartedRef.current = false;
+        setIsPlaying(false);
+        setPosition(clip.clipStartSeconds);
+        setIsInitializing(true);
+      }
 
       // Set volume (best-effort)
       playerRef.current.setVolume(0.8).catch(() => {});
@@ -333,6 +499,12 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
           body: JSON.stringify(playBody)
         });
       };
+
+      // Strict device activation handshake (cached) before play
+      const active = await ensureDeviceActive(token, currentDeviceId);
+      if (!active) {
+        log('Device handshake did not confirm active device within timeout; proceeding with /play anyway');
+      }
 
       // First-play must be allowed immediately after SDK ready.
       // If Spotify returns 404 (Device not found) on the very first attempt, retry ONCE shortly.
@@ -372,10 +544,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       return true;
     } catch (error) {
       console.error('[Spotify] Error starting playback:', error);
-      setIsInitializing(false);
+      if (!opts?.skipReset) setIsInitializing(false);
       return false;
     }
-  }, [clearClipTimers, getAccessToken]);
+  }, [clearClipTimers, clearStabilization, ensureDeviceActive, getAccessToken]);
 
 
 
@@ -384,6 +556,16 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   const initializePlayerCore = useCallback((): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
       void (async () => {
+        // Prevent duplicate listener attachment: always detach any existing player first
+        if (playerRef.current) {
+          detachPlayer(playerRef.current, 'initializePlayerCore:recreate');
+          playerRef.current = null;
+          playerTokenRef.current = null;
+          setIsReady(false);
+          setDeviceId(null);
+          deviceIdRef.current = null;
+        }
+
         if (!window.Spotify?.Player) {
           log('Spotify SDK not available yet');
           setIsInitializing(false);
@@ -487,17 +669,31 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         });
         if (!isTrackMatch) return;
 
-        // Playback has ACTUALLY begun (first reliable moment to start timers)
-        if (!state.paused && !playbackStartedRef.current) {
-          log('🎵 Playback ACTUALLY started - setting up timers');
+        const commandId = currentCommandIdRef.current ?? 'no-command';
+
+        const markStablePlayback = (reason: string) => {
+          if (playbackStartedRef.current) return;
+
+          // Stable playback achieved
+          log('✅ Stable playback achieved:', {
+            reason,
+            commandId,
+            position: state.position
+          });
+
+          // Clear stabilization timers/retries
+          if (stablePlaybackTimeoutRef.current) {
+            window.clearTimeout(stablePlaybackTimeoutRef.current);
+            stablePlaybackTimeoutRef.current = null;
+          }
+          if (stabilizationRetryRef.current?.timeoutId) {
+            window.clearTimeout(stabilizationRetryRef.current.timeoutId);
+          }
+          stabilizationRetryRef.current = null;
+          pendingStabilityRef.current = null;
+
           playbackStartedRef.current = true;
           playbackStartPerfMsRef.current = performance.now();
-          
-          // Track this playing state for auto-pause recovery detection
-          lastPlayingStateRef.current = { 
-            position: state.position, 
-            timestamp: performance.now() 
-          };
 
           setIsInitializing(false);
           setIsPlaying(true);
@@ -523,93 +719,119 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
           log('Scheduling clip-end timeout for', durationMs, 'ms');
           clipEndTimeoutRef.current = window.setTimeout(() => {
             log('Clip-end timeout fired - pausing');
-            // Single pause command per clip
             player.pause().catch(() => {});
-
-            // Stop timers and update state (idempotent)
-            if (clipEndTimeoutRef.current) {
-              window.clearTimeout(clipEndTimeoutRef.current);
-              clipEndTimeoutRef.current = null;
-            }
-            if (progressIntervalRef.current) {
-              window.clearInterval(progressIntervalRef.current);
-              progressIntervalRef.current = null;
-            }
-            playbackStartedRef.current = false;
-            playbackStartPerfMsRef.current = null;
-            lastPlayingStateRef.current = null;
+            clearClipTimers();
+            pendingStabilityRef.current = null;
             setIsPlaying(false);
           }, durationMs);
+        };
 
+        // Unpaused state: start/continue stabilization, but do not mark as playing yet
+        if (!state.paused && !playbackStartedRef.current) {
+          const pending = pendingStabilityRef.current;
+          if (!pending || pending.commandId !== commandId) {
+            pendingStabilityRef.current = {
+              commandId,
+              clip,
+              firstUnpausedPerfMs: performance.now(),
+              firstUnpausedPositionMs: state.position
+            };
+
+            log('⏳ Unpaused observed; waiting for stable playback...', {
+              commandId,
+              position: state.position,
+              stableMs: STABLE_UNPAUSED_MS,
+              stableAdvanceMs: STABLE_POSITION_ADVANCE_MS
+            });
+
+            if (stablePlaybackTimeoutRef.current) {
+              window.clearTimeout(stablePlaybackTimeoutRef.current);
+            }
+            stablePlaybackTimeoutRef.current = window.setTimeout(() => {
+              // If we still haven't become stable and no pause happened, accept stability by time
+              const stillPending = pendingStabilityRef.current;
+              if (stillPending && stillPending.commandId === commandId) {
+                markStablePlayback('unpaused_for_500ms');
+              }
+            }, STABLE_UNPAUSED_MS);
+          } else {
+            // If we observe position advance, mark stable earlier
+            const advancedBy = state.position - pending.firstUnpausedPositionMs;
+            if (advancedBy >= STABLE_POSITION_ADVANCE_MS) {
+              markStablePlayback('position_advanced');
+            }
+          }
           return;
         }
 
-        // If Spotify reports paused while we thought we were playing, check for auto-pause bug
-        if (state.paused && playbackStartedRef.current) {
-          const lastPlaying = lastPlayingStateRef.current;
-          const timeSinceStart = lastPlaying ? performance.now() - lastPlaying.timestamp : Infinity;
-          const positionUnchanged = lastPlaying ? Math.abs(state.position - lastPlaying.position) < 1000 : false;
-          
-          log('⏸️ Spotify reported PAUSED unexpectedly:', {
-            timeSinceStartMs: Math.round(timeSinceStart),
-            position: state.position,
-            lastPosition: lastPlaying?.position,
-            positionUnchanged,
-            retryUsed: autoPauseRetryUsedRef.current,
-            commandId: currentCommandIdRef.current
-          });
+        // Paused state handling
+        if (state.paused) {
+          // If we were already stable, accept the pause normally
+          if (playbackStartedRef.current) {
+            log('⏸️ Playback paused after stable start - clearing timers');
+            clearClipTimers();
+            pendingStabilityRef.current = null;
+            setIsPlaying(false);
+            setIsInitializing(false);
+            return;
+          }
 
-          // AUTO-PAUSE RECOVERY: If paused within 500ms at same position, and we haven't retried yet
-          if (timeSinceStart < 500 && positionUnchanged && !autoPauseRetryUsedRef.current && clip) {
-            log('🔄 AUTO-PAUSE RECOVERY: Detected iOS auto-pause bug, issuing ONE retry');
-            autoPauseRetryUsedRef.current = true;
-            
-            // Don't clear timers or update UI - just retry the play command silently
-            const token = accessTokenRef.current;
-            const currentDeviceId = deviceIdRef.current;
-            
-            if (token && currentDeviceId) {
-              const playUrl = `https://api.spotify.com/v1/me/player/play?device_id=${currentDeviceId}`;
-              const playBody = {
-                uris: [clip.trackUri],
-                position_ms: Math.max(0, Math.floor(clip.clipStartSeconds * 1000))
-              };
-              
-              log('🔄 Retry play request:', { position_ms: playBody.position_ms });
-              
-              fetch(playUrl, {
-                method: 'PUT',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(playBody)
-              }).then(response => {
-                log('🔄 Auto-pause retry response:', response.status);
-              }).catch(err => {
-                log('🔄 Auto-pause retry failed:', err);
-              });
-              
-              // Reset playback tracking so we can detect the new play
-              playbackStartedRef.current = false;
-              lastPlayingStateRef.current = null;
-              return; // Don't update UI or clear timers - wait for retry result
+          // Detect auto-pause bug during stabilization window
+          const pending = pendingStabilityRef.current;
+          if (pending && pending.commandId === commandId) {
+            const elapsed = performance.now() - pending.firstUnpausedPerfMs;
+            const posDelta = Math.abs(state.position - pending.firstUnpausedPositionMs);
+            const positionUnchanged = posDelta < STABLE_POSITION_ADVANCE_MS;
+
+            if (elapsed < AUTO_PAUSE_WINDOW_MS && positionUnchanged) {
+              // Bounded stabilization retries
+              const current = stabilizationRetryRef.current;
+              const retries = current && current.commandId === commandId ? current.attempts : 0;
+              const nextAttempt = retries + 1;
+
+              if (nextAttempt <= STABILIZATION_RETRY_BACKOFF_MS.length) {
+                const delay = STABILIZATION_RETRY_BACKOFF_MS[nextAttempt - 1];
+                log('🔄 Auto-pause detected; scheduling stabilization retry', {
+                  commandId,
+                  attempt: nextAttempt,
+                  delayMs: delay,
+                  elapsedMs: Math.round(elapsed),
+                  position: state.position
+                });
+
+                // Cancel stability timer and reschedule retry
+                if (stablePlaybackTimeoutRef.current) {
+                  window.clearTimeout(stablePlaybackTimeoutRef.current);
+                  stablePlaybackTimeoutRef.current = null;
+                }
+
+                if (current?.timeoutId) window.clearTimeout(current.timeoutId);
+                stabilizationRetryRef.current = { commandId, attempts: nextAttempt, timeoutId: null };
+                stabilizationRetryRef.current.timeoutId = window.setTimeout(() => {
+                  // Only retry if this is still the active command
+                  if ((currentCommandIdRef.current ?? '') !== commandId) return;
+                  // Reset pending stability so we can require stability again
+                  pendingStabilityRef.current = null;
+                  void startClipPlayback(clip, {
+                    skipReset: true,
+                    reason: `stabilization_retry_${nextAttempt}`,
+                    commandId
+                  });
+                }, delay);
+
+                // Keep isInitializing=true during stabilization attempts
+                setIsInitializing(true);
+                return;
+              }
             }
           }
-          
-          // Not a recoverable auto-pause, or retry already used - accept the pause
-          log('This is the mobile bug - Spotify auto-paused after play command (no retry available)');
-          if (clipEndTimeoutRef.current) {
-            window.clearTimeout(clipEndTimeoutRef.current);
-            clipEndTimeoutRef.current = null;
-          }
-          if (progressIntervalRef.current) {
-            window.clearInterval(progressIntervalRef.current);
-            progressIntervalRef.current = null;
-          }
-          playbackStartedRef.current = false;
-          playbackStartPerfMsRef.current = null;
-          lastPlayingStateRef.current = null;
+
+          // Not recoverable (or retries exhausted) -> stop loading and accept pause
+          log('⏸️ Paused during stabilization; retries exhausted or conditions not met', {
+            commandId,
+            attempts: stabilizationRetryRef.current?.commandId === commandId ? stabilizationRetryRef.current.attempts : 0
+          });
+          clearStabilization();
           setIsPlaying(false);
           setIsInitializing(false);
         }
@@ -671,11 +893,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     if (!currentToken) return;
 
     if (playerRef.current && playerTokenRef.current && playerTokenRef.current !== currentToken) {
-      try {
-        playerRef.current.disconnect();
-      } catch {
-        // ignore
-      }
+      detachPlayer(playerRef.current, 'token_change');
 
       playerRef.current = null;
       playerTokenRef.current = null;
@@ -690,37 +908,32 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       setIsInitializing(true);
       initPromiseRef.current = initializePlayerCore();
     }
-  }, [tokenEpoch, initializePlayerCore]);
+  }, [tokenEpoch, initializePlayerCore, detachPlayer]);
 
   // EARLY PLAYER INITIALIZATION: Create player as soon as auth + Spotify connected
   // This ensures the player exists BEFORE the user taps play, avoiding first-tap issues
   useEffect(() => {
     if (!authState.user) return;
+    if (!spotifyConnected) return;
     if (earlyInitAttemptedRef.current) return;
     if (playerRef.current || initPromiseRef.current) return;
 
+    // HARD GATE: proactive init can only run once per session
+    earlyInitAttemptedRef.current = true;
+    proactiveInitRunCountRef.current += 1;
+    log('Proactive init run count:', proactiveInitRunCountRef.current);
+
     void (async () => {
       try {
-        // First check if Spotify is connected by trying to get a token
-        const token = await getAccessToken();
-        if (!token) {
-          log('Early init: No Spotify token available (not connected yet)');
-          return;
-        }
-        
-        log('Early init: Spotify connected, initializing player proactively');
-        earlyInitAttemptedRef.current = true;
-        
         await loadSpotifySDK();
         if (playerRef.current || initPromiseRef.current) return;
-        
-        log('Early init: SDK loaded, creating player (NO auto-play)');
+        log('Early init: Spotify connected, creating player (NO auto-play)');
         initPromiseRef.current = initializePlayerCore();
       } catch (e) {
         log('Early init failed (best-effort):', e);
       }
     })();
-  }, [authState.user, spotifyConnected, loadSpotifySDK, initializePlayerCore, getAccessToken]);
+  }, [authState.user, spotifyConnected, loadSpotifySDK, initializePlayerCore]);
 
   // Ensure player creation happens inside the user gesture when possible.
   // This is the key to preventing the "first tap" being wasted on mobile.
@@ -855,6 +1068,8 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     currentCommandIdRef.current = commandId;
     autoPauseRetryUsedRef.current = false; // Reset retry flag for new command
     lastPlayingStateRef.current = null;
+    clearStabilization();
+    stabilizationRetryRef.current = { commandId, attempts: 0, timeoutId: null };
     
     log('▶️ playClip called:', clip.entryId, {
       trackUri: clip.trackUri,
@@ -917,7 +1132,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       log('Player ready - starting playback immediately');
       pendingClipRef.current = null;
       activateSpotifyPlayer();
-      void startClipPlayback(clip);
+      void startClipPlayback(clip, { commandId, reason: 'play_immediate' });
       return;
     }
 
@@ -962,6 +1177,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
 
   // Cleanup
   const cleanup = useCallback(() => {
+    clearStabilization();
     // Stop timers
     if (clipEndTimeoutRef.current) {
       window.clearTimeout(clipEndTimeoutRef.current);
@@ -976,7 +1192,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     requestedClipRef.current = null;
 
     if (playerRef.current) {
-      playerRef.current.disconnect();
+      detachPlayer(playerRef.current, 'cleanup');
       playerRef.current = null;
       playerTokenRef.current = null;
     }
@@ -998,9 +1214,16 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
     pendingClipRef.current = null;
     initPromiseRef.current = null;
 
+    // Reset one-time init gates for next session
+    earlyInitAttemptedRef.current = false;
+    proactiveInitRunCountRef.current = 0;
+    deviceActivationCacheRef.current = null;
+    stabilizationRetryRef.current = null;
+    pendingStabilityRef.current = null;
+
     playbackActivatedRef.current = false;
 
-  }, []);
+  }, [clearStabilization, detachPlayer]);
 
   // Cleanup on unmount
   useEffect(() => {
