@@ -116,12 +116,8 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
     );
   }
 
-  // Check if location is valid
-  const hasValidLocation = weatherData.location && 
-    !weatherData.location.includes("New York") && 
-    !weatherData.location.includes("Manhattan") &&
-    weatherData.location !== "Unknown Location" &&
-    weatherData.location.trim() !== '';
+  // Location validity is now handled upstream in getWeatherForLocation
+  const hasValidLocation = Boolean(weatherData.location?.trim());
 
   return (
     <div className={cn("flex items-center gap-2 group", className)}>
