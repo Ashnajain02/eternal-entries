@@ -72,7 +72,7 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
   const handlePlayPause = useCallback(() => {
     console.log('[ClipRangeSelector] handlePlayPause called, isPreviewPlaying:', isPreviewPlaying);
     if (isPreviewPlaying) {
-      pauseClip(); // Fire and forget
+      pauseClip('USER'); // Fire and forget
     } else {
       // playClip is synchronous - it activates audio context immediately
       playClip({
@@ -88,7 +88,7 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
   useEffect(() => {
     return () => {
       if (isPreviewPlaying) {
-        pauseClip();
+        pauseClip('CLEANUP');
       }
     };
   }, [isPreviewPlaying, pauseClip]);

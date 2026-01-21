@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthState, SignUpMetadata } from '@/types/auth';
@@ -13,6 +13,8 @@ const initialState: AuthState = {
 
 export const useAuthProvider = () => {
   const [authState, setAuthState] = useState<AuthState>(initialState);
+  const [authReady, setAuthReady] = useState(false);
+  const authReadySetRef = useRef(false); // Ensures authReady only flips to true ONCE
   const { toast } = useToast();
 
   const forceClearSupabaseAuthStorage = () => {
@@ -45,6 +47,7 @@ export const useAuthProvider = () => {
       // ignore
     }
   };
+
   useEffect(() => {
     // onAuthStateChange handles all auth state updates including INITIAL_SESSION
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -55,6 +58,15 @@ export const useAuthProvider = () => {
           user: session?.user ?? null,
           loading: false,
         });
+        
+        // authReady becomes true ONLY ONCE after auth has fully settled with a valid session
+        // This happens on INITIAL_SESSION (page load with existing session) or SIGNED_IN (fresh login)
+        // Once true, it NEVER flips back to false
+        if (!authReadySetRef.current && session?.access_token) {
+          console.log('🔐 AUTH_READY: Auth fully settled with access_token');
+          authReadySetRef.current = true;
+          setAuthReady(true);
+        }
         
         if (event === 'PASSWORD_RECOVERY') {
           toast({
@@ -226,6 +238,7 @@ export const useAuthProvider = () => {
 
   return {
     authState,
+    authReady,
     signUp,
     signIn,
     signOut,
