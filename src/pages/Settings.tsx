@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import { IntegrationsSettings } from '@/components/settings/IntegrationsSettings';
 import { AccountSettings } from '@/components/settings/AccountSettings';
 import { TemperatureSettings } from '@/components/settings/TemperatureSettings';
+import { BlurSettings } from '@/components/settings/BlurSettings';
 import { useSearchParams } from 'react-router-dom';
 
 const Settings = () => {
@@ -55,6 +56,7 @@ const Settings = () => {
           <TabsContent value="display">
             <div className="space-y-6">
               <TemperatureSettings />
+              <BlurSettings />
             </div>
           </TabsContent>
         </Tabs>

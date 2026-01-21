@@ -137,20 +137,20 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     };
   }, []);
 
-  // Get user's temperature unit preference
+  // Get user's profile preferences (temperature unit and blur setting)
   const { data: userProfile } = useQuery({
-    queryKey: ['temperature-settings', authState.user?.id],
+    queryKey: ['user-profile-settings', authState.user?.id],
     queryFn: async () => {
       if (!authState.user) return null;
       
       const { data, error } = await supabase
         .from('profiles')
-        .select('temperature_unit')
+        .select('temperature_unit, disable_song_blur')
         .eq('id', authState.user.id)
         .single();
       
       if (error) {
-        console.error('Error fetching temperature preferences:', error);
+        console.error('Error fetching user preferences:', error);
         return null;
       }
       
@@ -158,6 +158,14 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     },
     enabled: !!authState.user
   });
+
+  // Determine if content should be blurred (respects user preference)
+  const shouldBlurContent = useMemo(() => {
+    // If user has disabled blur, never blur
+    if (userProfile?.disable_song_blur) return false;
+    // Otherwise, blur if there's a track and user hasn't clicked to play
+    return Boolean(entry.track && !hasClickedToPlay);
+  }, [userProfile?.disable_song_blur, entry.track, hasClickedToPlay]);
 
   // Format temperature based on user preference (stored as Celsius)
   const formatTemperature = (celsius: number): string => {
@@ -285,7 +293,13 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         </div>
         
         {entry.weather && (
-          <div className="flex items-center gap-2 text-sm mt-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm mt-2 text-muted-foreground flex-wrap">
+            {formattedTime && (
+              <>
+                <span>{formattedTime}</span>
+                <span>·</span>
+              </>
+            )}
             <span>{formatTemperature(entry.weather.temperature)}</span>
             {entry.weather.description && (
               <>
@@ -299,6 +313,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
                 <span>{entry.weather.location}</span>
               </>
             )}
+          </div>
+        )}
+        {/* Show time even without weather */}
+        {!entry.weather && formattedTime && (
+          <div className="flex items-center gap-2 text-sm mt-2 text-muted-foreground">
+            <span>{formattedTime}</span>
           </div>
         )}
       </div>
@@ -383,8 +403,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           ref={contentRef}
           className="px-6 py-6"
           style={{
-            filter: entry.track && !hasClickedToPlay ? 'blur(4px)' : 'blur(0px)',
-            opacity: entry.track && !hasClickedToPlay ? 0.6 : 1,
+            filter: shouldBlurContent ? 'blur(4px)' : 'blur(0px)',
+            opacity: shouldBlurContent ? 0.6 : 1,
             transition: 'filter 0.8s ease, opacity 0.8s ease',
           }}
         >
@@ -395,7 +415,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           />
         </div>
         
-        {entry.track && !hasClickedToPlay && (
+        {shouldBlurContent && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="bg-card border border-border px-5 py-2.5 rounded-full text-sm text-muted-foreground shadow-sm">
               Play the song to read
@@ -408,8 +428,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       {!isPreview && (
         <div
           style={{
-            filter: entry.track && !hasClickedToPlay ? 'blur(4px)' : 'blur(0px)',
-            opacity: entry.track && !hasClickedToPlay ? 0.6 : 1,
+            filter: shouldBlurContent ? 'blur(4px)' : 'blur(0px)',
+            opacity: shouldBlurContent ? 0.6 : 1,
             transition: 'filter 0.8s ease, opacity 0.8s ease',
           }}
         >

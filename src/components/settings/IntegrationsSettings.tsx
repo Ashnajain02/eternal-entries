@@ -5,6 +5,7 @@ import { Music, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { initiateSpotifyAuth, isSpotifyConnected, disconnectSpotify } from '@/services/spotify';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { SpotifyProfileDisplay } from './SpotifyProfileDisplay';
 
 export const IntegrationsSettings: React.FC = () => {
   const [spotifyConnected, setSpotifyConnected] = useState(false);
@@ -104,37 +105,41 @@ export const IntegrationsSettings: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 border rounded-md">
-            <div className="flex items-center gap-4">
-              <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full shrink-0">
-                <Music className="h-5 w-5 text-green-500" />
+          <div className="flex flex-col p-4 border rounded-md">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full shrink-0">
+                  <Music className="h-5 w-5 text-green-500" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-medium">Spotify</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Connect your Spotify account to add songs to your journal entries
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h3 className="font-medium">Spotify</h3>
-                <p className="text-sm text-muted-foreground">
-                  Connect your Spotify account to add songs to your journal entries
-                </p>
-              </div>
+              {spotifyConnected ? (
+                <Button 
+                  variant="outline"
+                  disabled={isLoading}
+                  onClick={handleDisconnectSpotify}
+                  className="shrink-0 w-full sm:w-auto"
+                >
+                  {isLoading ? "Processing..." : "Disconnect"}
+                </Button>
+              ) : (
+                <Button 
+                  variant="default"
+                  disabled={isLoading}
+                  onClick={handleConnectSpotify}
+                  className="shrink-0 w-full sm:w-auto"
+                >
+                  {isLoading ? "Connecting..." : "Connect"}
+                </Button>
+              )}
             </div>
-            {spotifyConnected ? (
-              <Button 
-                variant="outline"
-                disabled={isLoading}
-                onClick={handleDisconnectSpotify}
-                className="shrink-0 w-full sm:w-auto"
-              >
-                {isLoading ? "Processing..." : "Disconnect"}
-              </Button>
-            ) : (
-              <Button 
-                variant="default"
-                disabled={isLoading}
-                onClick={handleConnectSpotify}
-                className="shrink-0 w-full sm:w-auto"
-              >
-                {isLoading ? "Connecting..." : "Connect"}
-              </Button>
-            )}
+            {/* Show Spotify profile when connected */}
+            {spotifyConnected && <SpotifyProfileDisplay />}
           </div>
         </CardContent>
       </Card>
