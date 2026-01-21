@@ -135,10 +135,6 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
   // Get access token from edge function
   const getAccessToken = useCallback(async (): Promise<string | null> => {
     try {
-      // Hard requirement: never fetch/use a Spotify token until a Supabase session exists.
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) return null;
-
       const { data, error } = await supabase.functions.invoke('spotify-playback-token', {
         body: { action: 'get_token' }
       });
@@ -158,9 +154,10 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
         const prevToken: string | null = accessTokenRef.current;
 
         accessTokenRef.current = nextToken;
-        setIsPremium(data.is_premium ?? null);
+        // Premium status is stored at connection time, use from response
+        setIsPremium(data.is_premium ?? false);
 
-        // Track token changes so we can rebuild the SDK Player if needed.
+        // Track token changes so we can rebuild the SDK Player if needed
         if (prevToken && prevToken !== nextToken) {
           setTokenEpoch((e) => e + 1);
         }

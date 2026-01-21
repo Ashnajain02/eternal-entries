@@ -12,8 +12,7 @@ import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useDrafts } from '@/contexts/DraftsContext';
 import { JournalEntry } from '@/types';
-
-const SPOTIFY_REDIRECT_KEY = 'spotify_redirect_from_journal';
+import { SPOTIFY_REDIRECT_KEY } from '@/constants/spotify';
 
 const Index = () => {
   const { authState } = useAuth();

@@ -1,30 +1,20 @@
-
 import { supabase } from '@/integrations/supabase/client';
-
-// Constants
-const REDIRECT_URI = `${window.location.origin}/callback`;
+import { SPOTIFY_REDIRECT_URI } from '@/constants/spotify';
 
 /**
  * Check if the user has connected their Spotify account
- * and the token is still valid
  */
 export const isSpotifyConnected = async (): Promise<boolean> => {
   try {
-    // Get the current session to ensure we have a valid token
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      return false;
-    }
-    
-    const { data, error } = await supabase.functions.invoke('spotify-auth', {
-      body: { action: 'is_token_expired' }
+    const { data, error } = await supabase.functions.invoke('spotify-playback-token', {
+      body: { action: 'is_connected' }
     });
     
     if (error) {
-      return false; // Assume not connected on error
+      return false;
     }
     
-    return !(data?.expired || false);
+    return data?.connected ?? false;
   } catch (error) {
     return false;
   }
@@ -40,24 +30,14 @@ export interface SpotifyAuthResult {
 }
 
 /**
- * Initiate the Spotify authorization process
- * Returns info about whether popup was blocked
+ * Initiate the Spotify authorization process via popup
  */
 export const initiateSpotifyAuth = async (): Promise<SpotifyAuthResult> => {
   try {
-    // Get the current session to ensure we have a valid token
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      return { 
-        success: false, 
-        error: 'No active session. Please sign in first.' 
-      };
-    }
-    
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { 
         action: 'authorize',
-        redirect_uri: REDIRECT_URI
+        redirect_uri: SPOTIFY_REDIRECT_URI
       }
     });
 
@@ -68,10 +48,9 @@ export const initiateSpotifyAuth = async (): Promise<SpotifyAuthResult> => {
       };
     }
 
-    // Try to open the popup
+    // Open Spotify auth in popup
     const popup = window.open(data.url, '_blank');
     
-    // Check if popup was blocked
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
       return { 
         success: false, 
@@ -95,40 +74,30 @@ export const initiateSpotifyAuth = async (): Promise<SpotifyAuthResult> => {
 export const handleSpotifyCallback = async (code: string): Promise<{
   success: boolean;
   display_name?: string;
+  is_premium?: boolean;
   error?: string;
 }> => {
   try {
-    // Get the current session to ensure we have a valid token
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      return { 
-        success: false, 
-        error: 'No active session. Please sign in first.' 
-      };
-    }
-    
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { 
         action: 'callback',
         code, 
-        redirect_uri: REDIRECT_URI 
+        redirect_uri: SPOTIFY_REDIRECT_URI 
       }
     });
 
     if (error) {
-      // Extract more detailed error from FunctionsHttpError
-      const errorMessage = error.message || 'Failed to connect to Spotify';
-      return { success: false, error: errorMessage };
+      return { success: false, error: error.message || 'Failed to connect to Spotify' };
     }
     
-    // Check if the response contains an error
     if (data?.error) {
       return { success: false, error: data.error };
     }
 
     return { 
       success: data?.success ?? false,
-      display_name: data?.display_name
+      display_name: data?.display_name,
+      is_premium: data?.is_premium
     };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -136,16 +105,10 @@ export const handleSpotifyCallback = async (code: string): Promise<{
 };
 
 /**
- * Revoke Spotify access
+ * Disconnect Spotify account
  */
 export const disconnectSpotify = async (): Promise<boolean> => {
   try {
-    // Get the current session to ensure we have a valid token
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData.session) {
-      return false;
-    }
-    
     const { data, error } = await supabase.functions.invoke('spotify-auth', {
       body: { action: 'revoke' }
     });
