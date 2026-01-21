@@ -27,7 +27,7 @@ const WeatherAnimationButton: React.FC<WeatherAnimationButtonProps> = ({
   className,
 }) => {
   const WeatherIcon = WEATHER_ICONS[category];
-  const TimeIcon = timeOfDay === 'night' ? Moon : timeOfDay === 'twilight' ? Sun : Sun;
+  const TimeIcon = timeOfDay === 'night' ? Moon : Sun;
   
   return (
     <Button

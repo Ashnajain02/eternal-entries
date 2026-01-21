@@ -1,7 +1,7 @@
 // Weather overlay types - frozen at journal creation time
 
 export type WeatherCategory = 'rain' | 'snow' | 'fog' | 'clear';
-export type TimeOfDay = 'day' | 'night' | 'twilight';
+export type TimeOfDay = 'morning' | 'evening' | 'night';
 
 export interface WeatherOverlayState {
   category: WeatherCategory;
@@ -27,7 +27,10 @@ export function deriveWeatherCategory(description: string): WeatherCategory {
 }
 
 /**
- * Derives time of day from timestamp
+ * Derives time of day from timestamp using fixed thresholds (local time)
+ * Morning: 05:00 → 16:00
+ * Evening: 16:00 → 20:00
+ * Night: 20:00 → 05:00
  */
 export function deriveTimeOfDay(timestamp: string | number): TimeOfDay {
   let date: Date;
@@ -35,21 +38,21 @@ export function deriveTimeOfDay(timestamp: string | number): TimeOfDay {
   if (typeof timestamp === 'number') {
     date = new Date(timestamp);
   } else if (typeof timestamp === 'string') {
-    date = timestamp.includes('T') ? new Date(timestamp) : new Date(`${timestamp}T00:00:00.000Z`);
+    date = timestamp.includes('T') ? new Date(timestamp) : new Date(`${timestamp}T00:00:00`);
   } else {
-    return 'day';
+    return 'morning';
   }
   
   const hour = date.getHours();
   
-  // 5-7 AM or 5-8 PM = twilight (golden hour)
-  if ((hour >= 5 && hour < 7) || (hour >= 17 && hour < 20)) {
-    return 'twilight';
+  // Morning: 05:00 → 16:00
+  if (hour >= 5 && hour < 16) {
+    return 'morning';
   }
-  // 7 AM - 5 PM = day
-  if (hour >= 7 && hour < 17) {
-    return 'day';
+  // Evening: 16:00 → 20:00
+  if (hour >= 16 && hour < 20) {
+    return 'evening';
   }
-  // Otherwise night
+  // Night: 20:00 → 05:00
   return 'night';
 }
