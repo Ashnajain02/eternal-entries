@@ -46,7 +46,7 @@ export const useAuthProvider = () => {
     }
   };
   useEffect(() => {
-    // Set up auth state listener first
+    // onAuthStateChange handles all auth state updates including INITIAL_SESSION
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log('Auth state change:', event, !!session);
@@ -56,7 +56,6 @@ export const useAuthProvider = () => {
           loading: false,
         });
         
-        // Show toast for certain auth events
         if (event === 'PASSWORD_RECOVERY') {
           toast({
             title: "Recovery link detected",
@@ -66,16 +65,6 @@ export const useAuthProvider = () => {
       }
     );
 
-    // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', !!session);
-      setAuthState({
-        session,
-        user: session?.user ?? null,
-        loading: false,
-      });
-    });
-
     return () => {
       subscription.unsubscribe();
     };
@@ -83,11 +72,14 @@ export const useAuthProvider = () => {
 
   const signUp = async (email: string, password: string, metadata?: SignUpMetadata) => {
     try {
+      const redirectUrl = `${window.location.origin}/`;
+      
       const { error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
-          data: metadata
+          data: metadata,
+          emailRedirectTo: redirectUrl
         }
       });
       if (error) throw error;
