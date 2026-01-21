@@ -22,6 +22,8 @@ serve(async (req) => {
     
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    // Use service role to access the secure spotify_credentials table
     const supabase = createClient(supabaseUrl ?? "", supabaseKey ?? "");
     
     // Extract and validate JWT from Authorization header
@@ -111,7 +113,7 @@ function getAuthorizationUrl(redirect_uri: string) {
   return successResponse({ url: authUrl });
 }
 
-// Handle OAuth callback - exchange code for tokens and store them
+// Handle OAuth callback - exchange code for tokens and store them securely
 async function handleCallback(
   code: string, 
   redirect_uri: string, 
@@ -184,7 +186,7 @@ async function handleCallback(
   const profileData = await profileResponse.json();
   console.log(`Got Spotify profile for: ${profileData.display_name || profileData.id}`);
   
-  // Check premium status - stored once at connection time
+  // Check premium status
   const isPremium = profileData.product === "premium";
   console.log(`User premium status: ${isPremium}`);
   
@@ -196,22 +198,35 @@ async function handleCallback(
   const encryptedAccessToken = await encryptToken(tokenData.access_token);
   const encryptedRefreshToken = await encryptToken(tokenData.refresh_token);
   
-  // Store encrypted tokens and premium status in database
-  const { error } = await supabase.rpc("update_profile_spotify_data", {
+  // Store encrypted tokens in the SECURE spotify_credentials table
+  const { error: credentialsError } = await supabase.rpc("update_spotify_credentials", {
     p_user_id: userId,
     p_access_token: encryptedAccessToken,
     p_refresh_token: encryptedRefreshToken,
     p_expires_at: expiresAt.toISOString(),
-    p_username: profileData.id,
-    p_is_premium: isPremium,
   });
   
-  if (error) {
-    console.error("Database error:", error.message);
-    return errorResponse("Failed to save Spotify data", 500);
+  if (credentialsError) {
+    console.error("Error storing credentials:", credentialsError.message);
+    return errorResponse("Failed to save Spotify credentials", 500);
   }
   
-  console.log("Successfully stored Spotify data in database");
+  // Store non-sensitive profile data (username, premium status) in profiles table
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({
+      spotify_username: profileData.id,
+      spotify_is_premium: isPremium,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", userId);
+  
+  if (profileError) {
+    console.error("Error updating profile:", profileError.message);
+    // Non-fatal - credentials are stored, profile data is optional
+  }
+  
+  console.log("Successfully stored Spotify data securely");
   
   return successResponse({ 
     success: true,
@@ -220,7 +235,7 @@ async function handleCallback(
   });
 }
 
-// Revoke Spotify access - clear all Spotify data from profile
+// Revoke Spotify access - clear credentials and profile data
 async function revokeAccess(supabase: any, userId: string | null) {
   console.log("Revoking Spotify access");
   
@@ -228,20 +243,31 @@ async function revokeAccess(supabase: any, userId: string | null) {
     return errorResponse("User not authenticated", 401);
   }
   
-  const { error } = await supabase
+  // Delete from secure credentials table
+  const { error: credentialsError } = await supabase.rpc("delete_spotify_credentials", {
+    p_user_id: userId
+  });
+  
+  if (credentialsError) {
+    console.error("Error deleting credentials:", credentialsError);
+  }
+  
+  // Clear non-sensitive Spotify data from profiles
+  const { error: profileError } = await supabase
     .from("profiles")
     .update({
+      spotify_username: null,
+      spotify_is_premium: null,
+      // Clear legacy token columns if they exist
       spotify_access_token: null,
       spotify_refresh_token: null,
       spotify_token_expires_at: null,
-      spotify_username: null,
-      spotify_is_premium: null,
       updated_at: new Date().toISOString()
     })
     .eq("id", userId);
   
-  if (error) {
-    console.error("Error revoking access:", error);
+  if (profileError) {
+    console.error("Error clearing profile:", profileError);
     return errorResponse("Failed to revoke access", 500);
   }
   

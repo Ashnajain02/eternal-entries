@@ -214,11 +214,42 @@ export type Database = {
         }
         Relationships: []
       }
+      spotify_credentials: {
+        Row: {
+          access_token: string
+          created_at: string
+          refresh_token: string
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          refresh_token: string
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          refresh_token?: string
+          token_expires_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      delete_spotify_credentials: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       is_spotify_token_expired: { Args: { user_id: string }; Returns: boolean }
       update_profile_spotify_data:
         | {
@@ -242,6 +273,15 @@ export type Database = {
             }
             Returns: boolean
           }
+      update_spotify_credentials: {
+        Args: {
+          p_access_token: string
+          p_expires_at: string
+          p_refresh_token: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

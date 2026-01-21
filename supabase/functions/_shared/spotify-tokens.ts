@@ -8,36 +8,43 @@ export interface TokenResult {
   isPremium?: boolean;
 }
 
-export interface UserTokenData {
-  spotify_access_token: string | null;
-  spotify_refresh_token: string | null;
-  spotify_token_expires_at: string | null;
-  spotify_is_premium: boolean | null;
+export interface CredentialsData {
+  access_token: string;
+  refresh_token: string;
+  token_expires_at: string;
 }
 
 /**
  * Get a valid Spotify access token for a user, refreshing if needed.
+ * Tokens are stored in the secure spotify_credentials table (service role only).
  * This is the single source of truth for token retrieval and refresh.
  */
 export async function getValidSpotifyToken(
   userId: string,
   supabase: ReturnType<typeof createClient>
 ): Promise<TokenResult> {
-  // Get the user's Spotify token data
-  const { data: profileData, error: profileError } = await supabase
+  // Get the user's Spotify credentials from the SECURE table (service role access only)
+  const { data: credentialsData, error: credentialsError } = await supabase
+    .from("spotify_credentials")
+    .select("access_token, refresh_token, token_expires_at")
+    .eq("user_id", userId)
+    .single();
+
+  // Also get premium status from profiles (non-sensitive data)
+  const { data: profileData } = await supabase
     .from("profiles")
-    .select("spotify_access_token, spotify_refresh_token, spotify_token_expires_at, spotify_is_premium")
+    .select("spotify_is_premium")
     .eq("id", userId)
     .single();
 
-  if (profileError || !profileData) {
-    console.error("Error getting user profile:", profileError);
-    return { success: false, error: "Failed to retrieve user profile" };
+  if (credentialsError || !credentialsData) {
+    console.log("No Spotify credentials found for user");
+    return { success: false, error: "Spotify not connected" };
   }
 
-  const { spotify_access_token, spotify_refresh_token, spotify_token_expires_at, spotify_is_premium } = profileData as UserTokenData;
+  const { access_token, refresh_token, token_expires_at } = credentialsData as CredentialsData;
 
-  if (!spotify_access_token || !spotify_refresh_token) {
+  if (!access_token || !refresh_token) {
     return { success: false, error: "Spotify not connected" };
   }
 
@@ -46,8 +53,8 @@ export async function getValidSpotifyToken(
   let refreshToken: string;
   
   try {
-    accessToken = await decryptToken(spotify_access_token);
-    refreshToken = await decryptToken(spotify_refresh_token);
+    accessToken = await decryptToken(access_token);
+    refreshToken = await decryptToken(refresh_token);
   } catch (error) {
     console.error("Error decrypting tokens:", error);
     return { success: false, error: "Failed to decrypt tokens" };
@@ -55,7 +62,7 @@ export async function getValidSpotifyToken(
 
   // Check if token is expired
   const now = new Date();
-  const expiresAt = spotify_token_expires_at ? new Date(spotify_token_expires_at) : new Date(0);
+  const expiresAt = token_expires_at ? new Date(token_expires_at) : new Date(0);
 
   if (now >= expiresAt) {
     console.log("Token expired, refreshing...");
@@ -88,19 +95,19 @@ export async function getValidSpotifyToken(
       return { success: false, error: "Failed to refresh Spotify token" };
     }
 
-    // Update token in database
+    // Update token in the SECURE credentials table
     const newExpiresAt = new Date();
     newExpiresAt.setSeconds(newExpiresAt.getSeconds() + refreshData.expires_in);
 
     const encryptedNewToken = await encryptToken(refreshData.access_token);
 
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        spotify_access_token: encryptedNewToken,
-        spotify_token_expires_at: newExpiresAt.toISOString()
-      })
-      .eq("id", userId);
+    // Use the secure update function
+    const { error: updateError } = await supabase.rpc("update_spotify_credentials", {
+      p_user_id: userId,
+      p_access_token: encryptedNewToken,
+      p_refresh_token: access_token, // Keep existing refresh token (encrypted)
+      p_expires_at: newExpiresAt.toISOString()
+    });
 
     if (updateError) {
       console.error("Error updating tokens:", updateError);
@@ -113,6 +120,22 @@ export async function getValidSpotifyToken(
   return { 
     success: true, 
     accessToken,
-    isPremium: spotify_is_premium ?? undefined
+    isPremium: profileData?.spotify_is_premium ?? undefined
   };
+}
+
+/**
+ * Check if user has Spotify credentials stored
+ */
+export async function hasSpotifyCredentials(
+  userId: string,
+  supabase: ReturnType<typeof createClient>
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("spotify_credentials")
+    .select("user_id")
+    .eq("user_id", userId)
+    .single();
+
+  return !error && !!data;
 }
