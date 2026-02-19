@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, BookOpen, Music, Cloud, Heart } from 'lucide-react';
+import ashnaPhoto from '@/assets/ashna-jain.png';
 import { Button } from '@/components/ui/button';
 
 const About = () => {
@@ -68,13 +69,11 @@ const About = () => {
             className="relative"
           >
             <div className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted border border-border/60 shadow-lg">
-              {/* Placeholder — replace src with imported image once uploaded */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-3">
-                <div className="w-20 h-20 rounded-full bg-accent/60 flex items-center justify-center">
-                  <span className="font-display text-3xl font-light text-foreground/60">AJ</span>
-                </div>
-                <p className="font-body text-sm text-muted-foreground">Photo coming soon</p>
-              </div>
+              <img
+                src={ashnaPhoto}
+                alt="Ashna Jain"
+                className="absolute inset-0 w-full h-full object-cover object-top"
+              />
             </div>
             {/* Decorative offset border */}
             <div className="absolute -bottom-4 -right-4 w-full h-full rounded-2xl border border-border/40 -z-10" />
