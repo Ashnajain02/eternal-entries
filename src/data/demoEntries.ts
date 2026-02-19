@@ -6,13 +6,13 @@ import { JournalEntry } from '@/types';
 const DEMO_SONGS = [
   {
     // Calm/Nostalgic — matched to "content" 2023 entry
-    id: '4pFOZXL4gfTBEwLUmOarqN',
+    id: '4fbvXwMTXPWaFyaMWUm9CR',
     name: 'Holocene',
     artist: 'Bon Iver',
     album: 'Bon Iver, Bon Iver',
     albumArt: 'https://i.scdn.co/image/ab67616d0000b273e8ee9509f10afeafc5e2b9ba',
-    uri: 'spotify:track:4pFOZXL4gfTBEwLUmOarqN',
-    previewUrl: 'https://p.scdn.co/mp3-preview/8e96fad0b4a825e567de6b9b4e2527e90e818965?cid=cfe923b2d660439caf2b557b21f31221',
+    uri: 'spotify:track:4fbvXwMTXPWaFyaMWUm9CR',
+    previewUrl: null,
   },
   {
     // Calm/Nostalgic — matched to "sad" 2024 night entry
@@ -22,27 +22,27 @@ const DEMO_SONGS = [
     album: 'Strange Trails',
     albumArt: 'https://i.scdn.co/image/ab67616d0000b27317875a0610c23d8946454583',
     uri: 'spotify:track:3hRV0jL3vUpRrcy398teAU',
-    previewUrl: 'https://p.scdn.co/mp3-preview/84748fccd2c12d7a31ad4693ee2d3d7eec8be74b?cid=cfe923b2d660439caf2b557b21f31221',
+    previewUrl: null,
   },
   {
     // Calm/Nostalgic — matched to "happy" 2025 afternoon entry
-    id: '7v4DcYJDSpA6L3KXHVJ8N7',
+    id: '3z7kvwJVRfA4HCOfm9ngog',
     name: 'Rivers and Roads',
     artist: 'The Head and the Heart',
     album: 'The Head and the Heart',
-    albumArt: 'https://i.scdn.co/image/ab67616d0000b273f3b2f40a6e6e8e2a8d9f8b3c',
-    uri: 'spotify:track:7v4DcYJDSpA6L3KXHVJ8N7',
-    previewUrl: 'https://p.scdn.co/mp3-preview/b6c0ca0da9d32948a29f0ccf1d0a07d40c57b56e?cid=cfe923b2d660439caf2b557b21f31221',
+    albumArt: 'https://i.scdn.co/image/ab67616d0000b273e8ee9509f10afeafc5e2b9ba',
+    uri: 'spotify:track:3z7kvwJVRfA4HCOfm9ngog',
+    previewUrl: null,
   },
   {
     // Growth/Empowering — matched to "excited" 2026 morning entry
-    id: '6QhjECKvUJiGiZMDWIMRKP',
+    id: '1YLJVmuzeM2YSUkCCaTNUB',
     name: 'Dog Days Are Over',
     artist: 'Florence + The Machine',
     album: 'Lungs',
     albumArt: 'https://i.scdn.co/image/ab67616d0000b273e89dbd8ec052834e3e1d6748',
-    uri: 'spotify:track:6QhjECKvUJiGiZMDWIMRKP',
-    previewUrl: 'https://p.scdn.co/mp3-preview/0a18cf01a7f1cf0d0e2f85bf73ca05e0fd6c9b15?cid=cfe923b2d660439caf2b557b21f31221',
+    uri: 'spotify:track:1YLJVmuzeM2YSUkCCaTNUB',
+    previewUrl: null,
   },
 ];
 
