@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { DemoEntry } from '@/data/demoEntries';
 import { Mood } from '@/types';
@@ -6,6 +6,11 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import InteractiveContent from '@/components/journal/InteractiveContent';
 import DemoAudioPlayer from './DemoAudioPlayer';
+import ReflectionQuestion from '@/components/journal/reflection/ReflectionQuestion';
+import ReflectionEditor from '@/components/journal/reflection/ReflectionEditor';
+import ReflectionDisplay from '@/components/journal/reflection/ReflectionDisplay';
+import ReflectionTrigger from '@/components/journal/reflection/ReflectionTrigger';
+import { useToast } from '@/hooks/use-toast';
 import {
   WeatherOverlay,
   WeatherAnimationButton,
@@ -13,9 +18,6 @@ import {
   deriveWeatherCategory,
   deriveTimeOfDay,
 } from '@/components/journal/weather-overlay';
-import { useRef, useEffect } from 'react';
-import { Sparkles, RefreshCcw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface DemoJournalEntryProps {
   entry: DemoEntry;
@@ -28,15 +30,38 @@ const moodLabels: Record<Mood, string> = {
   'in-love': 'In Love', excited: 'Excited', tired: 'Tired',
 };
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+async function callDemoReflection(content: string, mood: string, track?: { name: string; artist: string }): Promise<string[]> {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-reflection-demo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, mood, track }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to generate reflection questions');
+  }
+  const data = await response.json();
+  return data.reflectionQuestions || [];
+}
+
 const DemoJournalEntry: React.FC<DemoJournalEntryProps> = ({ entry, onInteract }) => {
-  const [hasPlayed, setHasPlayed] = useState(false);
-  const [showReflection, setShowReflection] = useState(!!entry.reflectionQuestion);
-  const [generatingFakeReflection, setGeneratingFakeReflection] = useState(false);
-  const [fakeQuestion, setFakeQuestion] = useState<string | null>(entry.reflectionQuestion || null);
+  const { toast } = useToast();
   const articleRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentAreaBounds, setContentAreaBounds] = useState<{ top: number; bottom: number } | undefined>(undefined);
 
+  // Reflection state — mirrors ReflectionModule exactly, minus DB writes
+  const [isLoading, setIsLoading] = useState(false);
+  const [questions, setQuestions] = useState<string[]>(entry.reflectionQuestion ? [entry.reflectionQuestion] : []);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answer, setAnswer] = useState(entry.reflectionAnswer || '');
+  const [isEditing, setIsEditing] = useState(false);
+  const [showModule, setShowModule] = useState(!!entry.reflectionQuestion);
+  const currentQuestion = questions[currentQuestionIndex] || '';
+
+  // Weather
   const hasWeatherData = Boolean(entry.weather?.description);
   const weatherCategory = useMemo(
     () => hasWeatherData ? deriveWeatherCategory(entry.weather!.description) : null,
@@ -46,14 +71,7 @@ const DemoJournalEntry: React.FC<DemoJournalEntryProps> = ({ entry, onInteract }
     () => deriveTimeOfDay(entry.timestamp || entry.date),
     [entry.timestamp, entry.date]
   );
-
-  const {
-    isPlaying: isWeatherPlaying,
-    isVisible: isWeatherVisible,
-    opacity: weatherOpacity,
-    phase: weatherPhase,
-    playAnimation: playWeatherAnimation,
-  } = useWeatherAnimation(entry.id);
+  const { isPlaying: isWeatherPlaying, isVisible: isWeatherVisible, opacity: weatherOpacity, phase: weatherPhase, playAnimation: playWeatherAnimation } = useWeatherAnimation(entry.id);
 
   useEffect(() => {
     if (!isWeatherVisible || !articleRef.current || !contentRef.current) {
@@ -62,9 +80,10 @@ const DemoJournalEntry: React.FC<DemoJournalEntryProps> = ({ entry, onInteract }
     }
     const articleRect = articleRef.current.getBoundingClientRect();
     const contentRect = contentRef.current.getBoundingClientRect();
-    const top = ((contentRect.top - articleRect.top) / articleRect.height) * 100;
-    const bottom = ((contentRect.bottom - articleRect.top) / articleRect.height) * 100;
-    setContentAreaBounds({ top, bottom });
+    setContentAreaBounds({
+      top: ((contentRect.top - articleRect.top) / articleRect.height) * 100,
+      bottom: ((contentRect.bottom - articleRect.top) / articleRect.height) * 100,
+    });
   }, [isWeatherVisible]);
 
   const parseDate = (dateValue: string | number) => {
@@ -78,29 +97,65 @@ const DemoJournalEntry: React.FC<DemoJournalEntryProps> = ({ entry, onInteract }
   const formattedYear = format(entryDateTime, 'yyyy');
   const formattedTime = entry.timestamp ? format(parseDate(entry.timestamp), 'h:mm a') : '';
 
-  const formatTemperature = (celsius: number) => {
-    const fahrenheit = (celsius * 9 / 5) + 32;
-    return `${Math.round(fahrenheit)}°F`;
-  };
+  const formatTemperature = (celsius: number) => `${Math.round((celsius * 9 / 5) + 32)}°F`;
 
-  const handlePlay = () => {
-    setHasPlayed(true);
+  // --- Reflection handlers (same logic as ReflectionModule, no DB) ---
+  const generateQuestions = async () => {
+    setIsLoading(true);
     onInteract();
+    try {
+      const trackInfo = entry.demoTrack ? { name: entry.demoTrack.name, artist: entry.demoTrack.artist } : undefined;
+      const generated = await callDemoReflection(entry.content, entry.mood, trackInfo);
+      setQuestions(generated);
+      setCurrentQuestionIndex(0);
+      setShowModule(true);
+      setIsEditing(true);
+    } catch (error: any) {
+      toast({
+        title: 'Error generating reflection',
+        description: error.message || 'Could not generate reflection questions. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleGenerateFakeReflection = () => {
-    setGeneratingFakeReflection(true);
-    onInteract();
-    // Simulate generation delay
-    setTimeout(() => {
-      setFakeQuestion('What small moment from today are you most grateful for, and why did it stand out?');
-      setShowReflection(true);
-      setGeneratingFakeReflection(false);
-    }, 1800);
+  const cycleQuestion = () => {
+    if (questions.length > 1) setCurrentQuestionIndex(prev => (prev + 1) % questions.length);
   };
 
-  // In demo mode, content is never blurred
-  const shouldBlur = false;
+  // "Save" in demo: just switch to display mode, no DB write
+  const saveReflection = () => {
+    if (!currentQuestion || !answer.trim()) {
+      toast({ title: 'Cannot save empty reflection', description: 'Please write your reflection before saving.', variant: 'destructive' });
+      return;
+    }
+    setIsEditing(false);
+  };
+
+  // "Delete" in demo: just reset state, no DB write
+  const deleteReflection = () => {
+    setQuestions([]);
+    setCurrentQuestionIndex(0);
+    setAnswer('');
+    setShowModule(false);
+  };
+
+  const handleClose = () => {
+    if (isEditing && answer.trim()) {
+      const confirmed = window.confirm('You have an unsaved reflection. Are you sure you want to discard it?');
+      if (!confirmed) return;
+    }
+    if (!entry.reflectionQuestion) {
+      setShowModule(false);
+    } else {
+      setIsEditing(false);
+      setQuestions(entry.reflectionQuestion ? [entry.reflectionQuestion] : []);
+      setCurrentQuestionIndex(0);
+      setAnswer(entry.reflectionAnswer || '');
+    }
+  };
 
   return (
     <motion.article
@@ -135,11 +190,7 @@ const DemoJournalEntry: React.FC<DemoJournalEntryProps> = ({ entry, onInteract }
             {moodLabels[entry.mood] || entry.mood}
           </span>
           {weatherCategory && (
-            <WeatherAnimationButton
-              isPlaying={isWeatherPlaying}
-              onClick={() => { playWeatherAnimation(); onInteract(); }}
-              disabled={false}
-            />
+            <WeatherAnimationButton isPlaying={isWeatherPlaying} onClick={() => { playWeatherAnimation(); onInteract(); }} disabled={false} />
           )}
         </div>
         {entry.weather && (
@@ -159,19 +210,13 @@ const DemoJournalEntry: React.FC<DemoJournalEntryProps> = ({ entry, onInteract }
             <h3 className="font-display text-2xl font-semibold leading-tight text-foreground">{formattedDate}</h3>
             <div className="flex items-center gap-3 mt-1">
               <span className="text-sm text-muted-foreground">{formattedYear}</span>
-              {formattedTime && (
-                <><span className="text-muted-foreground">·</span><span className="text-sm text-muted-foreground">{formattedTime}</span></>
-              )}
+              {formattedTime && <><span className="text-muted-foreground">·</span><span className="text-sm text-muted-foreground">{formattedTime}</span></>}
               {entry.weather && (
                 <>
                   <span className="text-muted-foreground">·</span>
                   <span className="text-sm text-muted-foreground">{formatTemperature(entry.weather.temperature)}</span>
-                  {entry.weather.description && (
-                    <><span className="text-muted-foreground">·</span><span className="text-sm text-muted-foreground capitalize">{entry.weather.description}</span></>
-                  )}
-                  {entry.weather.location && (
-                    <><span className="text-muted-foreground">·</span><span className="text-sm text-muted-foreground">{entry.weather.location}</span></>
-                  )}
+                  {entry.weather.description && <><span className="text-muted-foreground">·</span><span className="text-sm text-muted-foreground capitalize">{entry.weather.description}</span></>}
+                  {entry.weather.location && <><span className="text-muted-foreground">·</span><span className="text-sm text-muted-foreground">{entry.weather.location}</span></>}
                 </>
               )}
             </div>
@@ -180,11 +225,7 @@ const DemoJournalEntry: React.FC<DemoJournalEntryProps> = ({ entry, onInteract }
                 {moodLabels[entry.mood] || entry.mood}
               </span>
               {weatherCategory && (
-                <WeatherAnimationButton
-                  isPlaying={isWeatherPlaying}
-                  onClick={() => { playWeatherAnimation(); onInteract(); }}
-                  disabled={false}
-                />
+                <WeatherAnimationButton isPlaying={isWeatherPlaying} onClick={() => { playWeatherAnimation(); onInteract(); }} disabled={false} />
               )}
             </div>
           </div>
@@ -194,52 +235,51 @@ const DemoJournalEntry: React.FC<DemoJournalEntryProps> = ({ entry, onInteract }
       {/* Audio Player */}
       {entry.demoTrack && (
         <div className="px-6 py-4 border-b border-border bg-accent/20">
-          <DemoAudioPlayer
-            track={entry.demoTrack}
-            onPlay={handlePlay}
-          />
+          <DemoAudioPlayer track={entry.demoTrack} onPlay={onInteract} />
         </div>
       )}
 
       {/* Content */}
       <div className="relative">
         <div ref={contentRef} className="px-6 py-6">
-          <InteractiveContent
-            content={entry.content}
-            disabled={true}
-          />
+          <InteractiveContent content={entry.content} disabled={true} />
         </div>
       </div>
 
-      {/* Reflection Section */}
+      {/* Reflection — identical UI to real app, no DB writes */}
       <div className="px-6 pb-4">
-        {showReflection && fakeQuestion ? (
+        {!showModule ? (
+          <ReflectionTrigger onClick={generateQuestions} isLoading={isLoading} />
+        ) : (
           <div className="border border-border rounded-md p-4 mt-4 bg-muted/20">
             <div className="flex flex-col space-y-4">
-              <div className="flex items-start gap-2">
-                <Sparkles className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                <p className="text-sm font-medium text-foreground leading-relaxed">{fakeQuestion}</p>
-              </div>
-              {entry.reflectionAnswer && (
-                <p className="text-sm text-muted-foreground leading-relaxed pl-6 italic">
-                  "{entry.reflectionAnswer}"
-                </p>
+              <ReflectionQuestion
+                question={currentQuestion}
+                isEditing={isEditing}
+                isLoading={isLoading}
+                onRefresh={generateQuestions}
+                onCycle={cycleQuestion}
+                onClose={handleClose}
+                totalQuestions={questions.length}
+                currentIndex={currentQuestionIndex}
+              />
+              {isEditing ? (
+                <ReflectionEditor
+                  answer={answer}
+                  isLoading={isLoading}
+                  onChange={setAnswer}
+                  onSave={saveReflection}
+                />
+              ) : (
+                <ReflectionDisplay
+                  answer={answer}
+                  onEdit={() => setIsEditing(true)}
+                  onDelete={deleteReflection}
+                  isLoading={isLoading}
+                />
               )}
             </div>
           </div>
-        ) : (
-          <Button
-            onClick={handleGenerateFakeReflection}
-            disabled={generatingFakeReflection}
-            className="w-full mt-4"
-            variant="outline"
-          >
-            {generatingFakeReflection ? (
-              <><RefreshCcw className="animate-spin mr-2 h-4 w-4" />Generating...</>
-            ) : (
-              <><Sparkles className="mr-2 h-4 w-4" />Generate Reflection Question</>
-            )}
-          </Button>
         )}
       </div>
     </motion.article>
