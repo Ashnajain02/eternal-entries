@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { ArrowRight, Music, Cloud, ListChecks, Play } from 'lucide-react';
+import { ArrowRight, Music, Cloud, ListChecks, Play, Lock, ShieldCheck, Eye, KeyRound } from 'lucide-react';
 import AnimatedDemo from './AnimatedDemo';
 
 const LandingPage = () => {
@@ -123,6 +123,10 @@ const LandingPage = () => {
                   <ListChecks className="h-4 w-4 text-primary" />
                   <span className="text-foreground">Habit tracking</span>
                 </div>
+                <div className="flex items-center justify-center gap-2">
+                  <Lock className="h-4 w-4 text-primary" />
+                  <span className="text-foreground">End-to-end encrypted</span>
+                </div>
               </motion.div>
 
               <motion.div
@@ -228,6 +232,87 @@ const LandingPage = () => {
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Track daily habits. Watch patterns emerge. 
                   Celebrate how far you've come.
+                </p>
+              </motion.div>
+            </div>
+          </motion.div>
+        </section>
+
+        {/* Privacy & Encryption Section */}
+        <section className="container py-20 border-t border-border">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="max-w-3xl mx-auto"
+          >
+            <div className="text-center mb-12">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6 }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border bg-accent/40 text-sm mb-6"
+              >
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                <span className="text-foreground font-medium">Privacy First, Always</span>
+              </motion.div>
+              <h2 className="font-display text-3xl md:text-4xl mb-4">
+                Your thoughts are yours alone
+              </h2>
+              <p className="text-muted-foreground text-lg leading-relaxed max-w-xl mx-auto">
+                Every journal entry is encrypted directly in your browser before it ever touches our servers. 
+                We literally cannot read your diary.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="rounded-xl border border-border bg-card p-6 space-y-3"
+              >
+                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                  <KeyRound className="h-5 w-5 text-foreground" />
+                </div>
+                <h3 className="font-display text-lg">AES-256 Encryption</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Military-grade AES-256-GCM encryption protects every word you write. The same standard used by banks and governments.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="rounded-xl border border-border bg-card p-6 space-y-3"
+              >
+                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                  <Lock className="h-5 w-5 text-foreground" />
+                </div>
+                <h3 className="font-display text-lg">Client-Side Only</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Encryption and decryption happen entirely in your browser. Your key never leaves your device—only encrypted data is stored.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="rounded-xl border border-border bg-card p-6 space-y-3"
+              >
+                <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                  <Eye className="h-5 w-5 text-foreground" />
+                </div>
+                <h3 className="font-display text-lg">Zero Knowledge</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Even we cannot read your entries. No data mining, no AI training on your words, no exceptions. Your privacy is absolute.
                 </p>
               </motion.div>
             </div>
