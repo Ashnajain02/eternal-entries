@@ -336,6 +336,8 @@ const LandingPage = () => {
               <span>Spotify Integration</span>
               <span className="hidden md:inline text-border">·</span>
               <span>AI Reflections</span>
+              <span className="hidden md:inline text-border">·</span>
+              <Link to="/about" className="hover:text-foreground transition-colors">About</Link>
             </div>
             <Button 
               asChild 
