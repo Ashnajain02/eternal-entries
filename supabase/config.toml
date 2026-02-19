@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.generate-reflection]
 verify_jwt = false
 
+[functions.generate-reflection-demo]
+verify_jwt = false
+
 [functions.spotify-playback-token]
 verify_jwt = false
 
