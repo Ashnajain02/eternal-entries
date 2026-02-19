@@ -15,6 +15,7 @@ import Habits from "./pages/Habits";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Callback from "./pages/Callback";
+import Demo from "./pages/Demo";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -30,6 +31,7 @@ const App = () => (
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/callback" element={<Callback />} />
+                  <Route path="/demo" element={<Demo />} />
                   <Route path="/" element={<Index />} />
                   <Route 
                     path="/archive" 

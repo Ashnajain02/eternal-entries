@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { ArrowRight, Music, Cloud, ListChecks } from 'lucide-react';
+import { ArrowRight, Music, Cloud, ListChecks, Play } from 'lucide-react';
 import AnimatedDemo from './AnimatedDemo';
 
 const LandingPage = () => {
@@ -129,6 +129,7 @@ const LandingPage = () => {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.7 }}
+                className="flex flex-col sm:flex-row items-center justify-center gap-3"
               >
                 <Button 
                   asChild 
@@ -138,6 +139,17 @@ const LandingPage = () => {
                   <Link to="/auth?tab=signup" className="flex items-center gap-2">
                     Start Your Journey
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="rounded-full px-8 group"
+                >
+                  <Link to="/demo" className="flex items-center gap-2">
+                    <Play className="h-4 w-4" />
+                    Try the demo
                   </Link>
                 </Button>
               </motion.div>
