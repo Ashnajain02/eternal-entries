@@ -72,6 +72,7 @@ const App = () => (
             </DraftsProvider>
           </JournalProvider>
         </SpotifyPlaybackProvider>
+        </VisitLogger>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
