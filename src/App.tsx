@@ -17,12 +17,19 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Callback from "./pages/Callback";
 import Demo from "./pages/Demo";
 import About from "./pages/About";
+import { useVisitLogger } from "./hooks/useVisitLogger";
 const queryClient = new QueryClient();
+
+const VisitLogger = ({ children }: { children: React.ReactNode }) => {
+  useVisitLogger();
+  return <>{children}</>;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
+        <VisitLogger>
         <SpotifyPlaybackProvider>
           <JournalProvider>
             <DraftsProvider>
