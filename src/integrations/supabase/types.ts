@@ -241,6 +241,39 @@ export type Database = {
         }
         Relationships: []
       }
+      visit_logs: {
+        Row: {
+          city: string | null
+          country: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          region: string | null
+          user_id: string
+          visited_at: string
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          region?: string | null
+          user_id: string
+          visited_at?: string
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          region?: string | null
+          user_id?: string
+          visited_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
