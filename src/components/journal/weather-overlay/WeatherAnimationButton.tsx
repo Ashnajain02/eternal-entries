@@ -1,6 +1,5 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Lock } from 'lucide-react';
+import { Lock, CloudSun } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface WeatherAnimationButtonProps {
@@ -17,27 +16,28 @@ const WeatherAnimationButton: React.FC<WeatherAnimationButtonProps> = ({
   className,
 }) => {
   const isLocked = disabled && !isPlaying;
-  
+
   return (
-    <Button
-      variant="ghost"
-      size="sm"
+    <button
       onClick={onClick}
       disabled={isPlaying || disabled}
       className={cn(
-        "text-xs gap-1.5 h-7 px-2 transition-all",
-        isLocked 
-          ? "text-muted-foreground/50 opacity-50 cursor-not-allowed" 
-          : "text-muted-foreground hover:text-foreground opacity-70 hover:opacity-100",
-        isPlaying && "opacity-50 cursor-not-allowed",
+        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all",
+        "bg-primary/10 text-primary border border-primary/20",
+        "hover:bg-primary/15 hover:border-primary/30 hover:shadow-sm",
+        "active:scale-[0.97]",
+        isLocked && "opacity-40 cursor-not-allowed",
+        isPlaying && "opacity-50 cursor-not-allowed animate-pulse",
         className
       )}
     >
-      {isLocked && <Lock className="h-3 w-3" />}
-      <span>
-        {isPlaying ? 'Playing...' : 'View weather'}
-      </span>
-    </Button>
+      {isLocked ? (
+        <Lock className="h-3 w-3" />
+      ) : (
+        <CloudSun className="h-3.5 w-3.5" />
+      )}
+      <span>{isPlaying ? 'Playing...' : 'View weather'}</span>
+    </button>
   );
 };
 

@@ -13,38 +13,23 @@ interface WeatherOverlayProps {
   opacity: number;
   phase: 'idle' | 'fading-in' | 'playing' | 'fading-out';
   contentAreaBounds?: ContentAreaBounds;
+  fullscreen?: boolean;
 }
 
 // Particle configuration based on weather
 const PARTICLE_CONFIG = {
-  rain: { count: 80, speed: 12, size: 2 },
-  snow: { count: 100, speed: 1.5, size: 3 },
-  fog: { count: 5, speed: 0.3, size: 180 }, // Cloud patches
+  rain: { count: 130, speed: 14, size: 3 },
+  snow: { count: 150, speed: 1.5, size: 5 },
+  fog: { count: 8, speed: 0.3, size: 250 }, // Cloud patches
   clear: { count: 0, speed: 0, size: 0 },
 };
 
-// Background tints for each weather + time combination
+// No background tints — just particles on transparent background
 const BACKGROUND_TINTS = {
-  rain: {
-    morning: 'rgba(180, 190, 200, 0.08)',
-    evening: 'rgba(150, 140, 160, 0.08)',
-    night: 'rgba(40, 50, 70, 0.12)',
-  },
-  snow: {
-    morning: 'rgba(220, 225, 235, 0.1)',
-    evening: 'rgba(200, 190, 210, 0.08)',
-    night: 'rgba(60, 70, 90, 0.1)',
-  },
-  fog: {
-    morning: 'rgba(180, 185, 195, 0.08)', // Gray for overcast
-    evening: 'rgba(160, 150, 180, 0.08)',
-    night: 'rgba(20, 35, 70, 0.14)', // Navy base for fog at night
-  },
-  clear: {
-    morning: 'rgba(180, 210, 240, 0.1)', // Light blue (muted, airy)
-    evening: 'rgba(235, 220, 200, 0.14)', // Muted warm beige / soft dusk - better text readability
-    night: 'rgba(12, 22, 55, 0.22)', // Navy/cool - clearly night, NOT gray
-  },
+  rain: { morning: 'transparent', evening: 'transparent', night: 'transparent' },
+  snow: { morning: 'transparent', evening: 'transparent', night: 'transparent' },
+  fog: { morning: 'transparent', evening: 'transparent', night: 'transparent' },
+  clear: { morning: 'transparent', evening: 'transparent', night: 'transparent' },
 };
 
 interface Particle {
@@ -101,14 +86,42 @@ function createParticles(category: WeatherCategory): Particle[] {
 }
 
 function createStars(): Particle[] {
-  // Many tiny, soft muted yellow stars for night sky
-  return Array.from({ length: 150 }, (_, i) => ({
+  return Array.from({ length: 60 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
     y: Math.random() * 90,
-    speed: 0.0012 + Math.random() * 0.002, // Slow twinkle
-    opacity: 0.35 + Math.random() * 0.4, // Slightly softer range (0.35-0.75)
-    size: 1.0 + Math.random() * 1.4, // Bigger stars (1.0-2.4px) - VISIBLE
+    speed: 0.0012 + Math.random() * 0.002,
+    opacity: 0.7 + Math.random() * 0.3,
+    size: 1.0 + Math.random() * 1.5,
+  }));
+}
+
+interface ShootingStar {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
+}
+
+function createShootingStarGroup(): ShootingStar[] {
+  // Pick a direction — from left or right
+  const fromRight = Math.random() > 0.5;
+  const baseX = fromRight ? 70 + Math.random() * 25 : Math.random() * 25;
+  const baseY = Math.random() * 30 + 5;
+  const dir = fromRight ? -1 : 1;
+
+  // 3 grouped together with slight offsets
+  return Array.from({ length: 3 }, (_, i) => ({
+    x: baseX + (i - 1) * (4 + Math.random() * 6) * dir,
+    y: baseY + (i - 1) * (3 + Math.random() * 5),
+    vx: (0.7 + Math.random() * 0.3) * dir,
+    vy: 0.25 + Math.random() * 0.2,
+    life: i * 5, // stagger slightly so they don't start at the exact same frame
+    maxLife: 90 + Math.random() * 40,
+    size: 1.5 + Math.random() * 1,
   }));
 }
 
@@ -119,11 +132,14 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
   opacity,
   phase,
   contentAreaBounds,
+  fullscreen = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const particlesRef = useRef<Particle[]>([]);
   const starsRef = useRef<Particle[]>([]);
+  const shootingStarsRef = useRef<ShootingStar[]>([]);
+  const lastShootingStarTime = useRef(0);
   
   
   // Initialize particles
@@ -150,13 +166,20 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
     
     // Set canvas size
     const updateSize = () => {
-      const rect = canvas.parentElement?.getBoundingClientRect();
-      if (rect) {
-        canvas.width = rect.width;
-        canvas.height = rect.height;
+      if (fullscreen) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      } else {
+        const rect = canvas.parentElement?.getBoundingClientRect();
+        if (rect) {
+          canvas.width = rect.width;
+          canvas.height = rect.height;
+        }
       }
     };
     updateSize();
+
+    window.addEventListener('resize', updateSize);
     
     const animate = () => {
       if (!ctx || !canvas.width || !canvas.height) return;
@@ -169,7 +192,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         ctx.strokeStyle = timeOfDay === 'night' 
           ? 'rgba(120, 160, 210, 0.5)' // Cooler blue at night
           : 'rgba(90, 140, 190, 0.45)'; // Muted cool blue during day
-        ctx.lineWidth = 2.2; // Thicker raindrops
+        ctx.lineWidth = 2.8;
         
         particlesRef.current.forEach(p => {
           const x = (p.x / 100) * canvas.width;
@@ -178,7 +201,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           ctx.globalAlpha = p.opacity;
           ctx.beginPath();
           ctx.moveTo(x, y);
-          ctx.lineTo(x - 2, y + p.size * 6); // Longer drops
+          ctx.lineTo(x - 2, y + p.size * 8);
           ctx.stroke();
           
           // Update position
@@ -274,34 +297,113 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         // Clear weather: sun or stars based on time of day
         
         if (timeOfDay === 'night') {
-          // NIGHT: Navy tint + many visible twinkling stars
-          
-          // Strong navy/cool blue tint (clearly night, NOT gray)
-          ctx.globalAlpha = 0.16;
-          ctx.fillStyle = 'rgba(12, 22, 55, 1)'; // Deep navy
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
-          // Render stars: stationary, twinkle via alpha, soft muted yellow
+          // NIGHT: Just big bright twinkling stars, no overlay
+
           starsRef.current.forEach(star => {
             const x = (star.x / 100) * canvas.width;
             const y = (star.y / 100) * canvas.height;
-            
-            // Gentle slow twinkle (sine-based alpha, varied phase)
-            const twinkle = 0.5 + 0.5 * Math.sin(Date.now() * star.speed + star.id * 7);
+
+            // Gentle twinkle — never goes below 0.7 so stars always visible
+            const twinkle = 0.75 + 0.25 * Math.sin(Date.now() * star.speed + star.id * 7);
             ctx.globalAlpha = star.opacity * twinkle;
-            
-            // Soft muted yellow star point
-            ctx.fillStyle = 'rgba(255, 245, 200, 1)'; // Soft muted yellow
+
+            // Star point
+            ctx.fillStyle = 'rgba(255, 230, 120, 1)';
             ctx.beginPath();
-            ctx.arc(x, y, star.size, 0, Math.PI * 2);
+            ctx.arc(x, y, star.size * 1.4, 0, Math.PI * 2);
             ctx.fill();
-            
-            // Minimal subtle warm halo for glow
-            ctx.globalAlpha = star.opacity * twinkle * 0.12;
-            ctx.fillStyle = 'rgba(255, 240, 180, 1)'; // Warmer yellow halo
+
+            // Soft glow halo
+            ctx.globalAlpha = star.opacity * twinkle * 0.2;
+            ctx.fillStyle = 'rgba(255, 220, 100, 1)';
             ctx.beginPath();
-            ctx.arc(x, y, star.size * 2, 0, Math.PI * 2);
+            ctx.arc(x, y, star.size * 3, 0, Math.PI * 2);
             ctx.fill();
+          });
+
+          // Shooting stars — spawn a group of 3 every ~8-18 seconds
+          const now = Date.now();
+          if (now - lastShootingStarTime.current > 8000 + Math.random() * 10000) {
+            if (shootingStarsRef.current.length === 0) {
+              shootingStarsRef.current.push(...createShootingStarGroup());
+              lastShootingStarTime.current = now;
+            }
+          }
+
+          // Render and update shooting stars
+          shootingStarsRef.current = shootingStarsRef.current.filter(ss => {
+            ss.x += ss.vx;
+            ss.y += ss.vy;
+            ss.life++;
+
+            const progress = ss.life / ss.maxLife;
+            const alpha = progress < 0.1
+              ? progress / 0.1
+              : progress > 0.7
+                ? (1 - progress) / 0.3
+                : 1;
+
+            const sx = (ss.x / 100) * canvas.width;
+            const sy = (ss.y / 100) * canvas.height;
+            const angle = Math.atan2(ss.vy, ss.vx);
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+
+            // Soft glow tail
+            const tailLen = 80 + ss.size * 25;
+            const tailGrad = ctx.createLinearGradient(
+              sx, sy,
+              sx - cosA * tailLen,
+              sy - sinA * tailLen
+            );
+            tailGrad.addColorStop(0, `rgba(255, 210, 100, ${alpha * 0.7})`);
+            tailGrad.addColorStop(0.3, `rgba(255, 210, 100, ${alpha * 0.2})`);
+            tailGrad.addColorStop(1, 'rgba(255, 210, 100, 0)');
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = tailGrad;
+            ctx.lineWidth = ss.size * 3;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx - cosA * tailLen, sy - sinA * tailLen);
+            ctx.stroke();
+
+            // Core trail
+            const coreLen = 50 + ss.size * 15;
+            const coreGrad = ctx.createLinearGradient(
+              sx, sy,
+              sx - cosA * coreLen,
+              sy - sinA * coreLen
+            );
+            coreGrad.addColorStop(0, `rgba(255, 245, 200, ${alpha})`);
+            coreGrad.addColorStop(0.4, `rgba(255, 230, 140, ${alpha * 0.4})`);
+            coreGrad.addColorStop(1, 'rgba(255, 230, 140, 0)');
+            ctx.strokeStyle = coreGrad;
+            ctx.lineWidth = ss.size * 1.2;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx - cosA * coreLen, sy - sinA * coreLen);
+            ctx.stroke();
+
+            // Head glow
+            ctx.globalAlpha = alpha * 0.3;
+            const headGlow = ctx.createRadialGradient(sx, sy, 0, sx, sy, ss.size * 6);
+            headGlow.addColorStop(0, 'rgba(255, 230, 120, 1)');
+            headGlow.addColorStop(0.5, 'rgba(255, 210, 80, 0.3)');
+            headGlow.addColorStop(1, 'rgba(255, 210, 80, 0)');
+            ctx.fillStyle = headGlow;
+            ctx.beginPath();
+            ctx.arc(sx, sy, ss.size * 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Bright core point
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = 'rgba(255, 250, 220, 1)';
+            ctx.beginPath();
+            ctx.arc(sx, sy, ss.size * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            return ss.life < ss.maxLife;
           });
         } else {
           // MORNING or EVENING: Draw sun disc centered in content area
@@ -340,8 +442,8 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                 innerMid1: 'rgba(255, 235, 150, 0.85)',
                 innerMid2: 'rgba(255, 220, 120, 0.55)',
                 innerEnd: 'rgba(255, 210, 100, 0)',
-                glowAlpha: 0.28,   // Much more visible
-                discAlpha: 0.38,   // Much more visible
+                glowAlpha: 0.15,
+                discAlpha: 0.25,
               }
             : {
                 outerStart: 'rgba(255, 210, 160, 1)',     // Softer golden - less orange
@@ -353,8 +455,8 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                 innerMid1: 'rgba(255, 220, 170, 0.8)',
                 innerMid2: 'rgba(255, 210, 155, 0.5)',
                 innerEnd: 'rgba(255, 200, 140, 0)',
-                glowAlpha: 0.26,   // Slightly reduced for better readability
-                discAlpha: 0.32,   // Slightly reduced for better readability
+                glowAlpha: 0.3,
+                discAlpha: 0.4,
               };
           
           // Outer warm glow (large, soft)
@@ -391,11 +493,12 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
     animate();
     
     return () => {
+      window.removeEventListener('resize', updateSize);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isVisible, category, timeOfDay, contentAreaBounds]);
+  }, [isVisible, category, timeOfDay, contentAreaBounds, fullscreen]);
   
   // Don't render if not visible and idle
   if (!isVisible && phase === 'idle') return null;
@@ -404,12 +507,15 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
   
   return (
     <div
-      className="absolute inset-0 pointer-events-none overflow-hidden rounded-md"
+      className={fullscreen
+        ? "fixed inset-0 pointer-events-none overflow-hidden"
+        : "absolute inset-0 pointer-events-none overflow-hidden rounded-md"
+      }
       style={{
         opacity: opacity,
         transition: 'opacity 500ms ease-in-out',
         backgroundColor: backgroundTint,
-        zIndex: 1,
+        zIndex: fullscreen ? 0 : 1,
       }}
     >
       <canvas

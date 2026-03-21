@@ -1,42 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useJournal } from '@/contexts/JournalContext';
 import Layout from '@/components/Layout';
 import JournalEditor from '@/components/JournalEditor';
-import JournalEntryView from '@/components/JournalEntry';
 import LandingPage from '@/components/landing/LandingPage';
-import DraftsList from '@/components/journal/DraftsList';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, BookOpen } from 'lucide-react';
+import { Plus, Loader2, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useDrafts } from '@/contexts/DraftsContext';
 import { JournalEntry } from '@/types';
-import { SPOTIFY_REDIRECT_KEY } from '@/constants/spotify';
+import DayNavigator from '@/components/day-navigator/DayNavigator';
+import { useIsMobile } from '@/hooks/use-mobile';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 const Index = () => {
   const { authState } = useAuth();
+  const isMobile = useIsMobile();
   const [isWriting, setIsWriting] = useState(false);
   const [editingDraft, setEditingDraft] = useState<JournalEntry | null>(null);
-  const location = useLocation();
-  
+
   const journalContext = useJournal();
-  const entries = authState.user ? (journalContext?.entries || []) : [];
   const isLoading = authState.user ? (journalContext?.isLoading || false) : false;
-  
+
   const { drafts, isLoadingDrafts, deleteDraft } = useDrafts();
-  
-  // Check for Spotify redirect to restore editor
-  useEffect(() => {
-    if (authState.user && !isWriting) {
-      const redirectSource = localStorage.getItem(SPOTIFY_REDIRECT_KEY);
-      if (redirectSource === 'journal_editor') {
-        localStorage.removeItem(SPOTIFY_REDIRECT_KEY);
-        setIsWriting(true);
-      }
-    }
-  }, [authState.user, location, isWriting]);
-  
+
   const handleCreateNewEntry = () => {
     setEditingDraft(null);
     setIsWriting(true);
@@ -73,91 +63,101 @@ const Index = () => {
     );
   }
 
-  const sortedEntries = [...entries].sort((a, b) => 
-    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-  );
+  if (isWriting) {
+    return (
+      <Layout>
+        <div className="fixed inset-0 flex flex-col" style={{ paddingTop: isMobile ? 56 : 64 }}>
+          <div className="flex-1 overflow-y-auto">
+            <div className="w-full max-w-3xl mx-auto px-6 md:px-16 pt-10 pb-24">
+              <JournalEditor
+                initialDraft={editingDraft || undefined}
+                onComplete={handleFinishWriting}
+              />
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex items-center justify-between mb-10"
-        >
-          <h1 className="font-display text-4xl text-foreground font-semibold">Journal</h1>
-          
-          {!isWriting && (
-            <Button 
-              onClick={handleCreateNewEntry} 
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-5"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Entry
-            </Button>
-          )}
-        </motion.div>
-        
-        {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : isWriting ? (
-          <JournalEditor 
-            initialDraft={editingDraft || undefined} 
-            onComplete={handleFinishWriting} 
-          />
-        ) : (
-          <>
-            {/* Drafts Section */}
-            <DraftsList
-              drafts={drafts}
-              onEditDraft={handleEditDraft}
-              onDeleteDraft={handleDeleteDraft}
-              isLoading={isLoadingDrafts}
-            />
+      {/* Day Navigator — full viewport experience */}
+      <DayNavigator />
 
-            {/* Published Entries */}
-            {sortedEntries.length > 0 ? (
-              <div className="space-y-6">
-                {sortedEntries.map((entry, index) => (
-                  <motion.div
-                    key={entry.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: index * 0.05 }}
-                  >
-                    <JournalEntryView entry={entry} />
-                  </motion.div>
-                ))}
-              </div>
-            ) : drafts.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="text-center py-20"
+      {/* Floating action buttons */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+        {/* Drafts button (if drafts exist) */}
+        {drafts.length > 0 && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="rounded-full h-11 px-4 bg-card/90 backdrop-blur-sm border-border shadow-md gap-2"
               >
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
-                  <BookOpen className="h-7 w-7 text-primary" />
-                </div>
-                <h2 className="font-display text-2xl mb-3 text-primary">Start your journal</h2>
-                <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-                  Capture your thoughts, moods, and the music you're listening to. 
-                  Your future self will thank you.
-                </p>
-                <Button 
-                  onClick={handleCreateNewEntry}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6"
-                >
-                  Write Your First Entry
-                </Button>
-              </motion.div>
-            ) : null}
-          </>
+                <FileText className="h-4 w-4" />
+                Drafts
+                <span className="text-xs bg-primary/10 text-primary rounded-full px-1.5 py-0.5 font-medium">
+                  {drafts.length}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-0">
+              <div className="p-3 border-b border-border">
+                <p className="text-sm font-medium">Drafts</p>
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {drafts.map((draft) => {
+                  const preview = draft.content
+                    ? draft.content.replace(/<[^>]*>/g, '').slice(0, 60)
+                    : 'Empty draft';
+                  return (
+                    <div
+                      key={draft.id}
+                      className="flex items-center justify-between px-3 py-2 hover:bg-accent/50 cursor-pointer border-b border-border/50 last:border-0"
+                      onClick={() => handleEditDraft(draft.id)}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm truncate">{preview || 'Empty draft'}</p>
+                        <p className="text-xs text-muted-foreground">{draft.date}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 ml-2 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDraft(draft.id);
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
         )}
+
+        {/* New Entry FAB */}
+        <Button
+          onClick={handleCreateNewEntry}
+          className="rounded-full h-14 w-14 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg"
+        >
+          <Plus className="h-6 w-6" />
+          <span className="sr-only">New Entry</span>
+        </Button>
       </div>
     </Layout>
   );

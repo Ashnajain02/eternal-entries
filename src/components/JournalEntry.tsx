@@ -6,7 +6,7 @@ import { useJournal } from '@/contexts/JournalContext';
 import JournalEditorInline from './journal/JournalEditorInline';
 import { useToast } from '@/hooks/use-toast';
 import CommentSection from './CommentSection';
-import SpotifyClipPlayer from './spotify/SpotifyClipPlayer';
+import TrackClipPlayer from './music/TrackClipPlayer';
 import ReflectionModule from './journal/ReflectionModule';
 import EntryActions from './journal/EntryActions';
 import InteractiveContent from './journal/InteractiveContent';
@@ -21,11 +21,13 @@ import {
   deriveWeatherCategory,
   deriveTimeOfDay,
 } from './journal/weather-overlay';
+import EntryPageLayout from './shared/EntryPageLayout';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
   className?: string;
   isPreview?: boolean;
+  isFullView?: boolean;
 }
 
 // Mood labels without emojis
@@ -42,13 +44,15 @@ const moodLabels: Record<Mood, string> = {
   'tired': 'Tired'
 };
 
-const JournalEntryView: React.FC<JournalEntryProps> = ({ 
-  entry, 
+const JournalEntryView: React.FC<JournalEntryProps> = ({
+  entry,
   className,
-  isPreview = false
+  isPreview = false,
+  isFullView = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [hasClickedToPlay, setHasClickedToPlay] = useState(false);
+  const [weatherEnabled, setWeatherEnabled] = useState(true);
   const [localContent, setLocalContent] = useState(entry.content);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntryContent } = useJournal();
   const { toast } = useToast();
@@ -241,18 +245,106 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     );
   }
 
+  // --- Full-View Layout (editorial journal page) ---
+  if (isFullView) {
+    const blurStyle = {
+      filter: shouldBlurContent ? 'blur(4px)' : 'blur(0px)',
+      opacity: shouldBlurContent ? 0.6 : 1,
+      transition: 'filter 0.8s ease, opacity 0.8s ease',
+    };
+
+    return (
+      <EntryPageLayout
+        date={entry.date}
+        timestamp={entry.timestamp}
+        mood={entry.mood}
+        weather={entry.weather}
+        weatherEnabled={weatherEnabled}
+        onWeatherToggle={() => setWeatherEnabled(prev => !prev)}
+        formatTemperature={formatTemperature}
+        actions={!isPreview ? (
+          <EntryActions
+            onEdit={() => setIsEditing(true)}
+            onDelete={handleDelete}
+          />
+        ) : undefined}
+        footer={!isPreview ? (
+          <div style={blurStyle}>
+            <div className="pb-4">
+              <ReflectionModule
+                entryId={entry.id}
+                entryContent={entry.content}
+                entryMood={entry.mood}
+                entryTrack={entry.track}
+                reflectionQuestion={entry.reflectionQuestion || null}
+                reflectionAnswer={entry.reflectionAnswer || null}
+                onReflectionUpdate={handleReflectionUpdate}
+              />
+            </div>
+            <div className="pb-6 pt-2">
+              <CommentSection
+                comments={entry.comments || []}
+                onAddComment={handleAddComment}
+                onDeleteComment={handleDeleteComment}
+              />
+            </div>
+          </div>
+        ) : undefined}
+        className={className}
+      >
+        {/* Spotify Track */}
+        {entry.track && (
+          <div className="mb-8">
+            <TrackClipPlayer
+              track={entry.track}
+              entryId={entry.id}
+              clipStartSeconds={entry.track.clipStartSeconds}
+              clipEndSeconds={entry.track.clipEndSeconds}
+              onPlayStateChange={(playing) => {
+                if (playing) setHasClickedToPlay(true);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Entry content */}
+        <div className="relative">
+          <div
+            ref={contentRef}
+            className="text-[1.1rem] leading-[1.9] text-foreground/90"
+            style={blurStyle}
+          >
+            <InteractiveContent
+              content={localContent}
+              onContentChange={!isPreview ? handleContentChange : undefined}
+              disabled={isPreview}
+            />
+          </div>
+          {shouldBlurContent && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="bg-card/80 backdrop-blur-sm border border-border/50 px-5 py-2.5 rounded-full text-sm text-muted-foreground">
+                Play the song to read
+              </div>
+            </div>
+          )}
+        </div>
+      </EntryPageLayout>
+    );
+  }
+
+  // --- Card Layout (used on Memories page, etc.) ---
   return (
-    <motion.article 
+    <motion.article
       ref={articleRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
       className={cn(
-        "bg-card border border-border rounded-md overflow-hidden relative",
+        "overflow-hidden relative bg-card border border-border rounded-md",
         className
       )}
     >
-      {/* Weather Overlay - only renders when playing */}
+      {/* Weather Overlay */}
       {weatherCategory && (
         <WeatherOverlay
           category={weatherCategory}
@@ -263,7 +355,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           contentAreaBounds={contentAreaBounds}
         />
       )}
-      {/* Header - Mobile Layout */}
+
+      {/* Header — Mobile */}
       <div className="sm:hidden px-4 py-4 border-b border-border">
         <div className="flex items-start justify-between mb-2">
           <div>
@@ -271,113 +364,57 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
             <p className="text-sm text-muted-foreground">{formattedYear}</p>
           </div>
           {!isPreview && (
-            <EntryActions
-              onEdit={() => setIsEditing(true)}
-              onDelete={handleDelete}
-            />
+            <EntryActions onEdit={() => setIsEditing(true)} onDelete={handleDelete} />
           )}
         </div>
-        
-        {/* Mood tag + View weather button grouped together */}
         <div className="flex items-center gap-2 mt-3">
           <span className="px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
             {moodLabels[entry.mood] || entry.mood}
           </span>
           {!isPreview && weatherCategory && (
-            <WeatherAnimationButton
-              isPlaying={isWeatherPlaying}
-              onClick={playWeatherAnimation}
-              disabled={Boolean(entry.track && !hasClickedToPlay)}
-            />
+            <WeatherAnimationButton isPlaying={isWeatherPlaying} onClick={playWeatherAnimation} disabled={Boolean(entry.track && !hasClickedToPlay)} />
           )}
         </div>
-        
         {entry.weather && (
           <div className="flex items-center gap-2 text-sm mt-2 text-muted-foreground flex-wrap">
-            {formattedTime && (
-              <>
-                <span>{formattedTime}</span>
-                <span>·</span>
-              </>
-            )}
+            {formattedTime && (<><span>{formattedTime}</span><span>·</span></>)}
             <span>{formatTemperature(entry.weather.temperature)}</span>
-            {entry.weather.description && (
-              <>
-                <span>·</span>
-                <span className="capitalize">{entry.weather.description}</span>
-              </>
-            )}
-            {entry.weather.location && (
-              <>
-                <span>·</span>
-                <span>{entry.weather.location}</span>
-              </>
-            )}
+            {entry.weather.description && (<><span>·</span><span className="capitalize">{entry.weather.description}</span></>)}
+            {entry.weather.location && (<><span>·</span><span>{entry.weather.location}</span></>)}
           </div>
         )}
-        {/* Show time even without weather */}
         {!entry.weather && formattedTime && (
-          <div className="flex items-center gap-2 text-sm mt-2 text-muted-foreground">
-            <span>{formattedTime}</span>
-          </div>
+          <div className="text-sm mt-2 text-muted-foreground">{formattedTime}</div>
         )}
       </div>
 
-      {/* Header - Desktop Layout */}
+      {/* Header — Desktop */}
       <div className="hidden sm:block px-6 py-5 border-b border-border">
         <div className="flex items-start justify-between">
-          {/* Left: Date, Year, Time, Weather info */}
           <div>
             <h3 className="font-display text-2xl font-semibold leading-tight text-foreground">{formattedDate}</h3>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-sm text-muted-foreground">{formattedYear}</span>
-              {formattedTime && (
-                <>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="text-sm text-muted-foreground">{formattedTime}</span>
-                </>
-              )}
+            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+              <span>{formattedYear}</span>
+              {formattedTime && (<><span>·</span><span>{formattedTime}</span></>)}
               {entry.weather && (
                 <>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="text-sm text-muted-foreground">{formatTemperature(entry.weather.temperature)}</span>
-                  {entry.weather.description && (
-                    <>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="text-sm text-muted-foreground capitalize">{entry.weather.description}</span>
-                    </>
-                  )}
-                  {entry.weather.location && (
-                    <>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="text-sm text-muted-foreground">{entry.weather.location}</span>
-                    </>
-                  )}
+                  <span>·</span><span>{formatTemperature(entry.weather.temperature)}</span>
+                  {entry.weather.description && (<><span>·</span><span className="capitalize">{entry.weather.description}</span></>)}
+                  {entry.weather.location && (<><span>·</span><span>{entry.weather.location}</span></>)}
                 </>
               )}
             </div>
-            
-            {/* Mood tag + View weather button grouped together */}
             <div className="flex items-center gap-2 mt-2">
               <span className="px-2.5 py-0.5 text-xs rounded-full bg-primary/10 text-primary border border-primary/20">
                 {moodLabels[entry.mood] || entry.mood}
               </span>
               {!isPreview && weatherCategory && (
-                <WeatherAnimationButton
-                  isPlaying={isWeatherPlaying}
-                  onClick={playWeatherAnimation}
-                  disabled={Boolean(entry.track && !hasClickedToPlay)}
-                />
+                <WeatherAnimationButton isPlaying={isWeatherPlaying} onClick={playWeatherAnimation} disabled={Boolean(entry.track && !hasClickedToPlay)} />
               )}
             </div>
           </div>
-          
-          {/* Right: Actions */}
           {!isPreview && (
-            <EntryActions
-              onEdit={() => setIsEditing(true)}
-              onDelete={handleDelete}
-            />
+            <EntryActions onEdit={() => setIsEditing(true)} onDelete={handleDelete} />
           )}
         </div>
       </div>
@@ -385,72 +422,36 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
       {/* Spotify Track */}
       {entry.track && (
         <div className="px-6 py-4 border-b border-border bg-accent/20">
-          <SpotifyClipPlayer 
+          <TrackClipPlayer
             track={entry.track}
             entryId={entry.id}
             clipStartSeconds={entry.track.clipStartSeconds}
             clipEndSeconds={entry.track.clipEndSeconds}
-            onPlayStateChange={(playing) => {
-              if (playing) setHasClickedToPlay(true);
-            }}
+            onPlayStateChange={(playing) => { if (playing) setHasClickedToPlay(true); }}
           />
         </div>
       )}
-      
+
       {/* Content */}
       <div className="relative">
-        <div
-          ref={contentRef}
-          className="px-6 py-6"
-          style={{
-            filter: shouldBlurContent ? 'blur(4px)' : 'blur(0px)',
-            opacity: shouldBlurContent ? 0.6 : 1,
-            transition: 'filter 0.8s ease, opacity 0.8s ease',
-          }}
-        >
-          <InteractiveContent 
-            content={localContent}
-            onContentChange={!isPreview ? handleContentChange : undefined}
-            disabled={isPreview}
-          />
+        <div ref={contentRef} className="px-6 py-6" style={{ filter: shouldBlurContent ? 'blur(4px)' : 'blur(0px)', opacity: shouldBlurContent ? 0.6 : 1, transition: 'filter 0.8s ease, opacity 0.8s ease' }}>
+          <InteractiveContent content={localContent} onContentChange={!isPreview ? handleContentChange : undefined} disabled={isPreview} />
         </div>
-        
         {shouldBlurContent && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="bg-card border border-border px-5 py-2.5 rounded-full text-sm text-muted-foreground shadow-sm">
-              Play the song to read
-            </div>
+            <div className="bg-card border border-border px-5 py-2.5 rounded-full text-sm text-muted-foreground shadow-sm">Play the song to read</div>
           </div>
         )}
       </div>
 
       {/* Reflection & Comments */}
       {!isPreview && (
-        <div
-          style={{
-            filter: shouldBlurContent ? 'blur(4px)' : 'blur(0px)',
-            opacity: shouldBlurContent ? 0.6 : 1,
-            transition: 'filter 0.8s ease, opacity 0.8s ease',
-          }}
-        >
+        <div style={{ filter: shouldBlurContent ? 'blur(4px)' : 'blur(0px)', opacity: shouldBlurContent ? 0.6 : 1, transition: 'filter 0.8s ease, opacity 0.8s ease' }}>
           <div className="px-6 pb-4">
-            <ReflectionModule
-              entryId={entry.id}
-              entryContent={entry.content}
-              entryMood={entry.mood}
-              entryTrack={entry.track}
-              reflectionQuestion={entry.reflectionQuestion || null}
-              reflectionAnswer={entry.reflectionAnswer || null}
-              onReflectionUpdate={handleReflectionUpdate}
-            />
+            <ReflectionModule entryId={entry.id} entryContent={entry.content} entryMood={entry.mood} entryTrack={entry.track} reflectionQuestion={entry.reflectionQuestion || null} reflectionAnswer={entry.reflectionAnswer || null} onReflectionUpdate={handleReflectionUpdate} />
           </div>
-
           <div className="px-6 pb-6 pt-2 border-t border-border">
-            <CommentSection
-              comments={entry.comments || []}
-              onAddComment={handleAddComment}
-              onDeleteComment={handleDeleteComment}
-            />
+            <CommentSection comments={entry.comments || []} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />
           </div>
         </div>
       )}

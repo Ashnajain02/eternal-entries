@@ -1,0 +1,163 @@
+import React from 'react';
+import { format, parseISO } from 'date-fns';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { WeatherData, Mood } from '@/types';
+import {
+  WeatherOverlay,
+  deriveWeatherCategory,
+  deriveTimeOfDay,
+} from '@/components/journal/weather-overlay';
+
+// Mood labels
+const moodLabels: Record<Mood, string> = {
+  'happy': 'Happy', 'content': 'Content', 'neutral': 'Neutral',
+  'sad': 'Sad', 'anxious': 'Anxious', 'angry': 'Angry',
+  'emotional': 'Emotional', 'in-love': 'In Love',
+  'excited': 'Excited', 'tired': 'Tired',
+};
+
+interface EntryPageLayoutProps {
+  // Date/time
+  date: string;         // YYYY-MM-DD
+  timestamp?: string;   // ISO string
+  // Metadata
+  mood?: Mood;
+  weather?: WeatherData;
+  // Weather overlay
+  weatherEnabled?: boolean;
+  onWeatherToggle?: () => void;
+  // Temperature formatting
+  formatTemperature?: (celsius: number) => string;
+  // Top-right actions slot
+  actions?: React.ReactNode;
+  // Additional metadata line content
+  metadataExtra?: React.ReactNode;
+  // Content sections
+  children: React.ReactNode;
+  // Below-content sections (reflection, comments, etc.)
+  footer?: React.ReactNode;
+  // Styling
+  className?: string;
+}
+
+const EntryPageLayout: React.FC<EntryPageLayoutProps> = ({
+  date,
+  timestamp,
+  mood,
+  weather,
+  weatherEnabled = true,
+  onWeatherToggle,
+  formatTemperature: formatTemp,
+  actions,
+  metadataExtra,
+  children,
+  footer,
+  className,
+}) => {
+  const parseDate = (dateValue: string) => {
+    return dateValue.includes('T') ? parseISO(dateValue) : parseISO(`${dateValue}T00:00:00.000Z`);
+  };
+
+  const entryDateTime = timestamp ? parseDate(timestamp) : parseDate(date);
+  const formattedDate = format(entryDateTime, 'EEEE, MMMM d');
+  const formattedYear = format(entryDateTime, 'yyyy');
+  const formattedTime = timestamp ? format(parseDate(timestamp), 'h:mm a') : '';
+
+  const weatherCategory = weather?.description ? deriveWeatherCategory(weather.description) : null;
+  const timeOfDay = deriveTimeOfDay(timestamp || date);
+
+  const defaultFormatTemp = (celsius: number) => {
+    const f = (celsius * 9 / 5) + 32;
+    return `${Math.round(f)}°F`;
+  };
+  const tempFormatter = formatTemp || defaultFormatTemp;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className={cn("relative", className)}
+    >
+      {/* Weather Overlay — fullscreen background */}
+      {weatherCategory && (
+        <WeatherOverlay
+          category={weatherCategory}
+          timeOfDay={timeOfDay}
+          isVisible={weatherEnabled}
+          opacity={weatherEnabled ? 1 : 0}
+          phase={weatherEnabled ? 'playing' : 'idle'}
+          fullscreen
+        />
+      )}
+
+      {/* Page content */}
+      <div className="relative z-10">
+        {/* Actions — top right */}
+        {actions && (
+          <div className="flex justify-end mb-6">
+            {actions}
+          </div>
+        )}
+
+        {/* Date — centered hero */}
+        <div className="text-center mb-4">
+          <h1 className="font-display text-4xl md:text-5xl font-normal text-foreground tracking-tight leading-tight">
+            {formattedDate}
+          </h1>
+        </div>
+
+        {/* Metadata line */}
+        <p className="text-center text-sm text-muted-foreground/70 mb-3">
+          {formattedYear}
+          {formattedTime && <> &middot; {formattedTime}</>}
+          {weather && (
+            <>
+              {' '}&middot; {tempFormatter(weather.temperature)}
+              {weather.description && <> &middot; <span className="capitalize">{weather.description}</span></>}
+              {weather.location && <> &middot; {weather.location}</>}
+            </>
+          )}
+          {metadataExtra}
+        </p>
+
+        {/* Mood + weather toggle — centered */}
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/50 tracking-widest uppercase mb-6">
+          {mood && <span>{moodLabels[mood] || mood}</span>}
+          {weatherCategory && onWeatherToggle && (
+            <>
+              {mood && <span className="opacity-40">&middot;</span>}
+              <button
+                onClick={onWeatherToggle}
+                className="hover:text-muted-foreground transition-colors"
+              >
+                {weatherEnabled ? 'Weather on' : 'Weather off'}
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="flex justify-center mb-10">
+          <div className="w-12 h-px bg-border" />
+        </div>
+
+        {/* Main content */}
+        {children}
+
+        {/* Footer (reflection, comments, etc.) */}
+        {footer && (
+          <>
+            <div className="flex justify-center my-10">
+              <div className="w-12 h-px bg-border" />
+            </div>
+            {footer}
+          </>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+export default EntryPageLayout;
