@@ -194,14 +194,6 @@
     @apply w-8 h-8 text-muted-foreground;
   }
   
-  .spotify-button {
-    @apply bg-primary text-primary-foreground transition-all duration-300;
-  }
-
-  .spotify-button:hover {
-    opacity: 0.9;
-  }
-
   /* Elevated card style */
   .elevated-card {
     @apply bg-card border rounded-md;

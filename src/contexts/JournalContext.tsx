@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { JournalEntry, Mood, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,9 +21,6 @@ interface JournalContextType {
   searchEntries: (query: string) => JournalEntry[];
   addCommentToEntry: (entryId: string, content: string) => Promise<void>;
   deleteCommentFromEntry: (entryId: string, commentId: string) => Promise<void>;
-  sortedUniqueDates: string[];
-  getNextEntryDay: (currentDate: string) => string | null;
-  getPrevEntryDay: (currentDate: string) => string | null;
   getRandomEntries: (count: number) => JournalEntry[];
   isLoading: boolean;
   statsData: {
@@ -171,24 +168,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     
     return { totalEntries, moodCounts, longestStreak, mostCommonTime };
   }, [entries]);
-
-  // Sorted unique dates (descending — newest first) for day navigation
-  const sortedUniqueDates = useMemo(() => {
-    const dates = [...new Set(entries.map(e => e.date))];
-    return dates.sort((a, b) => b.localeCompare(a));
-  }, [entries]);
-
-  const getNextEntryDay = useCallback((currentDate: string): string | null => {
-    const idx = sortedUniqueDates.indexOf(currentDate);
-    if (idx <= 0) return null; // already at newest or not found
-    return sortedUniqueDates[idx - 1];
-  }, [sortedUniqueDates]);
-
-  const getPrevEntryDay = useCallback((currentDate: string): string | null => {
-    const idx = sortedUniqueDates.indexOf(currentDate);
-    if (idx === -1 || idx >= sortedUniqueDates.length - 1) return null; // at oldest or not found
-    return sortedUniqueDates[idx + 1];
-  }, [sortedUniqueDates]);
 
   const getRandomEntries = useCallback((count: number): JournalEntry[] => {
     const today = new Date().toISOString().split('T')[0];
@@ -490,9 +469,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     searchEntries,
     addCommentToEntry,
     deleteCommentFromEntry,
-    sortedUniqueDates,
-    getNextEntryDay,
-    getPrevEntryDay,
     getRandomEntries,
     isLoading,
     statsData
