@@ -430,38 +430,43 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           // Different sun colors for morning vs evening
           const isMorning = timeOfDay === 'morning';
           
-          // Morning: brighter yellow sun | Evening: darker golden yellow
+          // Morning: bright yellow sun | Evening: larger, darker golden sun
           const sunColors = isMorning
             ? {
-                outerStart: 'rgba(255, 235, 140, 1)',     // Warm yellow
-                outerMid1: 'rgba(255, 225, 120, 0.7)',
-                outerMid2: 'rgba(255, 215, 100, 0.4)',
-                outerMid3: 'rgba(255, 205, 85, 0.15)',
-                outerEnd: 'rgba(255, 195, 70, 0)',
-                innerStart: 'rgba(255, 245, 180, 1)',     // Bright warm center
-                innerMid1: 'rgba(255, 235, 150, 0.85)',
-                innerMid2: 'rgba(255, 220, 120, 0.55)',
-                innerEnd: 'rgba(255, 210, 100, 0)',
-                glowAlpha: 0.15,
-                discAlpha: 0.25,
+                outerStart: 'rgba(255, 240, 140, 1)',     // Warm bright yellow
+                outerMid1: 'rgba(255, 230, 120, 0.8)',
+                outerMid2: 'rgba(255, 220, 100, 0.5)',
+                outerMid3: 'rgba(255, 210, 85, 0.2)',
+                outerEnd: 'rgba(255, 200, 70, 0)',
+                innerStart: 'rgba(255, 250, 200, 1)',     // Bright warm center
+                innerMid1: 'rgba(255, 240, 160, 0.9)',
+                innerMid2: 'rgba(255, 230, 130, 0.65)',
+                innerEnd: 'rgba(255, 215, 100, 0)',
+                glowAlpha: 0.25,
+                discAlpha: 0.4,
+                radiusScale: 1.4,
               }
             : {
-                outerStart: 'rgba(255, 210, 160, 1)',     // Softer golden - less orange
-                outerMid1: 'rgba(255, 200, 150, 0.6)',
-                outerMid2: 'rgba(255, 190, 140, 0.35)',
-                outerMid3: 'rgba(255, 180, 130, 0.15)',
-                outerEnd: 'rgba(255, 170, 120, 0)',
-                innerStart: 'rgba(255, 230, 190, 1)',     // Lighter golden center
-                innerMid1: 'rgba(255, 220, 170, 0.8)',
-                innerMid2: 'rgba(255, 210, 155, 0.5)',
-                innerEnd: 'rgba(255, 200, 140, 0)',
-                glowAlpha: 0.3,
-                discAlpha: 0.4,
+                outerStart: 'rgba(240, 185, 110, 1)',      // Warm golden
+                outerMid1: 'rgba(235, 170, 100, 0.75)',
+                outerMid2: 'rgba(225, 160, 90, 0.45)',
+                outerMid3: 'rgba(215, 150, 80, 0.2)',
+                outerEnd: 'rgba(205, 140, 70, 0)',
+                innerStart: 'rgba(250, 210, 150, 1)',     // Brighter amber center
+                innerMid1: 'rgba(245, 195, 130, 0.9)',
+                innerMid2: 'rgba(235, 180, 110, 0.6)',
+                innerEnd: 'rgba(225, 170, 100, 0)',
+                glowAlpha: 0.4,
+                discAlpha: 0.55,
+                radiusScale: 1.4,
               };
           
+          // Scale radius for evening (larger sun)
+          const scaledRadius = sunRadius * (sunColors.radiusScale || 1);
+
           // Outer warm glow (large, soft)
           ctx.globalAlpha = sunColors.glowAlpha * pulse;
-          const outerGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius * 3);
+          const outerGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, scaledRadius * 3);
           outerGlow.addColorStop(0, sunColors.outerStart);
           outerGlow.addColorStop(0.25, sunColors.outerMid1);
           outerGlow.addColorStop(0.5, sunColors.outerMid2);
@@ -469,19 +474,19 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           outerGlow.addColorStop(1, sunColors.outerEnd);
           ctx.fillStyle = outerGlow;
           ctx.beginPath();
-          ctx.arc(sunX, sunY, sunRadius * 3, 0, Math.PI * 2);
+          ctx.arc(sunX, sunY, scaledRadius * 3, 0, Math.PI * 2);
           ctx.fill();
-          
-          // Inner sun disc (muted warm)
+
+          // Inner sun disc
           ctx.globalAlpha = sunColors.discAlpha * pulse;
-          const sunDisc = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius);
+          const sunDisc = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, scaledRadius);
           sunDisc.addColorStop(0, sunColors.innerStart);
           sunDisc.addColorStop(0.4, sunColors.innerMid1);
           sunDisc.addColorStop(0.7, sunColors.innerMid2);
           sunDisc.addColorStop(1, sunColors.innerEnd);
           ctx.fillStyle = sunDisc;
           ctx.beginPath();
-          ctx.arc(sunX, sunY, sunRadius * 1.2, 0, Math.PI * 2);
+          ctx.arc(sunX, sunY, scaledRadius * 1.2, 0, Math.PI * 2);
           ctx.fill();
         }
       }
