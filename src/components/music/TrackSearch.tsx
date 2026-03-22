@@ -3,6 +3,7 @@ import { SpotifyTrack } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Search, Music, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TrackSearchProps {
   isOpen: boolean;
@@ -38,11 +39,11 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ isOpen, onClose, onTrackSelec
     debounceRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const response = await fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=8`
-        );
-        const data = await response.json();
-        setResults(data.results || []);
+        const { data, error } = await supabase.functions.invoke('itunes-search', {
+          body: { query, limit: 8 },
+        });
+        if (error) throw error;
+        setResults(data?.results || []);
       } catch (error) {
         console.error('iTunes search error:', error);
         setResults([]);
