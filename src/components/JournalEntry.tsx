@@ -28,6 +28,8 @@ interface JournalEntryProps {
   className?: string;
   isPreview?: boolean;
   isFullView?: boolean;
+  initialWeatherEnabled?: boolean;
+  shouldPauseMusic?: boolean;
 }
 
 // Mood labels without emojis
@@ -49,10 +51,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   className,
   isPreview = false,
   isFullView = false,
+  initialWeatherEnabled,
+  shouldPauseMusic,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [hasClickedToPlay, setHasClickedToPlay] = useState(false);
-  const [weatherEnabled, setWeatherEnabled] = useState(true);
+  const [weatherEnabled, setWeatherEnabled] = useState(initialWeatherEnabled ?? true);
   const [localContent, setLocalContent] = useState(entry.content);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntryContent } = useJournal();
   const { toast } = useToast();
@@ -229,9 +233,12 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     // This callback is kept for compatibility
   };
 
-  const handleSpotifyPlayerClick = () => {
-    setHasClickedToPlay(true);
-  };
+  // Sync weather with intersection observer from parent
+  useEffect(() => {
+    if (initialWeatherEnabled !== undefined) {
+      setWeatherEnabled(initialWeatherEnabled);
+    }
+  }, [initialWeatherEnabled]);
   
   // For published entries, we use inline editing via the existing edit mode
   // The JournalEditor is now only for new entries/drafts
@@ -297,9 +304,9 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
           <div className="mb-8">
             <TrackClipPlayer
               track={entry.track}
-              entryId={entry.id}
               clipStartSeconds={entry.track.clipStartSeconds}
               clipEndSeconds={entry.track.clipEndSeconds}
+              shouldPause={shouldPauseMusic}
               onPlayStateChange={(playing) => {
                 if (playing) setHasClickedToPlay(true);
               }}
@@ -424,7 +431,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         <div className="px-6 py-4 border-b border-border bg-accent/20">
           <TrackClipPlayer
             track={entry.track}
-            entryId={entry.id}
             clipStartSeconds={entry.track.clipStartSeconds}
             clipEndSeconds={entry.track.clipEndSeconds}
             onPlayStateChange={(playing) => { if (playing) setHasClickedToPlay(true); }}

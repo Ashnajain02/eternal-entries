@@ -3,6 +3,7 @@ import { SpotifyTrack } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Music, X } from 'lucide-react';
 import TrackSearch from './TrackSearch';
+import TrackClipPlayer from './TrackClipPlayer';
 
 interface MusicSectionProps {
   selectedTrack: SpotifyTrack | null | undefined;
@@ -30,27 +31,18 @@ const MusicSection: React.FC<MusicSectionProps> = ({ selectedTrack, onTrackSelec
   return (
     <div>
       {selectedTrack ? (
-        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
-          {selectedTrack.albumArt ? (
-            <img
-              src={selectedTrack.albumArt}
-              alt={selectedTrack.album}
-              className="h-12 w-12 object-cover rounded-sm"
-            />
-          ) : (
-            <div className="h-12 w-12 bg-muted flex items-center justify-center rounded-sm">
-              <Music className="h-6 w-6 text-muted-foreground" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">{selectedTrack.name}</p>
-            <p className="text-sm text-muted-foreground truncate">
-              {selectedTrack.artist} &middot; {selectedTrack.album}
-            </p>
+        <div className="space-y-3">
+          <TrackClipPlayer
+            track={selectedTrack}
+            clipStartSeconds={selectedTrack.clipStartSeconds}
+            clipEndSeconds={selectedTrack.clipEndSeconds}
+          />
+          <div className="flex justify-end">
+            <Button variant="ghost" size="sm" onClick={handleRemove} className="text-muted-foreground text-xs h-7">
+              <X className="h-3 w-3 mr-1" />
+              Remove song
+            </Button>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleRemove} className="h-8 w-8 shrink-0">
-            <X className="h-4 w-4" />
-          </Button>
         </div>
       ) : (
         <Button
