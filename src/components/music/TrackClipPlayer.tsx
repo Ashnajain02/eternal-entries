@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { SpotifyTrack } from '@/types';
 import { Play, Pause, Music, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ interface TrackClipPlayerProps {
   clipEndSeconds?: number;
   className?: string;
   onPlayStateChange?: (isPlaying: boolean) => void;
+  shouldPause?: boolean;
 }
 
 const formatTime = (seconds: number): string => {
@@ -24,9 +25,18 @@ const TrackClipPlayer: React.FC<TrackClipPlayerProps> = ({
   clipEndSeconds = 30,
   className,
   onPlayStateChange,
+  shouldPause,
 }) => {
   const { isPlaying, isLoading, position, playClip, pause } = useAudioPlayer();
   const previewUrl = track.uri; // uri field stores the preview URL
+
+  // Auto-pause when shouldPause becomes true
+  useEffect(() => {
+    if (shouldPause && isPlaying) {
+      pause();
+      onPlayStateChange?.(false);
+    }
+  }, [shouldPause]);
 
   // Check if this is a playable preview URL (not an old spotify:track: URI)
   const isPlayable = previewUrl && previewUrl.startsWith('http');

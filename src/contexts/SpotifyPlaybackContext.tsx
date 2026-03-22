@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 
 // Debug logging
-const DEBUG = true;
+const DEBUG = false;
 const log = (...args: any[]) => DEBUG && console.log('[Spotify]', ...args);
 
 // Detect mobile/iOS
@@ -676,7 +676,7 @@ export const SpotifyPlaybackProvider: React.FC<{ children: React.ReactNode }> = 
       // 3. Create player
       log('🔧 INIT: Creating player...');
       const player = new window.Spotify.Player({
-        name: 'Eternal Entries Journal',
+        name: 'Echo Journal',
         getOAuthToken: async (callback) => {
           // Only fetch token if we're authenticated
           if (!authReady) {

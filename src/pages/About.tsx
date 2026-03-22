@@ -55,7 +55,7 @@ const About = () => {
         >
           <p className="text-sm font-body tracking-[0.2em] uppercase text-muted-foreground mb-3">The story behind</p>
           <h1 className="font-display text-5xl md:text-6xl font-light text-foreground leading-tight">
-            Eternal Entries
+            Echo
           </h1>
         </motion.div>
 
@@ -111,7 +111,7 @@ const About = () => {
               <p>
                 What started as a personal project, just for me, I now want to share with the world. Journaling has
                 been transformative in my life — it has held me through the darkest periods and helped me find light
-                on the other side. I hope Eternal Entries can do the same for you.
+                on the other side. I hope Echo can do the same for you.
               </p>
             </div>
 

@@ -51,7 +51,6 @@ export const useAuthProvider = () => {
     // onAuthStateChange handles all auth state updates including INITIAL_SESSION
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('Auth state change:', event, !!session);
         setAuthState({
           session,
           user: session?.user ?? null,
@@ -62,12 +61,10 @@ export const useAuthProvider = () => {
         // authReady = false when session is null (logged out)
         if (session?.access_token) {
           if (!authReady) {
-            console.log('🔐 AUTH_READY: true (session with access_token)');
             setAuthReady(true);
           }
         } else {
           if (authReady || event === 'SIGNED_OUT') {
-            console.log('🔐 AUTH_READY: false (no session)');
             setAuthReady(false);
           }
         }
@@ -132,8 +129,6 @@ export const useAuthProvider = () => {
   };
 
   const signOut = async () => {
-    console.log('Starting sign out process...');
-
     // Clear local auth state immediately so UI updates right away
     setAuthState({
       session: null,
@@ -165,7 +160,6 @@ export const useAuthProvider = () => {
       forceClearSupabaseAuthStorage();
     }
 
-    console.log('Sign out completed successfully');
     toast({
       title: 'Signed out',
       description: "You've been signed out successfully.",

@@ -32,11 +32,25 @@ const LandingPage: React.FC = () => {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-center"
         >
-          <h1 className="font-display text-6xl md:text-8xl font-normal text-foreground tracking-tight">
-            Eternal Entries
+          <h1 className="font-display text-8xl md:text-[10rem] font-normal text-foreground tracking-tight leading-none flex justify-center">
+            {'Echo'.split('').map((letter, i) => (
+              <motion.span
+                key={i}
+                className="inline-block"
+                animate={{ y: [0, -8, 0, 6, 0] }}
+                transition={{
+                  duration: 4 + i * 0.6,
+                  delay: 1.2 + i * 0.3,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
+              >
+                {letter}
+              </motion.span>
+            ))}
           </h1>
           <p className="mt-4 text-lg text-muted-foreground/70">
-            A private journal that remembers
+            A JOURNALING EXPERIENCE
           </p>
           <div className="mt-10">
             <Link to="/auth?tab=signup">

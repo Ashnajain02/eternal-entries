@@ -70,7 +70,6 @@ const ClipRangeSelector: React.FC<ClipRangeSelectorProps> = ({
 
   // CRITICAL: This handler must be synchronous for mobile gesture chain
   const handlePlayPause = useCallback(() => {
-    console.log('[ClipRangeSelector] handlePlayPause called, isPreviewPlaying:', isPreviewPlaying);
     if (isPreviewPlaying) {
       pauseClip('USER'); // Fire and forget
     } else {

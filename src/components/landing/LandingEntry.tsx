@@ -76,6 +76,7 @@ const LandingEntry: React.FC<LandingEntryProps> = ({ entry }) => {
                   reflectionQuestion={entry.reflectionQuestion || null}
                   reflectionAnswer={entry.reflectionAnswer || null}
                   onReflectionUpdate={handleReflectionUpdate}
+                  demo
                 />
               </div>
               <div className="pb-6 pt-2">
@@ -95,6 +96,7 @@ const LandingEntry: React.FC<LandingEntryProps> = ({ entry }) => {
                 track={entry.track}
                 clipStartSeconds={entry.track.clipStartSeconds}
                 clipEndSeconds={entry.track.clipEndSeconds}
+                shouldPause={!weatherEnabled}
               />
             </div>
           )}

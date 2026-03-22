@@ -93,7 +93,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
             transformedEntries.push(decryptedEntry);
           }
 
-          console.log("Loaded entries with tracks:", transformedEntries.filter(e => e.track).length);
           setEntries(transformedEntries);
           hasLoadedEntriesRef.current = true;
           currentUserIdRef.current = authState.user.id;
@@ -210,7 +209,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     }
 
     // Entry is already in DB (inserted by publishDraft) - just update local state
-    console.log("Adding published entry to local state:", entry.id);
     setEntries(prev => {
       const exists = prev.some(e => e.id === entry.id);
       if (exists) {
@@ -231,8 +229,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     }
 
     try {
-      console.log("Updating entry with track:", updatedEntry.track);
-      
       const now = new Date();
       const encryptedEntry = await encryptJournalEntry(updatedEntry, authState.user.id);
       const payload = buildDbPayload(updatedEntry, encryptedEntry.content);
@@ -476,7 +472,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       comments: []
     };
     
-    console.log(`Creating new entry with date: ${localDate}`);
     return newEntry;
   };
   

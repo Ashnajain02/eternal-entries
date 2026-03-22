@@ -68,7 +68,6 @@ export const getLocationNameFromCoordinates = async (lat: number, lon: number): 
     
     // If these are default coordinates, don't fetch the location name
     if (isDefaultLocation) {
-      console.log('Using default coordinates - not displaying location name');
       return null;
     }
     

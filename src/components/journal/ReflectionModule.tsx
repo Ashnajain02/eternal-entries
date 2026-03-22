@@ -16,6 +16,7 @@ interface ReflectionModuleProps {
   reflectionQuestion: string | null;
   reflectionAnswer: string | null;
   onReflectionUpdate: () => void;
+  demo?: boolean;
 }
 
 const ReflectionModule: React.FC<ReflectionModuleProps> = ({
@@ -25,7 +26,8 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   entryTrack,
   reflectionQuestion,
   reflectionAnswer,
-  onReflectionUpdate
+  onReflectionUpdate,
+  demo = false
 }) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +49,7 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
       } : undefined;
       
       // Use the API service to call the Supabase function
-      const generatedQuestions = await generateReflectionQuestions(entryContent, entryMood, trackInfo);
+      const generatedQuestions = await generateReflectionQuestions(entryContent, entryMood, trackInfo, demo);
       
       setQuestions(generatedQuestions);
       setCurrentQuestionIndex(0);
@@ -83,20 +85,22 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
 
     setIsLoading(true);
     try {
-      const { error } = await supabase
-        .from('journal_entries')
-        .update({
-          reflection_question: currentQuestion,
-          reflection_answer: answer.trim(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', entryId);
+      if (!demo) {
+        const { error } = await supabase
+          .from('journal_entries')
+          .update({
+            reflection_question: currentQuestion,
+            reflection_answer: answer.trim(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', entryId);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       setIsEditing(false);
       onReflectionUpdate();
-      
+
       toast({
         title: 'Reflection saved',
         description: 'Your reflection has been saved successfully.'
@@ -116,23 +120,25 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   const deleteReflection = async () => {
     setIsLoading(true);
     try {
-      const { error } = await supabase
-        .from('journal_entries')
-        .update({
-          reflection_question: null,
-          reflection_answer: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', entryId);
+      if (!demo) {
+        const { error } = await supabase
+          .from('journal_entries')
+          .update({
+            reflection_question: null,
+            reflection_answer: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', entryId);
 
-      if (error) throw error;
-      
+        if (error) throw error;
+      }
+
       setQuestions([]);
       setCurrentQuestionIndex(0);
       setAnswer('');
       setShowModule(false);
       onReflectionUpdate();
-      
+
       toast({
         title: 'Reflection deleted',
         description: 'Your reflection has been deleted successfully.'

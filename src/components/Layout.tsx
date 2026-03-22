@@ -38,7 +38,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="fixed inset-x-0 top-0 border-b border-border/50 bg-background/80 backdrop-blur-sm z-50">
         <div className="container px-4 flex items-center justify-between h-14 md:h-16">
           <Link to="/" className="font-display text-lg md:text-xl tracking-tight text-foreground">
-            Eternal Entries
+            Echo
           </Link>
           
           <div className="flex items-center gap-2 md:gap-6">
