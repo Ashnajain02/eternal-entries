@@ -39,6 +39,10 @@ serve(async (req) => {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
 
+  if (req.method !== "GET") {
+    return json({ error: "Method not allowed" }, 405);
+  }
+
   try {
     // Extract bearer token
     const authHeader = req.headers.get("Authorization") || "";
@@ -195,10 +199,11 @@ serve(async (req) => {
     };
 
     // ── This week / month / year ──
-    const nowMs = Date.now();
+    const nowDate = new Date();
+    const nowMs = nowDate.getTime();
     const weekAgo = nowMs - 7 * 86400000;
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    const yearStart = new Date(now.getFullYear(), 0, 1).getTime();
+    const monthStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).getTime();
+    const yearStart = new Date(nowDate.getFullYear(), 0, 1).getTime();
 
     let entriesThisWeek = 0;
     let entriesThisMonth = 0;
@@ -395,6 +400,7 @@ serve(async (req) => {
         mostCommonLocation: topLocation
           ? { location: topLocation[0], count: topLocation[1] }
           : null,
+        distribution: weatherCounts,
       },
       writing: {
         totalWords,

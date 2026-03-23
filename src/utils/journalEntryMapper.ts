@@ -1,7 +1,8 @@
-import { JournalEntry, Mood, SpotifyTrack, WeatherData } from '@/types';
+import { JournalEntry, Mood, MusicTrack, WeatherData } from '@/types';
 
 /**
- * Database row type from journal_entries table
+ * Database row type from journal_entries table.
+ * Column names still use `spotify_` prefix for backward compatibility with the DB schema.
  */
 interface JournalEntryRow {
   id: string;
@@ -28,39 +29,45 @@ interface JournalEntryRow {
 }
 
 /**
- * Maps a Spotify track from database columns to a SpotifyTrack object
+ * Maps music track columns from a DB row to a MusicTrack object.
+ * The `uri` field stores an Apple Music preview URL (or a legacy spotify:track: URI).
  */
-function mapSpotifyTrack(row: JournalEntryRow): SpotifyTrack | undefined {
+function mapTrack(row: JournalEntryRow): MusicTrack | undefined {
   if (!row.spotify_track_uri) return undefined;
-  
+
+  // For legacy Spotify URIs (spotify:track:abc123), extract the ID.
+  // For iTunes preview URLs, use the trackId stored in spotify_track_uri or derive from URL.
+  const uri = row.spotify_track_uri;
+  const id = uri.startsWith('spotify:') ? (uri.split(':').pop() || '') : uri;
+
   return {
-    id: row.spotify_track_uri.split(':').pop() || '',
+    id,
     name: row.spotify_track_name || '',
     artist: row.spotify_track_artist || '',
     album: row.spotify_track_album || '',
     albumArt: row.spotify_track_image || '',
-    uri: row.spotify_track_uri,
+    uri,
     clipStartSeconds: row.spotify_clip_start_seconds ?? 0,
-    clipEndSeconds: row.spotify_clip_end_seconds ?? 30
+    clipEndSeconds: row.spotify_clip_end_seconds ?? 30,
   };
 }
 
 /**
- * Maps weather data from database columns to a WeatherData object
+ * Maps weather columns from a DB row to a WeatherData object.
  */
-function mapWeatherData(row: JournalEntryRow): WeatherData | undefined {
+function mapWeather(row: JournalEntryRow): WeatherData | undefined {
   if (row.weather_temperature === null) return undefined;
-  
+
   return {
     temperature: row.weather_temperature,
     description: row.weather_description || '',
     icon: row.weather_icon || '',
-    location: row.weather_location || ''
+    location: row.weather_location || '',
   };
 }
 
 /**
- * Maps a database row to a JournalEntry object
+ * Maps a full database row to a JournalEntry.
  */
 export function mapDbRowToJournalEntry(row: JournalEntryRow): JournalEntry {
   return {
@@ -69,19 +76,20 @@ export function mapDbRowToJournalEntry(row: JournalEntryRow): JournalEntry {
     date: new Date(row.timestamp_started).toISOString().split('T')[0],
     timestamp: row.timestamp_started,
     mood: row.mood as Mood,
-    weather: mapWeatherData(row),
-    track: mapSpotifyTrack(row),
+    weather: mapWeather(row),
+    track: mapTrack(row),
     createdAt: new Date(row.created_at).getTime(),
     updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : undefined,
     user_id: row.user_id,
     comments: [],
     reflectionQuestion: row.reflection_question || undefined,
-    reflectionAnswer: row.reflection_answer || undefined
+    reflectionAnswer: row.reflection_answer || undefined,
   };
 }
 
 /**
- * Builds the database update/insert payload from a JournalEntry
+ * Builds the database insert/update payload from a JournalEntry.
+ * Column names use `spotify_` prefix for DB backward compatibility.
  */
 export function buildDbPayload(entry: JournalEntry, encryptedContent: string) {
   return {
@@ -97,19 +105,21 @@ export function buildDbPayload(entry: JournalEntry, encryptedContent: string) {
     weather_temperature: entry.weather?.temperature ?? null,
     weather_description: entry.weather?.description || null,
     weather_icon: entry.weather?.icon || null,
-    weather_location: entry.weather?.location || null
+    weather_location: entry.weather?.location || null,
+    reflection_question: entry.reflectionQuestion || null,
+    reflection_answer: entry.reflectionAnswer || null,
   };
 }
 
 /**
- * Strips HTML tags from content to get plain text
+ * Strips HTML tags from content to get plain text.
  */
 export function getPlainTextContent(htmlContent: string): string {
   return htmlContent?.replace(/<[^>]*>/g, '').trim() || '';
 }
 
 /**
- * Checks if an entry has meaningful content worth saving
+ * Checks if an entry has meaningful content worth saving.
  */
 export function hasMeaningfulContent(entry: JournalEntry): boolean {
   const textContent = getPlainTextContent(entry.content);

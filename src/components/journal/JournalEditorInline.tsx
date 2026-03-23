@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { JournalEntry } from '@/types';
+import { getPlainTextContent } from '@/utils/journalEntryMapper';
 import { useJournal } from '@/contexts/JournalContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -37,8 +38,7 @@ const JournalEditorInline: React.FC<JournalEditorInlineProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
-    const textContent = content.replace(/<[^>]*>/g, '').trim();
-    if (!textContent) {
+    if (!getPlainTextContent(content)) {
       toast({
         title: "Cannot save empty entry",
         description: "Please write something in your journal before saving.",
@@ -67,9 +67,7 @@ const JournalEditorInline: React.FC<JournalEditorInlineProps> = ({
   };
 
   const handleCancel = () => {
-    const textContent = content.replace(/<[^>]*>/g, '').trim();
-    const originalContent = initialEntry.content.replace(/<[^>]*>/g, '').trim();
-    if (textContent !== originalContent) {
+    if (getPlainTextContent(content) !== getPlainTextContent(initialEntry.content)) {
       const confirmCancel = window.confirm("You have unsaved changes. Discard them?");
       if (!confirmCancel) return;
     }

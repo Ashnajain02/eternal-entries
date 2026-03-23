@@ -139,45 +139,40 @@ export const getWeatherForLocation = async (lat: number, lon: number): Promise<W
 };
 
 /**
- * Maps Open-Meteo weather codes to descriptions and icons
- * @param weatherCode The weather code from Open-Meteo API
- * @returns Object with description and icon
+ * Maps Open-Meteo weather codes to descriptions and icons.
+ * https://open-meteo.com/en/docs
  */
+const WEATHER_CODE_MAP: Record<number, { description: string; icon: string }> = {
+  0:  { description: 'Clear sky',              icon: 'cloud-sun' },
+  1:  { description: 'Mainly clear',           icon: 'cloud-sun' },
+  2:  { description: 'Partly cloudy',          icon: 'cloud' },
+  3:  { description: 'Overcast',               icon: 'cloud' },
+  45: { description: 'Fog',                    icon: 'cloud' },
+  48: { description: 'Fog',                    icon: 'cloud' },
+  51: { description: 'Drizzle',                icon: 'droplet' },
+  53: { description: 'Drizzle',                icon: 'droplet' },
+  55: { description: 'Drizzle',                icon: 'droplet' },
+  56: { description: 'Freezing Drizzle',       icon: 'thermometer-snowflake' },
+  57: { description: 'Freezing Drizzle',       icon: 'thermometer-snowflake' },
+  61: { description: 'Rain',                   icon: 'cloud-rain' },
+  63: { description: 'Rain',                   icon: 'cloud-rain' },
+  65: { description: 'Rain',                   icon: 'cloud-rain' },
+  66: { description: 'Freezing Rain',          icon: 'cloud-rain' },
+  67: { description: 'Freezing Rain',          icon: 'cloud-rain' },
+  71: { description: 'Snow',                   icon: 'thermometer-snowflake' },
+  73: { description: 'Snow',                   icon: 'thermometer-snowflake' },
+  75: { description: 'Snow',                   icon: 'thermometer-snowflake' },
+  77: { description: 'Snow grains',            icon: 'thermometer-snowflake' },
+  80: { description: 'Rain showers',           icon: 'cloud-rain' },
+  81: { description: 'Rain showers',           icon: 'cloud-rain' },
+  82: { description: 'Rain showers',           icon: 'cloud-rain' },
+  85: { description: 'Snow showers',           icon: 'thermometer-snowflake' },
+  86: { description: 'Snow showers',           icon: 'thermometer-snowflake' },
+  95: { description: 'Thunderstorm',           icon: 'cloud-lightning' },
+  96: { description: 'Thunderstorm with hail', icon: 'cloud-lightning' },
+  99: { description: 'Thunderstorm with hail', icon: 'cloud-lightning' },
+};
+
 const mapWeatherCode = (weatherCode: number): { description: string; icon: string } => {
-  // Weather code mapping based on Open-Meteo documentation
-  // https://open-meteo.com/en/docs
-  switch (true) {
-    case weatherCode === 0:
-      return { description: 'Clear sky', icon: 'cloud-sun' };
-    case weatherCode === 1:
-      return { description: 'Mainly clear', icon: 'cloud-sun' };
-    case weatherCode === 2:
-      return { description: 'Partly cloudy', icon: 'cloud' };
-    case weatherCode === 3:
-      return { description: 'Overcast', icon: 'cloud' };
-    case [45, 48].includes(weatherCode):
-      return { description: 'Fog', icon: 'cloud' };
-    case [51, 53, 55].includes(weatherCode):
-      return { description: 'Drizzle', icon: 'droplet' };
-    case [56, 57].includes(weatherCode):
-      return { description: 'Freezing Drizzle', icon: 'thermometer-snowflake' };
-    case [61, 63, 65].includes(weatherCode):
-      return { description: 'Rain', icon: 'cloud-rain' };
-    case [66, 67].includes(weatherCode):
-      return { description: 'Freezing Rain', icon: 'cloud-rain' };
-    case [71, 73, 75].includes(weatherCode):
-      return { description: 'Snow', icon: 'thermometer-snowflake' };
-    case [77].includes(weatherCode):
-      return { description: 'Snow grains', icon: 'thermometer-snowflake' };
-    case [80, 81, 82].includes(weatherCode):
-      return { description: 'Rain showers', icon: 'cloud-rain' };
-    case [85, 86].includes(weatherCode):
-      return { description: 'Snow showers', icon: 'thermometer-snowflake' };
-    case [95].includes(weatherCode):
-      return { description: 'Thunderstorm', icon: 'cloud-moon-rain' };
-    case [96, 99].includes(weatherCode):
-      return { description: 'Thunderstorm with hail', icon: 'cloud-moon-rain' };
-    default:
-      return { description: 'Unknown', icon: 'cloud' };
-  }
+  return WEATHER_CODE_MAP[weatherCode] ?? { description: 'Unknown', icon: 'cloud' };
 };

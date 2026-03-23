@@ -1,23 +1,18 @@
 import React, { useMemo, useEffect } from 'react';
-import { SpotifyTrack } from '@/types';
+import { MusicTrack } from '@/types';
 import { Play, Pause, Music, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
+import { formatTime } from '@/utils/formatTime';
 
 interface TrackClipPlayerProps {
-  track: SpotifyTrack;
+  track: MusicTrack;
   clipStartSeconds?: number;
   clipEndSeconds?: number;
   className?: string;
   onPlayStateChange?: (isPlaying: boolean) => void;
   shouldPause?: boolean;
 }
-
-const formatTime = (seconds: number): string => {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-};
 
 const TrackClipPlayer: React.FC<TrackClipPlayerProps> = ({
   track,

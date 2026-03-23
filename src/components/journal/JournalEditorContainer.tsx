@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { JournalEntry } from '@/types';
+import { getPlainTextContent } from '@/utils/journalEntryMapper';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -79,8 +80,7 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   }, [content, selectedMood, selectedTrack, weatherData]);
 
   const handlePublish = async () => {
-    const textContent = content.replace(/<[^>]*>/g, '').trim();
-    if (!textContent) {
+    if (!getPlainTextContent(content)) {
       toast({
         title: "Cannot publish empty entry",
         description: "Please write something in your journal before publishing.",
@@ -93,8 +93,7 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   };
 
   const handleDelete = async () => {
-    const textContent = content.replace(/<[^>]*>/g, '').trim();
-    const hasContent = textContent || selectedTrack || selectedMood !== 'neutral';
+    const hasContent = getPlainTextContent(content) || selectedTrack || selectedMood !== 'neutral';
     if (hasContent) {
       const confirmDelete = window.confirm("Are you sure you want to delete this entry? This cannot be undone.");
       if (!confirmDelete) return;
@@ -104,8 +103,7 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   };
 
   const handleSaveAndClose = () => {
-    const textContent = content.replace(/<[^>]*>/g, '').trim();
-    const hasContent = textContent || selectedTrack || selectedMood !== 'neutral';
+    const hasContent = getPlainTextContent(content) || selectedTrack || selectedMood !== 'neutral';
     if (hasContent) {
       toast({ title: "Draft saved", description: "Your entry has been saved as a draft." });
     }

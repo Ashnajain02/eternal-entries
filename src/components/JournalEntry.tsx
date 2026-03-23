@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { format, parseISO } from 'date-fns';
-import { JournalEntry as JournalEntryType, Mood } from '@/types';
+import { format } from 'date-fns';
+import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditorInline from './journal/JournalEditorInline';
@@ -22,6 +22,9 @@ import {
   deriveTimeOfDay,
 } from './journal/weather-overlay';
 import EntryPageLayout from './shared/EntryPageLayout';
+import { moodLabels } from '@/constants/moods';
+import { parseDate } from '@/utils/dateUtils';
+import { formatTemperature } from '@/utils/temperature';
 
 interface JournalEntryProps {
   entry: JournalEntryType;
@@ -32,19 +35,6 @@ interface JournalEntryProps {
   shouldPauseMusic?: boolean;
 }
 
-// Mood labels without emojis
-const moodLabels: Record<Mood, string> = {
-  'happy': 'Happy',
-  'content': 'Content',
-  'neutral': 'Neutral',
-  'sad': 'Sad',
-  'anxious': 'Anxious',
-  'angry': 'Angry',
-  'emotional': 'Emotional',
-  'in-love': 'In Love',
-  'excited': 'Excited',
-  'tired': 'Tired'
-};
 
 const JournalEntryView: React.FC<JournalEntryProps> = ({
   entry,
@@ -175,28 +165,8 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
     return Boolean(entry.track && !hasClickedToPlay);
   }, [userProfile?.disable_song_blur, entry.track, hasClickedToPlay]);
 
-  // Format temperature based on user preference (stored as Celsius)
-  const formatTemperature = (celsius: number): string => {
-    const useCelsius = userProfile?.temperature_unit === 'celsius';
-    
-    if (useCelsius) {
-      return `${Math.round(celsius)}°C`;
-    } else {
-      const fahrenheit = (celsius * 9/5) + 32;
-      return `${Math.round(fahrenheit)}°F`;
-    }
-  };
-  
-  const parseDate = (dateValue: string | number) => {
-    if (!dateValue) return new Date();
-    if (typeof dateValue === 'number') return new Date(dateValue);
-    if (typeof dateValue === 'string') {
-      return dateValue.includes('T') 
-        ? parseISO(dateValue) 
-        : parseISO(`${dateValue}T00:00:00.000Z`);
-    }
-    return new Date(dateValue);
-  };
+  const formatTemp = (celsius: number) =>
+    formatTemperature(celsius, userProfile?.temperature_unit);
   
   const entryDateTime = entry.timestamp 
     ? parseDate(entry.timestamp)
@@ -268,7 +238,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         weather={entry.weather}
         weatherEnabled={weatherEnabled}
         onWeatherToggle={() => setWeatherEnabled(prev => !prev)}
-        formatTemperature={formatTemperature}
+        formatTemperature={formatTemp}
         actions={!isPreview ? (
           <EntryActions
             onEdit={() => setIsEditing(true)}
@@ -385,7 +355,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
         {entry.weather && (
           <div className="flex items-center gap-2 text-sm mt-2 text-muted-foreground flex-wrap">
             {formattedTime && (<><span>{formattedTime}</span><span>·</span></>)}
-            <span>{formatTemperature(entry.weather.temperature)}</span>
+            <span>{formatTemp(entry.weather.temperature)}</span>
             {entry.weather.description && (<><span>·</span><span className="capitalize">{entry.weather.description}</span></>)}
             {entry.weather.location && (<><span>·</span><span>{entry.weather.location}</span></>)}
           </div>
@@ -405,7 +375,7 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
               {formattedTime && (<><span>·</span><span>{formattedTime}</span></>)}
               {entry.weather && (
                 <>
-                  <span>·</span><span>{formatTemperature(entry.weather.temperature)}</span>
+                  <span>·</span><span>{formatTemp(entry.weather.temperature)}</span>
                   {entry.weather.description && (<><span>·</span><span className="capitalize">{entry.weather.description}</span></>)}
                   {entry.weather.location && (<><span>·</span><span>{entry.weather.location}</span></>)}
                 </>

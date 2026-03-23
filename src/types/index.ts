@@ -15,7 +15,7 @@ export interface WeatherData {
   location: string;
 }
 
-export interface SpotifyTrack {
+export interface MusicTrack {
   id: string;
   name: string;
   artist: string;
@@ -26,6 +26,9 @@ export interface SpotifyTrack {
   clipStartSeconds?: number;
   clipEndSeconds?: number;
 }
+
+/** @deprecated Use MusicTrack instead */
+export type SpotifyTrack = MusicTrack;
 
 export interface JournalComment {
   id: string;
@@ -41,7 +44,7 @@ export interface JournalEntry {
   timestamp: string;
   mood: Mood;
   weather?: WeatherData;
-  track?: SpotifyTrack;
+  track?: MusicTrack;
   createdAt: number;
   updatedAt?: number;
   user_id?: string;

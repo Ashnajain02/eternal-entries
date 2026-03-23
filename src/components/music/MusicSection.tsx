@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
-import { SpotifyTrack } from '@/types';
+import { MusicTrack } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Music, X } from 'lucide-react';
 import TrackSearch from './TrackSearch';
 import TrackClipPlayer from './TrackClipPlayer';
 
 interface MusicSectionProps {
-  selectedTrack: SpotifyTrack | null | undefined;
-  onTrackSelect: (track: SpotifyTrack | undefined) => void;
+  selectedTrack: MusicTrack | null | undefined;
+  onTrackSelect: (track: MusicTrack | undefined) => void;
 }
 
 const MusicSection: React.FC<MusicSectionProps> = ({ selectedTrack, onTrackSelect }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  const handleTrackSelect = (track: SpotifyTrack) => {
+  const handleTrackSelect = (track: MusicTrack) => {
     // Default clip: 0 to 30 seconds (or full preview if shorter)
     const durationSeconds = track.durationMs ? Math.floor(track.durationMs / 1000) : 30;
     const clipEnd = Math.min(30, durationSeconds);

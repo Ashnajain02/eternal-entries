@@ -1,5 +1,5 @@
 import React from 'react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { WeatherData, Mood } from '@/types';
@@ -8,14 +8,9 @@ import {
   deriveWeatherCategory,
   deriveTimeOfDay,
 } from '@/components/journal/weather-overlay';
-
-// Mood labels
-const moodLabels: Record<Mood, string> = {
-  'happy': 'Happy', 'content': 'Content', 'neutral': 'Neutral',
-  'sad': 'Sad', 'anxious': 'Anxious', 'angry': 'Angry',
-  'emotional': 'Emotional', 'in-love': 'In Love',
-  'excited': 'Excited', 'tired': 'Tired',
-};
+import { moodLabels } from '@/constants/moods';
+import { parseDate } from '@/utils/dateUtils';
+import { formatTemperature } from '@/utils/temperature';
 
 interface EntryPageLayoutProps {
   // Date/time
@@ -55,10 +50,6 @@ const EntryPageLayout: React.FC<EntryPageLayoutProps> = ({
   footer,
   className,
 }) => {
-  const parseDate = (dateValue: string) => {
-    return dateValue.includes('T') ? parseISO(dateValue) : parseISO(`${dateValue}T00:00:00.000Z`);
-  };
-
   const entryDateTime = timestamp ? parseDate(timestamp) : parseDate(date);
   const formattedDate = format(entryDateTime, 'EEEE, MMMM d');
   const formattedYear = format(entryDateTime, 'yyyy');
@@ -67,11 +58,7 @@ const EntryPageLayout: React.FC<EntryPageLayoutProps> = ({
   const weatherCategory = weather?.description ? deriveWeatherCategory(weather.description) : null;
   const timeOfDay = deriveTimeOfDay(timestamp || date);
 
-  const defaultFormatTemp = (celsius: number) => {
-    const f = (celsius * 9 / 5) + 32;
-    return `${Math.round(f)}°F`;
-  };
-  const tempFormatter = formatTemp || defaultFormatTemp;
+  const tempFormatter = formatTemp || ((celsius: number) => formatTemperature(celsius));
 
   return (
     <motion.div

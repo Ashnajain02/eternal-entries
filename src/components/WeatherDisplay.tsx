@@ -2,12 +2,10 @@
 import React from 'react';
 import { WeatherData } from '@/types';
 import { cn } from '@/lib/utils';
-import { 
-  CloudSun, 
-  CloudRain, 
-  ThermometerSun, 
-  ThermometerSnowflake, 
-  Droplet, 
+import {
+  CloudSun,
+  CloudRain,
+  Droplet,
   CloudMoonRain,
   Cloud,
   RefreshCw,
@@ -17,9 +15,8 @@ import {
   CloudLightning
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { useTemperatureUnit } from '@/hooks/useTemperatureUnit';
+import { formatTemperature } from '@/utils/temperature';
 
 interface WeatherDisplayProps {
   weatherData: WeatherData | null;
@@ -28,70 +25,30 @@ interface WeatherDisplayProps {
   onRefresh?: () => void;
 }
 
-const WeatherDisplay: React.FC<WeatherDisplayProps> = ({ 
-  weatherData, 
+const ICON_CLASS = "h-5 w-5 text-muted-foreground";
+
+const WEATHER_ICONS: Record<string, React.ReactNode> = {
+  'cloud-sun': <CloudSun className={ICON_CLASS} />,
+  'cloud-rain': <CloudRain className={ICON_CLASS} />,
+  'thermometer-sun': <Sun className={ICON_CLASS} />,
+  'thermometer-snowflake': <Snowflake className={ICON_CLASS} />,
+  'droplet': <Droplet className={ICON_CLASS} />,
+  'cloud-moon-rain': <CloudMoonRain className={ICON_CLASS} />,
+  'cloud-lightning': <CloudLightning className={ICON_CLASS} />,
+  'cloud': <Cloud className={ICON_CLASS} />,
+};
+
+const getWeatherIcon = (iconName: string) =>
+  WEATHER_ICONS[iconName] ?? WEATHER_ICONS['cloud'];
+
+const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
+  weatherData,
   isLoading,
-  className, 
+  className,
   onRefresh
 }) => {
-  const { authState } = useAuth();
-
-  // Get user's temperature unit preference
-  const { data: userProfile } = useQuery({
-    queryKey: ['temperature-settings', authState.user?.id],
-    queryFn: async () => {
-      if (!authState.user) return null;
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('temperature_unit')
-        .eq('id', authState.user.id)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching temperature preferences:', error);
-        return null;
-      }
-      
-      return data;
-    },
-    enabled: !!authState.user
-  });
-
-  const getWeatherIcon = (iconName: string) => {
-    const iconClass = "h-5 w-5 text-muted-foreground";
-    switch (iconName) {
-      case 'cloud-sun':
-        return <CloudSun className={iconClass} />;
-      case 'cloud-rain':
-        return <CloudRain className={iconClass} />;
-      case 'thermometer-sun':
-        return <Sun className={iconClass} />;
-      case 'thermometer-snowflake':
-        return <Snowflake className={iconClass} />;
-      case 'droplet':
-        return <Droplet className={iconClass} />;
-      case 'cloud-moon-rain':
-        return <CloudMoonRain className={iconClass} />;
-      case 'cloud-lightning':
-        return <CloudLightning className={iconClass} />;
-      default:
-        return <Cloud className={iconClass} />;
-    }
-  };
-
-  // Convert temperature based on user preference
-  // Default to Fahrenheit for unauthenticated users or users without preference set
-  const formatTemperature = (celsius: number): string => {
-    const useCelsius = userProfile?.temperature_unit === 'celsius';
-    
-    if (useCelsius) {
-      return `${Math.round(celsius)}°C`;
-    } else {
-      const fahrenheit = (celsius * 9/5) + 32;
-      return `${Math.round(fahrenheit)}°F`;
-    }
-  };
+  const temperatureUnit = useTemperatureUnit();
+  const formatTemp = (celsius: number) => formatTemperature(celsius, temperatureUnit);
 
   if (isLoading) {
     return (
@@ -124,7 +81,7 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
       {getWeatherIcon(weatherData.icon)}
       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <span className="font-medium text-foreground">
-          {formatTemperature(weatherData.temperature)}
+          {formatTemp(weatherData.temperature)}
         </span>
         {weatherData.description && (
           <>

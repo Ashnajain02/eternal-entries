@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { JournalEntry as JournalEntryType } from '@/types';
+import { JournalEntry as JournalEntryType, JournalComment } from '@/types';
 import EntryPageLayout from '@/components/shared/EntryPageLayout';
 import TrackClipPlayer from '@/components/music/TrackClipPlayer';
 import InteractiveContent from '@/components/journal/InteractiveContent';
 import ReflectionModule from '@/components/journal/ReflectionModule';
 import CommentSection from '@/components/CommentSection';
-import { JournalComment } from '@/types';
+import { formatTemperature } from '@/utils/temperature';
 
 interface LandingEntryProps {
   entry: JournalEntryType;
@@ -49,10 +49,7 @@ const LandingEntry: React.FC<LandingEntryProps> = ({ entry }) => {
   // No-op reflection update (demo mode)
   const handleReflectionUpdate = useCallback(async () => {}, []);
 
-  const formatTemp = (celsius: number) => {
-    const f = (celsius * 9 / 5) + 32;
-    return `${Math.round(f)}°F`;
-  };
+  const formatTemp = (celsius: number) => formatTemperature(celsius);
 
   return (
     <div ref={containerRef} className="min-h-screen flex items-center justify-center py-20">

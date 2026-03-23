@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { encryptJournalEntry, decryptJournalEntry } from '@/utils/encryption';
-import { mapDbRowToJournalEntry, buildDbPayload, hasMeaningfulContent } from '@/utils/journalEntryMapper';
+import { mapDbRowToJournalEntry, buildDbPayload, hasMeaningfulContent, getPlainTextContent } from '@/utils/journalEntryMapper';
 
 interface DraftsContextType {
   drafts: JournalEntry[];
@@ -64,7 +64,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
       }
       
       setDrafts(decryptedDrafts);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading drafts:', error);
     } finally {
       setIsLoadingDrafts(false);
@@ -177,7 +177,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
       setLastAutoSave(new Date());
 
       return savedId;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving draft:', error);
       return null;
     }
@@ -237,11 +237,11 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
         title: "Draft deleted",
         description: "Your draft has been permanently deleted."
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting draft:', error);
       toast({
         title: "Error deleting draft",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: "destructive"
       });
     }
@@ -250,8 +250,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
   const publishDraft = useCallback(async (entry: JournalEntry, addToContext: (entry: JournalEntry) => Promise<void>) => {
     if (!authState.user) return;
 
-    const textContent = entry.content?.replace(/<[^>]*>/g, '').trim() || '';
-    if (!textContent) {
+    if (!getPlainTextContent(entry.content)) {
       toast({
         title: "Cannot publish empty entry",
         description: "Please write something before publishing.",
@@ -321,11 +320,11 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
         title: "Entry published",
         description: "Your journal entry has been published."
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error publishing draft:', error);
       toast({
         title: "Error publishing entry",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: "destructive"
       });
     }

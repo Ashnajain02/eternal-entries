@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SpotifyTrack } from '@/types';
+import { MusicTrack } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Search, Music, Loader2 } from 'lucide-react';
@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface TrackSearchProps {
   isOpen: boolean;
   onClose: () => void;
-  onTrackSelect: (track: SpotifyTrack) => void;
+  onTrackSelect: (track: MusicTrack) => void;
 }
 
 interface ITunesResult {
@@ -66,13 +66,13 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ isOpen, onClose, onTrackSelec
   }, [isOpen]);
 
   const handleSelect = (result: ITunesResult) => {
-    const track: SpotifyTrack = {
+    const track: MusicTrack = {
       id: String(result.trackId),
       name: result.trackName,
       artist: result.artistName,
       album: result.collectionName,
       albumArt: result.artworkUrl100.replace('100x100', '300x300'),
-      uri: result.previewUrl, // Store preview URL in uri field
+      uri: result.previewUrl,
       durationMs: result.trackTimeMillis,
     };
     onTrackSelect(track);

@@ -93,11 +93,11 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           setEntries(transformedEntries);
           hasLoadedEntriesRef.current = true;
           currentUserIdRef.current = authState.user.id;
-        } catch (error: any) {
-          console.error('Error loading journal entries:', error.message);
+        } catch (error: unknown) {
+          console.error('Error loading journal entries:', error instanceof Error ? error.message : 'An unexpected error occurred');
           toast({
             title: "Error loading journal entries",
-            description: error.message,
+            description: error instanceof Error ? error.message : 'An unexpected error occurred',
             variant: "destructive",
           });
         } finally {
@@ -229,11 +229,11 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         title: "Entry updated",
         description: "Your journal entry has been securely updated",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating journal entry:', error);
       toast({
         title: "Error updating entry",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: "destructive",
       });
       throw error;
@@ -268,7 +268,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       setEntries(prev => prev.map(entry => 
         entry.id === entryId ? { ...entry, content: newContent, updatedAt: now.getTime() } : entry
       ));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating entry content:', error);
       throw error;
     }
@@ -298,11 +298,11 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         title: "Entry deleted",
         description: "Your journal entry has been deleted successfully",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting journal entry:', error);
       toast({
         title: "Error deleting entry",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: "destructive",
       });
       throw error;
@@ -375,11 +375,11 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         title: "Comment added",
         description: "Your note has been added to this journal entry"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding comment:', error);
       toast({
         title: "Error adding comment",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: "destructive",
       });
       throw error;
@@ -426,11 +426,11 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         title: "Note deleted",
         description: "Your note has been deleted successfully"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error deleting comment:', error);
       toast({
         title: "Error deleting note",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: "destructive",
       });
       throw error;

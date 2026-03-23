@@ -13,7 +13,6 @@ import Settings from "./pages/Settings";
 import Habits from "./pages/Habits";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
-// Demo page removed — landing page IS the demo
 import About from "./pages/About";
 import { useVisitLogger } from "./hooks/useVisitLogger";
 const queryClient = new QueryClient();
@@ -35,7 +34,6 @@ const App = () => (
               <BrowserRouter>
                 <Routes>
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/demo" element={<Navigate to="/" replace />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/" element={<Index />} />
                   <Route

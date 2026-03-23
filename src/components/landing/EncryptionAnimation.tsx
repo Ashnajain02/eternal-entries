@@ -102,9 +102,9 @@ const EncryptionAnimation: React.FC = () => {
     : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
   return (
-    <div ref={outerRef} style={{ height: '200vh' }} className="relative">
+    <div ref={outerRef} style={{ height: '180vh' }} className="relative">
       <div className="sticky top-0 h-screen flex flex-col items-center justify-center px-6">
-        <div className="relative w-full max-w-2xl mx-auto" style={{ height: '380px' }}>
+        <div className="relative w-full max-w-2xl mx-auto" style={{ height: '320px' }}>
           {ALL_CHARS.map((c, i) => {
             const tp = textPositions[i] || { x: 0.5, y: 0.5 };
             const lp = lockPositions[i] || { x: 0.5, y: 0.5 };

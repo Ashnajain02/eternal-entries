@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { JournalComment } from '@/types';
+import { parseDate } from '@/utils/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { MessageCircle, Calendar, Clock, ChevronDown, ChevronUp, Trash2, Plus } from 'lucide-react';
@@ -50,18 +51,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({
     }
   };
 
-  // Helper function to parse dates consistently
-  const parseDate = (dateValue: string | number) => {
-    if (!dateValue) return new Date();
-    
-    // Handle both string and number timestamp values
-    if (typeof dateValue === 'number') {
-      return new Date(dateValue);
-    }
-    
-    // Handle string formats (ISO or date-only)
-    return dateValue.includes('T') ? parseISO(dateValue) : parseISO(`${dateValue}T00:00:00.000Z`);
-  };
 
   return (
     <div className={className}>

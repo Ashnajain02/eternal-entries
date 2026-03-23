@@ -6,13 +6,13 @@ import ReflectionQuestion from './reflection/ReflectionQuestion';
 import ReflectionEditor from './reflection/ReflectionEditor';
 import ReflectionDisplay from './reflection/ReflectionDisplay';
 import ReflectionTrigger from './reflection/ReflectionTrigger';
-import { SpotifyTrack } from '@/types';
+import { MusicTrack } from '@/types';
 
 interface ReflectionModuleProps {
   entryId: string;
   entryContent: string;
   entryMood: string;
-  entryTrack?: SpotifyTrack;
+  entryTrack?: MusicTrack;
   reflectionQuestion: string | null;
   reflectionAnswer: string | null;
   onReflectionUpdate: () => void;
