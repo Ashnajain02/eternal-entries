@@ -6,6 +6,7 @@ import Layout from '@/components/Layout';
 import { AccountSettings } from '@/components/settings/AccountSettings';
 import { TemperatureSettings } from '@/components/settings/TemperatureSettings';
 import { BlurSettings } from '@/components/settings/BlurSettings';
+import { ApiSettings } from '@/components/settings/ApiSettings';
 
 const Settings = () => {
   const { authState } = useAuth();
@@ -30,6 +31,7 @@ const Settings = () => {
           <TabsList className="mb-6">
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="display">Display</TabsTrigger>
+            <TabsTrigger value="api">API</TabsTrigger>
           </TabsList>
 
           <TabsContent value="account">
@@ -41,6 +43,10 @@ const Settings = () => {
               <TemperatureSettings />
               <BlurSettings />
             </div>
+          </TabsContent>
+
+          <TabsContent value="api">
+            <ApiSettings />
           </TabsContent>
         </Tabs>
       </div>
