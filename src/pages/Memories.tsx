@@ -4,6 +4,7 @@ import { useJournal } from '@/contexts/JournalContext';
 import ScrollEntry from '@/components/shared/ScrollEntry';
 import Layout from '@/components/Layout';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { getLocalDate, parseDate } from '@/utils/dateUtils';
 
 const Memories: React.FC = () => {
   const isMobile = useIsMobile();
@@ -14,12 +15,12 @@ const Memories: React.FC = () => {
     const now = new Date();
     const month = now.getMonth();
     const day = now.getDate();
-    const todayDate = now.toISOString().split('T')[0];
+    const todayDate = getLocalDate();
 
     return entries
       .filter((e) => {
-        if (e.date === todayDate) return false; // exclude today's entries
-        const d = e.timestamp ? new Date(e.timestamp) : new Date(e.date + 'T00:00:00');
+        if (e.date === todayDate) return false;
+        const d = parseDate(e.timestamp || e.date);
         return d.getMonth() === month && d.getDate() === day;
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

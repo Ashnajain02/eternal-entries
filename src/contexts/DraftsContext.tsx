@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { encryptJournalEntry, decryptJournalEntry } from '@/utils/encryption';
 import { mapDbRowToJournalEntry, buildDbPayload, hasMeaningfulContent, getPlainTextContent } from '@/utils/journalEntryMapper';
+import { getLocalDate, getUtcTimestamp, getUserTimezone } from '@/utils/dateUtils';
 
 interface DraftsContextType {
   drafts: JournalEntry[];
@@ -39,6 +40,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
   const [currentDraft, setCurrentDraft] = useState<JournalEntry | null>(null);
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isPublishingRef = useRef(false);
   const currentDraftIdRef = useRef<string | null>(null);
   const tempIdToRealIdRef = useRef<Record<string, string>>({});
 
@@ -85,8 +87,9 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
     return {
       id: `draft-${Date.now()}`,
       content: '',
-      date: now.toISOString().split('T')[0],
-      timestamp: now.toISOString(),
+      date: getLocalDate(),
+      timestamp: getUtcTimestamp(),
+      timezone: getUserTimezone(),
       mood: 'neutral',
       createdAt: now.getTime(),
     };
@@ -102,6 +105,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
   const saveDraft = useCallback(async (entry: JournalEntry): Promise<string | null> => {
     if (!authState.user) return null;
     if (!hasMeaningfulContent(entry)) return null;
+    if (isPublishingRef.current) return null;
 
     const isTempId = entry.id.startsWith('draft-');
     const tempId = isTempId ? entry.id : null;
@@ -156,6 +160,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
             ...payload,
             status: 'draft',
             timestamp_started: entry.timestamp,
+            timezone: entry.timezone || getUserTimezone(),
             updated_at: new Date().toISOString()
           })
           .select('id, created_at')
@@ -189,6 +194,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
     }
     
     autoSaveTimeoutRef.current = setTimeout(async () => {
+      if (isPublishingRef.current) return;
       const savedId = await saveDraft(entry);
       if (savedId && entry.id.startsWith('draft-') && savedId !== entry.id) {
         onIdChanged?.(savedId);
@@ -262,6 +268,7 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
+    isPublishingRef.current = true;
 
     const realId = entry.id.startsWith('draft-') ? tempIdToRealIdRef.current[entry.id] : null;
     const actualId = realId || entry.id;
@@ -271,28 +278,24 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
       const encryptedEntry = await encryptJournalEntry(entry, authState.user.id);
       const payload = buildDbPayload(entry, encryptedEntry.content);
 
-      if (isNewDraft) {
-        const { data, error } = await supabase
-          .from('journal_entries')
-          .insert([{
-            user_id: authState.user.id,
-            ...payload,
-            status: 'published',
-            timestamp_started: entry.timestamp
-          }])
-          .select()
-          .single();
+      // Always check if a draft row already exists for this timestamp
+      // (auto-save may have created one before tempIdToRealIdRef was updated)
+      let existingId = isNewDraft ? null : actualId;
 
-        if (error) throw error;
-        
-        const publishedEntry: JournalEntry = {
-          ...entry,
-          id: data.id,
-          createdAt: new Date(data.created_at).getTime(),
-        };
-        await addToContext(publishedEntry);
-        setDrafts(prev => prev.filter(d => d.id !== entry.id));
-      } else {
+      if (!existingId) {
+        const { data: existingRow } = await supabase
+          .from('journal_entries')
+          .select('id')
+          .eq('user_id', authState.user.id)
+          .eq('timestamp_started', entry.timestamp)
+          .eq('status', 'draft')
+          .maybeSingle();
+
+        if (existingRow) existingId = existingRow.id;
+      }
+
+      if (existingId) {
+        // Update existing row to published
         const { error } = await supabase
           .from('journal_entries')
           .update({
@@ -300,14 +303,45 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
             status: 'published',
             updated_at: new Date().toISOString()
           })
-          .eq('id', actualId);
+          .eq('id', existingId);
 
         if (error) throw error;
 
-        const publishedEntry: JournalEntry = { ...entry, id: actualId };
+        const publishedEntry: JournalEntry = { ...entry, id: existingId };
         await addToContext(publishedEntry);
-        setDrafts(prev => prev.filter(d => d.id !== actualId && d.id !== entry.id));
+        setDrafts(prev => prev.filter(d => d.id !== existingId && d.id !== entry.id));
+      } else {
+        // No draft exists — insert directly as published
+        const { data, error } = await supabase
+          .from('journal_entries')
+          .insert([{
+            user_id: authState.user.id,
+            ...payload,
+            status: 'published',
+            timestamp_started: entry.timestamp,
+            timezone: entry.timezone || getUserTimezone(),
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        const publishedEntry: JournalEntry = {
+          ...entry,
+          id: data.id,
+          createdAt: new Date(data.created_at).getTime(),
+        };
+        await addToContext(publishedEntry);
+        setDrafts(prev => prev.filter(d => d.id !== entry.id));
       }
+
+      // Clean up any leftover draft rows for this timestamp (race condition safety)
+      await supabase
+        .from('journal_entries')
+        .delete()
+        .eq('user_id', authState.user.id)
+        .eq('timestamp_started', entry.timestamp)
+        .eq('status', 'draft');
 
       if (entry.id.startsWith('draft-')) {
         delete tempIdToRealIdRef.current[entry.id];
@@ -327,6 +361,8 @@ export function DraftsProvider({ children }: { children: React.ReactNode }) {
         description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: "destructive"
       });
+    } finally {
+      isPublishingRef.current = false;
     }
   }, [authState.user, toast]);
 

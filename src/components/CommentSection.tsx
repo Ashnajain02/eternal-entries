@@ -1,8 +1,7 @@
 
 import React, { useState } from 'react';
-import { format } from 'date-fns';
 import { JournalComment } from '@/types';
-import { parseDate } from '@/utils/dateUtils';
+import { formatCommentDate, formatCommentTime } from '@/utils/dateUtils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { MessageCircle, Calendar, Clock, ChevronDown, ChevronUp, Trash2, Plus } from 'lucide-react';
@@ -93,11 +92,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({
                   <div className="flex items-center text-xs text-muted-foreground gap-2">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {format(parseDate(comment.createdAt), 'MMM d, yyyy')}
+                      {formatCommentDate(comment.createdAt)}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {format(parseDate(comment.createdAt), 'h:mm a')}
+                      {formatCommentTime(comment.createdAt)}
                     </span>
                   </div>
                 </div>

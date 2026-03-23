@@ -100,7 +100,7 @@ serve(async (req) => {
     let query = admin
       .from("journal_entries")
       .select(
-        "id, timestamp_started, mood, weather_temperature, weather_description, weather_icon, weather_location, spotify_track_name, spotify_track_artist, spotify_track_album, spotify_track_image, reflection_question, reflection_answer"
+        "id, timestamp_started, timezone, mood, weather_temperature, weather_description, weather_icon, weather_location, spotify_track_name, spotify_track_artist, spotify_track_album, spotify_track_image, reflection_question, reflection_answer"
       )
       .eq("user_id", userId)
       .eq("status", "published")
@@ -125,6 +125,7 @@ serve(async (req) => {
     const result = filtered.map((e) => ({
       id: e.id,
       timestamp: e.timestamp_started,
+      timezone: e.timezone || null,
       date: new Date(e.timestamp_started).toISOString().slice(0, 10),
       mood: e.mood,
       weather: e.weather_description

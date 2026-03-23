@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { format } from 'date-fns';
+// date-fns format no longer needed directly — using centralized dateUtils
 import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
 import { useJournal } from '@/contexts/JournalContext';
@@ -23,7 +23,7 @@ import {
 } from './journal/weather-overlay';
 import EntryPageLayout from './shared/EntryPageLayout';
 import { moodLabels } from '@/constants/moods';
-import { parseDate } from '@/utils/dateUtils';
+import { formatEntryDate, formatEntryYear, formatEntryTime } from '@/utils/dateUtils';
 import { formatTemperature } from '@/utils/temperature';
 
 interface JournalEntryProps {
@@ -168,15 +168,10 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const formatTemp = (celsius: number) =>
     formatTemperature(celsius, userProfile?.temperature_unit);
   
-  const entryDateTime = entry.timestamp 
-    ? parseDate(entry.timestamp)
-    : parseDate(entry.date);
-  
-  const formattedDate = format(entryDateTime, 'EEEE, MMMM d');
-  const formattedYear = format(entryDateTime, 'yyyy');
-  const formattedTime = entry.timestamp 
-    ? format(parseDate(entry.timestamp), 'h:mm a')
-    : '';
+  const dateSource = entry.timestamp || entry.date;
+  const formattedDate = formatEntryDate(dateSource);
+  const formattedYear = formatEntryYear(dateSource);
+  const formattedTime = entry.timestamp ? formatEntryTime(entry.timestamp) : '';
   
   const handleDelete = async () => {
     await deleteEntry(entry.id);

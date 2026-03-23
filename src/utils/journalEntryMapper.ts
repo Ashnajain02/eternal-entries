@@ -1,4 +1,5 @@
 import { JournalEntry, Mood, MusicTrack, WeatherData } from '@/types';
+import { extractLocalDate } from '@/utils/dateUtils';
 
 /**
  * Database row type from journal_entries table.
@@ -11,6 +12,7 @@ interface JournalEntryRow {
   mood: string;
   status: string;
   timestamp_started: string;
+  timezone: string | null;
   created_at: string;
   updated_at: string | null;
   spotify_track_uri: string | null;
@@ -73,8 +75,9 @@ export function mapDbRowToJournalEntry(row: JournalEntryRow): JournalEntry {
   return {
     id: row.id,
     content: row.entry_text,
-    date: new Date(row.timestamp_started).toISOString().split('T')[0],
+    date: extractLocalDate(row.timestamp_started),
     timestamp: row.timestamp_started,
+    timezone: row.timezone || undefined,
     mood: row.mood as Mood,
     weather: mapWeather(row),
     track: mapTrack(row),

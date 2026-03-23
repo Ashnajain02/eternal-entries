@@ -1,5 +1,4 @@
 import React from 'react';
-import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { WeatherData, Mood } from '@/types';
@@ -9,7 +8,7 @@ import {
   deriveTimeOfDay,
 } from '@/components/journal/weather-overlay';
 import { moodLabels } from '@/constants/moods';
-import { parseDate } from '@/utils/dateUtils';
+import { formatEntryDate, formatEntryYear, formatEntryTime } from '@/utils/dateUtils';
 import { formatTemperature } from '@/utils/temperature';
 
 interface EntryPageLayoutProps {
@@ -50,10 +49,10 @@ const EntryPageLayout: React.FC<EntryPageLayoutProps> = ({
   footer,
   className,
 }) => {
-  const entryDateTime = timestamp ? parseDate(timestamp) : parseDate(date);
-  const formattedDate = format(entryDateTime, 'EEEE, MMMM d');
-  const formattedYear = format(entryDateTime, 'yyyy');
-  const formattedTime = timestamp ? format(parseDate(timestamp), 'h:mm a') : '';
+  const dateSource = timestamp || date;
+  const formattedDate = formatEntryDate(dateSource);
+  const formattedYear = formatEntryYear(dateSource);
+  const formattedTime = timestamp ? formatEntryTime(timestamp) : '';
 
   const weatherCategory = weather?.description ? deriveWeatherCategory(weather.description) : null;
   const timeOfDay = deriveTimeOfDay(timestamp || date);

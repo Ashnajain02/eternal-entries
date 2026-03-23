@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { encryptJournalEntry, decryptJournalEntry } from '@/utils/encryption';
 import { mapDbRowToJournalEntry, buildDbPayload } from '@/utils/journalEntryMapper';
+import { getLocalDate, getUtcTimestamp, getUserTimezone } from '@/utils/dateUtils';
 
 interface JournalContextType {
   entries: JournalEntry[];
@@ -170,7 +171,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
   }, [entries]);
 
   const getRandomEntries = useCallback((count: number): JournalEntry[] => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDate();
     const pastEntries = entries.filter(e => e.date !== today);
     if (pastEntries.length === 0) return [];
     const shuffled = [...pastEntries].sort(() => Math.random() - 0.5);
@@ -438,19 +439,17 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
   };
   
   const createNewEntry = (date?: string) => {
-    const now = new Date();
-    const localDate = date || now.toLocaleDateString('en-CA');
-    
     const newEntry: JournalEntry = {
       id: `temp-${Date.now()}`,
       content: '',
-      date: localDate,
-      timestamp: now.toISOString(),
+      date: date || getLocalDate(),
+      timestamp: getUtcTimestamp(),
+      timezone: getUserTimezone(),
       mood: 'neutral',
       createdAt: Date.now(),
       comments: []
     };
-    
+
     return newEntry;
   };
   

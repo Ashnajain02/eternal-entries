@@ -42,6 +42,7 @@ export interface JournalEntry {
   content: string;
   date: string;
   timestamp: string;
+  timezone?: string; // IANA timezone e.g. "America/New_York"
   mood: Mood;
   weather?: WeatherData;
   track?: MusicTrack;

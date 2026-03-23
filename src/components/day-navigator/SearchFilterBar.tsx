@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { JournalEntry } from '@/types';
+import { parseDate } from '@/utils/dateUtils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,7 +39,7 @@ const SearchFilterBar: React.FC<SearchFilterBarProps> = ({ entries, onMatchedEnt
   const years = useMemo(() => {
     return Array.from(
       new Set(entries.map((entry) => {
-        const d = entry.timestamp ? new Date(entry.timestamp) : new Date(entry.date + 'T00:00:00');
+        const d = parseDate(entry.timestamp || entry.date);
         return d.getFullYear();
       }))
     ).sort((a, b) => b - a);
@@ -75,7 +76,7 @@ const SearchFilterBar: React.FC<SearchFilterBarProps> = ({ entries, onMatchedEnt
 
     if (hasMonth || hasDay || hasYear) {
       filtered = filtered.filter(entry => {
-        const d = entry.timestamp ? new Date(entry.timestamp) : new Date(entry.date + 'T00:00:00');
+        const d = parseDate(entry.timestamp || entry.date);
         if (hasMonth && d.getMonth() !== parseInt(selectedMonth!)) return false;
         if (hasDay && d.getDate() !== parseInt(selectedDay!)) return false;
         if (hasYear && d.getFullYear() !== parseInt(selectedYear!)) return false;

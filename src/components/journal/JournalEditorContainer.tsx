@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { getLocalDate, getUtcTimestamp, getUserTimezone } from '@/utils/dateUtils';
 import MusicSection from '@/components/music/MusicSection';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import MoodSelector from '@/components/MoodSelector';
@@ -48,12 +49,11 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
 
   useEffect(() => {
     if (!entry.date || !entry.timestamp) {
-      const now = new Date();
-      const isoDate = now.toISOString().split('T')[0];
       setEntry(prev => ({
         ...prev,
-        date: prev.date || isoDate,
-        timestamp: prev.timestamp || now.toISOString(),
+        date: prev.date || getLocalDate(),
+        timestamp: prev.timestamp || getUtcTimestamp(),
+        timezone: prev.timezone || getUserTimezone(),
       }));
     }
   }, [entry.date, entry.timestamp]);
