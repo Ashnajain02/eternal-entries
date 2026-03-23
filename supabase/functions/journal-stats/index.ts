@@ -356,10 +356,13 @@ serve(async (req) => {
       },
       activity: {
         totalEntries: entries.length,
+        lastEntryDate: entries[0]?.timestamp_started || null,
+        firstEntryDate: entries[entries.length - 1]?.timestamp_started || null,
         entriesThisWeek,
         entriesThisMonth,
         entriesThisYear,
         avgEntriesPerWeek,
+        totalDaysJournaled: entryDates.length,
       },
       timePatterns: {
         favoriteHour: favoriteHour
