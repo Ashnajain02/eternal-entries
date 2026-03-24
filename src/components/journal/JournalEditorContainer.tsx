@@ -74,7 +74,7 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   useEffect(() => {
     const currentEntry = getCurrentEntry();
     onAutoSave(currentEntry);
-  }, [content, selectedMood, selectedTrack, weatherData]);
+  }, [getCurrentEntry, onAutoSave]);
 
   const handlePublish = async () => {
     if (!getPlainTextContent(content)) {
