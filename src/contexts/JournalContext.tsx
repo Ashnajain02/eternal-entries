@@ -318,7 +318,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     const lowercaseQuery = query.toLowerCase();
     return entries.filter(entry => 
       entry.content.toLowerCase().includes(lowercaseQuery) ||
-      entry.weather?.location.toLowerCase().includes(lowercaseQuery) ||
+      entry.weather?.location?.toLowerCase().includes(lowercaseQuery) ||
       entry.track?.name?.toLowerCase().includes(lowercaseQuery) ||
       entry.track?.artist?.toLowerCase().includes(lowercaseQuery)
     );
@@ -453,7 +453,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     return newEntry;
   };
   
-  const value = {
+  const value = React.useMemo(() => ({
     entries,
     currentEntry,
     addEntry,
@@ -471,8 +471,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     getRandomEntries,
     isLoading,
     statsData
-  };
-  
+  }), [entries, currentEntry, isLoading, statsData]);
+
   return (
     <JournalContext.Provider value={value}>
       {children}

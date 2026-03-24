@@ -4,20 +4,17 @@
  * Uses AES-GCM algorithm with a key derived from the user's ID
  */
 
-/**
- * Derives an encryption key from the user ID using PBKDF2
- * @param userId The user's unique ID
- * @returns A Promise that resolves to a CryptoKey
- */
+// Cache derived keys per user session to avoid 100K PBKDF2 iterations on every call
+const keyCache = new Map<string, CryptoKey>();
+
 export const deriveKeyFromUserId = async (userId: string): Promise<CryptoKey> => {
-  // Convert the userId to an ArrayBuffer to use as key material
+  const cached = keyCache.get(userId);
+  if (cached) return cached;
+
   const encoder = new TextEncoder();
   const userIdBuffer = encoder.encode(userId);
-  
-  // Use a static salt for derivation (not ideal but maintains decryption capability)
   const salt = encoder.encode("journal-encryption-salt");
-  
-  // Import the user ID as raw key material
+
   const keyMaterial = await window.crypto.subtle.importKey(
     "raw",
     userIdBuffer,
@@ -25,9 +22,8 @@ export const deriveKeyFromUserId = async (userId: string): Promise<CryptoKey> =>
     false,
     ["deriveBits", "deriveKey"]
   );
-  
-  // Derive an AES-GCM key using PBKDF2
-  return window.crypto.subtle.deriveKey(
+
+  const key = await window.crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
       salt,
@@ -39,7 +35,12 @@ export const deriveKeyFromUserId = async (userId: string): Promise<CryptoKey> =>
     false,
     ["encrypt", "decrypt"]
   );
+
+  keyCache.set(userId, key);
+  return key;
 };
+
+export const clearKeyCache = () => keyCache.clear();
 
 /**
  * Encrypts text using AES-GCM
@@ -135,7 +136,7 @@ export const decryptText = async (encryptedText: string, userId: string): Promis
  * @param userId User's ID for encryption
  * @returns A copy of the entry with encrypted content
  */
-export const encryptJournalEntry = async (entry: any, userId: string): Promise<any> => {
+export const encryptJournalEntry = async (entry: { content: string; comments?: unknown[] } & Record<string, unknown>, userId: string) => {
   if (!entry || !userId) return entry;
   
   const encryptedEntry = { ...entry };
@@ -165,7 +166,7 @@ export const encryptJournalEntry = async (entry: any, userId: string): Promise<a
  * @param userId User's ID for decryption
  * @returns A copy of the entry with decrypted content
  */
-export const decryptJournalEntry = async (entry: any, userId: string): Promise<any> => {
+export const decryptJournalEntry = async (entry: { content: string; comments?: unknown[] } & Record<string, unknown>, userId: string) => {
   if (!entry || !userId) return entry;
   
   const decryptedEntry = { ...entry };

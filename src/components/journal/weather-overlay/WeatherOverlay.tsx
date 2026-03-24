@@ -183,9 +183,10 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
     
     const animate = () => {
       if (!ctx || !canvas.width || !canvas.height) return;
-      
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+      const now = Date.now();
+
       // Draw weather particles
       if (category === 'rain') {
         // Cool blue rain color - elegant and muted but noticeable
@@ -238,7 +239,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           p.x += (p.drift || 0) * 0.15;
           
           // Slight oscillation for organic movement
-          p.x += Math.sin(Date.now() / 2000 + p.id) * 0.02;
+          p.x += Math.sin(now / 2000 + p.id) * 0.02;
           
           if (p.y > 110) {
             p.y = -5;
@@ -253,7 +254,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         particlesRef.current.forEach(p => {
           const x = (p.x / 100) * canvas.width;
           // Minimal vertical micro-drift (1-2px, no bobbing)
-          const microDrift = Math.sin(Date.now() / 10000 + p.id * 3) * 1.5;
+          const microDrift = Math.sin(now / 10000 + p.id * 3) * 1.5;
           const y = ((p.y) / 100) * canvas.height + microDrift;
           
           // Create cloud patch using multiple overlapping blurred circles
@@ -304,7 +305,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             const y = (star.y / 100) * canvas.height;
 
             // Gentle twinkle — never goes below 0.7 so stars always visible
-            const twinkle = 0.75 + 0.25 * Math.sin(Date.now() * star.speed + star.id * 7);
+            const twinkle = 0.75 + 0.25 * Math.sin(now * star.speed + star.id * 7);
             ctx.globalAlpha = star.opacity * twinkle;
 
             // Star point
@@ -322,7 +323,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           });
 
           // Shooting stars — spawn a group of 3 every ~8-18 seconds
-          const now = Date.now();
+          
           if (now - lastShootingStarTime.current > 8000 + Math.random() * 10000) {
             if (shootingStarsRef.current.length === 0) {
               shootingStarsRef.current.push(...createShootingStarGroup());
@@ -425,7 +426,7 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           const sunRadius = Math.min(canvas.width, canvas.height) * 0.2; // Large sun
           
           // Gentle pulse
-          const pulse = 0.92 + 0.08 * Math.sin(Date.now() / 4000);
+          const pulse = 0.92 + 0.08 * Math.sin(now / 4000);
           
           // Different sun colors for morning vs evening
           const isMorning = timeOfDay === 'morning';

@@ -35,6 +35,7 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ isOpen, onClose, onTrackSelec
     }
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    let cancelled = false;
 
     debounceRef.current = setTimeout(async () => {
       setIsSearching(true);
@@ -42,17 +43,20 @@ const TrackSearch: React.FC<TrackSearchProps> = ({ isOpen, onClose, onTrackSelec
         const { data, error } = await supabase.functions.invoke('itunes-search', {
           body: { query, limit: 8 },
         });
+        if (cancelled) return;
         if (error) throw error;
         setResults(data?.results || []);
       } catch (error) {
+        if (cancelled) return;
         console.error('iTunes search error:', error);
         setResults([]);
       } finally {
-        setIsSearching(false);
+        if (!cancelled) setIsSearching(false);
       }
     }, 400);
 
     return () => {
+      cancelled = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query]);

@@ -80,13 +80,16 @@ export function useAudioPlayer() {
     audio.load();
   }, [pause]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount — remove all listeners and stop audio
   useEffect(() => {
     return () => {
       clearInterval_();
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
+      const audio = audioRef.current;
+      if (audio) {
+        // Remove any lingering canplay listeners
+        audio.oncanplay = null;
+        audio.pause();
+        audio.src = '';
       }
     };
   }, []);

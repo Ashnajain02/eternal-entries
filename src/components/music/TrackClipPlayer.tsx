@@ -31,7 +31,7 @@ const TrackClipPlayer: React.FC<TrackClipPlayerProps> = ({
       pause();
       onPlayStateChange?.(false);
     }
-  }, [shouldPause]);
+  }, [shouldPause, isPlaying, pause, onPlayStateChange]);
 
   // Check if this is a playable preview URL (not an old spotify:track: URI)
   const isPlayable = previewUrl && previewUrl.startsWith('http');
