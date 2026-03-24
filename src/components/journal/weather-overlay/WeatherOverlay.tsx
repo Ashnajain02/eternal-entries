@@ -86,7 +86,7 @@ function createParticles(category: WeatherCategory): Particle[] {
 }
 
 function createStars(): Particle[] {
-  return Array.from({ length: 60 }, (_, i) => ({
+  return Array.from({ length: 150 }, (_, i) => ({
     id: i,
     x: Math.random() * 100,
     y: Math.random() * 90,
@@ -298,7 +298,11 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         // Clear weather: sun or stars based on time of day
         
         if (timeOfDay === 'night') {
-          // NIGHT: Just big bright twinkling stars, no overlay
+          // NIGHT: Subtle navy splotches for sky depth, then stars
+
+          // Subtle navy blue background tint
+          ctx.fillStyle = 'rgba(8, 15, 50, 0.15)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
           starsRef.current.forEach(star => {
             const x = (star.x / 100) * canvas.width;
@@ -308,15 +312,15 @@ const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             const twinkle = 0.75 + 0.25 * Math.sin(now * star.speed + star.id * 7);
             ctx.globalAlpha = star.opacity * twinkle;
 
-            // Star point
-            ctx.fillStyle = 'rgba(255, 230, 120, 1)';
+            // Star point — bright white-yellow
+            ctx.fillStyle = 'rgba(255, 245, 180, 1)';
             ctx.beginPath();
-            ctx.arc(x, y, star.size * 1.4, 0, Math.PI * 2);
+            ctx.arc(x, y, star.size * 1.6, 0, Math.PI * 2);
             ctx.fill();
 
-            // Soft glow halo
-            ctx.globalAlpha = star.opacity * twinkle * 0.2;
-            ctx.fillStyle = 'rgba(255, 220, 100, 1)';
+            // Soft warm glow halo
+            ctx.globalAlpha = star.opacity * twinkle * 0.35;
+            ctx.fillStyle = 'rgba(255, 240, 150, 1)';
             ctx.beginPath();
             ctx.arc(x, y, star.size * 3, 0, Math.PI * 2);
             ctx.fill();
