@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+
 import confetti from 'canvas-confetti';
 
 export interface Habit {
@@ -21,7 +21,6 @@ export interface HabitCompletion {
 export function useHabits() {
   const { authState } = useAuth();
   const user = authState.user;
-  const { toast } = useToast();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<HabitCompletion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,16 +106,11 @@ export function useHabits() {
           spread: 70,
           origin: { y: 0.6 }
         });
-
-        toast({
-          title: "🎉 All habits completed!",
-          description: "Amazing work today! Keep it up!",
-        });
       }
 
       setAllCompletedToday(true);
     }
-  }, [user, habits, completions, allCompletedToday, today, toast]);
+  }, [user, habits, completions, allCompletedToday, today]);
 
   // Keep "today" synced to the user's *local* calendar day (not UTC).
   useEffect(() => {
@@ -167,10 +161,8 @@ export function useHabits() {
 
       if (error) throw error;
       setHabits(prev => [...prev, data]);
-      toast({ title: "Habit added", description: `"${name}" added to your habits.` });
     } catch (error) {
       console.error('Error adding habit:', error);
-      toast({ title: "Error", description: "Failed to add habit.", variant: "destructive" });
     }
   };
 
@@ -185,10 +177,8 @@ export function useHabits() {
 
       if (error) throw error;
       setHabits(prev => prev.map(h => h.id === id ? { ...h, name } : h));
-      toast({ title: "Habit updated" });
     } catch (error) {
       console.error('Error updating habit:', error);
-      toast({ title: "Error", description: "Failed to update habit.", variant: "destructive" });
     }
   };
 
@@ -204,10 +194,8 @@ export function useHabits() {
       if (error) throw error;
       setHabits(prev => prev.filter(h => h.id !== id));
       setCompletions(prev => prev.filter(c => c.habit_id !== id));
-      toast({ title: "Habit deleted" });
     } catch (error) {
       console.error('Error deleting habit:', error);
-      toast({ title: "Error", description: "Failed to delete habit.", variant: "destructive" });
     }
   };
 
@@ -248,7 +236,6 @@ export function useHabits() {
       }
     } catch (error) {
       console.error('Error toggling completion:', error);
-      toast({ title: "Error", description: "Failed to update completion.", variant: "destructive" });
     }
   };
 

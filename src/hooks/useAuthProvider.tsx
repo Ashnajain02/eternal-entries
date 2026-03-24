@@ -70,10 +70,7 @@ export const useAuthProvider = () => {
         }
         
         if (event === 'PASSWORD_RECOVERY') {
-          toast({
-            title: "Recovery link detected",
-            description: "You can now set a new password.",
-          });
+          // Recovery link detected — user can now set a new password
         }
       }
     );
@@ -81,7 +78,7 @@ export const useAuthProvider = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [toast, authReady]);
+  }, [authReady]);
 
   const signUp = async (email: string, password: string, metadata?: SignUpMetadata) => {
     try {
@@ -96,10 +93,6 @@ export const useAuthProvider = () => {
         }
       });
       if (error) throw error;
-      toast({
-        title: "Success!",
-        description: "Check your email for verification.",
-      });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -114,10 +107,6 @@ export const useAuthProvider = () => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      toast({
-        title: "Welcome back!",
-        description: "You've been signed in.",
-      });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -160,10 +149,6 @@ export const useAuthProvider = () => {
       forceClearSupabaseAuthStorage();
     }
 
-    toast({
-      title: 'Signed out',
-      description: "You've been signed out successfully.",
-    });
   };
   
   const resetPassword = async (email: string, redirectTo?: string) => {
@@ -179,11 +164,6 @@ export const useAuthProvider = () => {
       });
       
       if (error) throw error;
-      
-      toast({
-        title: "Password reset email sent",
-        description: "Check your email for a link to reset your password.",
-      });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -219,11 +199,6 @@ export const useAuthProvider = () => {
       error = updateError;
       
       if (error) throw error;
-      
-      toast({
-        title: "Success",
-        description: "Your password has been updated successfully.",
-      });
     } catch (error: any) {
       toast({
         title: "Error",

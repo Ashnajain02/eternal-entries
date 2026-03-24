@@ -58,11 +58,6 @@ export const ApiSettings: React.FC = () => {
       setFreshKey(data.key);
       setKeyMeta({ created_at: new Date().toISOString(), last_used_at: null });
       setShowKey(true);
-
-      toast({
-        title: 'API key generated',
-        description: 'Copy it now — you won\'t be able to see it again.',
-      });
     } catch (error) {
       console.error('Error generating API key:', error);
       toast({
@@ -89,8 +84,6 @@ export const ApiSettings: React.FC = () => {
       setFreshKey(null);
       setKeyMeta(null);
       setShowKey(false);
-
-      toast({ title: 'API key revoked' });
     } catch (error) {
       console.error('Error revoking API key:', error);
       toast({
@@ -106,7 +99,6 @@ export const ApiSettings: React.FC = () => {
   const copyKey = () => {
     if (!freshKey) return;
     navigator.clipboard.writeText(freshKey);
-    toast({ title: 'Copied to clipboard' });
   };
 
   const endpoint = 'https://veorhexddrwlwxtkuycb.supabase.co/functions/v1/journal-stats';

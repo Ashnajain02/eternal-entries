@@ -63,11 +63,18 @@ export function formatEntryYear(dateValue: string | number): string {
   return fnsFormat(parseDate(dateValue), 'yyyy');
 }
 
-export function formatEntryTime(dateValue: string | number): string {
+/**
+ * Format time with timezone abbreviation. Used everywhere time is displayed.
+ */
+function formatTimeWithTz(dateValue: string | number): string {
   const d = parseDate(dateValue);
   const time = fnsFormat(d, 'h:mm a');
   const tz = d.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop() || '';
   return `${time} ${tz}`;
+}
+
+export function formatEntryTime(dateValue: string | number): string {
+  return formatTimeWithTz(dateValue);
 }
 
 export function formatFullDate(dateValue: string | number): string {
@@ -79,5 +86,5 @@ export function formatCommentDate(dateValue: string | number): string {
 }
 
 export function formatCommentTime(dateValue: string | number): string {
-  return fnsFormat(parseDate(dateValue), 'h:mm a');
+  return formatTimeWithTz(dateValue);
 }

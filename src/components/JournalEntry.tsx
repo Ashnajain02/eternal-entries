@@ -4,7 +4,7 @@ import { JournalEntry as JournalEntryType } from '@/types';
 import { cn } from '@/lib/utils';
 import { useJournal } from '@/contexts/JournalContext';
 import JournalEditorInline from './journal/JournalEditorInline';
-import { useToast } from '@/hooks/use-toast';
+
 import CommentSection from './CommentSection';
 import TrackClipPlayer from './music/TrackClipPlayer';
 import ReflectionModule from './journal/ReflectionModule';
@@ -49,7 +49,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   const [weatherEnabled, setWeatherEnabled] = useState(initialWeatherEnabled ?? true);
   const [localContent, setLocalContent] = useState(entry.content);
   const { deleteEntry, addCommentToEntry, deleteCommentFromEntry, updateEntryContent } = useJournal();
-  const { toast } = useToast();
   const { authState } = useAuth();
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef(entry.content);
@@ -175,10 +174,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   const handleDelete = async () => {
     await deleteEntry(entry.id);
-    toast({
-      title: "Entry deleted",
-      description: "Your journal entry has been permanently deleted."
-    });
   };
   
   const handleAddComment = async (content: string) => {
@@ -187,10 +182,6 @@ const JournalEntryView: React.FC<JournalEntryProps> = ({
   
   const handleDeleteComment = async (commentId: string) => {
     await deleteCommentFromEntry(entry.id, commentId);
-    toast({
-      title: "Note deleted",
-      description: "Your note has been permanently deleted."
-    });
   };
 
   const handleReflectionUpdate = async () => {

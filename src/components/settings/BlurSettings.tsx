@@ -5,11 +5,10 @@ import { Label } from '@/components/ui/label';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+
 
 export const BlurSettings: React.FC = () => {
   const { authState } = useAuth();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: profile, isLoading } = useQuery({
@@ -45,22 +44,11 @@ export const BlurSettings: React.FC = () => {
       if (error) throw error;
       return disableBlur;
     },
-    onSuccess: (disableBlur) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blur-settings'] });
-      toast({
-        title: disableBlur ? "Blur disabled" : "Blur enabled",
-        description: disableBlur 
-          ? "Journal text will always be visible, even with attached songs."
-          : "Journal text will be blurred until the song is played."
-      });
     },
     onError: (error) => {
       console.error('Error updating blur setting:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update blur setting.",
-        variant: "destructive"
-      });
     }
   });
 

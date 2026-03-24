@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { JournalEntry, Mood, JournalComment } from '@/types';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+
 import { encryptJournalEntry, decryptJournalEntry } from '@/utils/encryption';
 import { mapDbRowToJournalEntry, buildDbPayload } from '@/utils/journalEntryMapper';
 import { getLocalDate, getUtcTimestamp, getUserTimezone } from '@/utils/dateUtils';
@@ -51,7 +51,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
   const [currentEntry, setCurrentEntry] = useState<JournalEntry | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { authState } = useAuth();
-  const { toast } = useToast();
   const hasLoadedEntriesRef = useRef(false);
   const currentUserIdRef = useRef<string | null>(null);
   
@@ -96,11 +95,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
           currentUserIdRef.current = authState.user.id;
         } catch (error: unknown) {
           console.error('Error loading journal entries:', error instanceof Error ? error.message : 'An unexpected error occurred');
-          toast({
-            title: "Error loading journal entries",
-            description: error instanceof Error ? error.message : 'An unexpected error occurred',
-            variant: "destructive",
-          });
         } finally {
           setIsLoading(false);
         }
@@ -108,7 +102,7 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
     };
 
     fetchEntries();
-  }, [authState.user?.id, toast]);
+  }, [authState.user?.id]);
   
   const statsData = React.useMemo(() => {
     const totalEntries = entries.length;
@@ -180,11 +174,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
 
   const addEntry = async (entry: JournalEntry) => {
     if (!authState.user) {
-      toast({
-        title: "Authentication required",
-        description: "You must be logged in to add journal entries",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -200,11 +189,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
   
   const updateEntry = async (updatedEntry: JournalEntry) => {
     if (!authState.user) {
-      toast({
-        title: "Authentication required",
-        description: "You must be logged in to update journal entries",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -226,17 +210,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         entry.id === updatedEntry.id ? updatedEntryWithTimestamp : entry
       ));
 
-      toast({
-        title: "Entry updated",
-        description: "Your journal entry has been securely updated",
-      });
     } catch (error: unknown) {
       console.error('Error updating journal entry:', error);
-      toast({
-        title: "Error updating entry",
-        description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        variant: "destructive",
-      });
       throw error;
     }
   };
@@ -277,11 +252,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
   
   const deleteEntry = async (id: string) => {
     if (!authState.user) {
-      toast({
-        title: "Authentication required",
-        description: "You must be logged in to delete journal entries",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -294,18 +264,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
       if (error) throw error;
 
       setEntries(prev => prev.filter(entry => entry.id !== id));
-
-      toast({
-        title: "Entry deleted",
-        description: "Your journal entry has been deleted successfully",
-      });
     } catch (error: unknown) {
       console.error('Error deleting journal entry:', error);
-      toast({
-        title: "Error deleting entry",
-        description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        variant: "destructive",
-      });
       throw error;
     }
   };
@@ -326,11 +286,6 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
   
   const addCommentToEntry = async (entryId: string, content: string) => {
     if (!authState.user) {
-      toast({
-        title: "Authentication required",
-        description: "You must be logged in to add comments",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -372,28 +327,14 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         } : entry
       ));
 
-      toast({
-        title: "Comment added",
-        description: "Your note has been added to this journal entry"
-      });
     } catch (error: unknown) {
       console.error('Error adding comment:', error);
-      toast({
-        title: "Error adding comment",
-        description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        variant: "destructive",
-      });
       throw error;
     }
   };
   
   const deleteCommentFromEntry = async (entryId: string, commentId: string) => {
     if (!authState.user) {
-      toast({
-        title: "Authentication required",
-        description: "You must be logged in to delete comments",
-        variant: "destructive",
-      });
       return;
     }
 
@@ -423,17 +364,8 @@ export const JournalProvider = ({ children }: JournalProviderProps) => {
         entry.id === entryId ? { ...entry, comments: updatedComments, updatedAt: now.getTime() } : entry
       ));
 
-      toast({
-        title: "Note deleted",
-        description: "Your note has been deleted successfully"
-      });
     } catch (error: unknown) {
       console.error('Error deleting comment:', error);
-      toast({
-        title: "Error deleting note",
-        description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        variant: "destructive",
-      });
       throw error;
     }
   };

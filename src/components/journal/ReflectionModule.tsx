@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+
 import { supabase } from '@/integrations/supabase/client';
 import { generateReflectionQuestions } from '@/services/api';
 import ReflectionQuestion from './reflection/ReflectionQuestion';
@@ -29,7 +29,6 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
   onReflectionUpdate,
   demo = false
 }) => {
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [questions, setQuestions] = useState<string[]>(reflectionQuestion ? [reflectionQuestion] : []);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -57,11 +56,6 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
       setIsEditing(true);
     } catch (error) {
       console.error('Error generating reflection questions:', error);
-      toast({
-        title: 'Error generating reflection',
-        description: 'Could not generate reflection questions. Please try again.',
-        variant: 'destructive'
-      });
     } finally {
       setIsLoading(false);
     }
@@ -75,11 +69,6 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
 
   const saveReflection = async () => {
     if (!currentQuestion || !answer.trim()) {
-      toast({
-        title: 'Cannot save empty reflection',
-        description: 'Please write your reflection before saving.',
-        variant: 'destructive'
-      });
       return;
     }
 
@@ -100,18 +89,8 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
 
       setIsEditing(false);
       onReflectionUpdate();
-
-      toast({
-        title: 'Reflection saved',
-        description: 'Your reflection has been saved successfully.'
-      });
     } catch (error) {
       console.error('Error saving reflection:', error);
-      toast({
-        title: 'Error saving reflection',
-        description: 'Could not save your reflection. Please try again.',
-        variant: 'destructive'
-      });
     } finally {
       setIsLoading(false);
     }
@@ -138,18 +117,8 @@ const ReflectionModule: React.FC<ReflectionModuleProps> = ({
       setAnswer('');
       setShowModule(false);
       onReflectionUpdate();
-
-      toast({
-        title: 'Reflection deleted',
-        description: 'Your reflection has been deleted successfully.'
-      });
     } catch (error) {
       console.error('Error deleting reflection:', error);
-      toast({
-        title: 'Error deleting reflection',
-        description: 'Could not delete your reflection. Please try again.',
-        variant: 'destructive'
-      });
     } finally {
       setIsLoading(false);
     }

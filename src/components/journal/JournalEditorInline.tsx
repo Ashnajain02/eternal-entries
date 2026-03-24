@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { JournalEntry } from '@/types';
 import { getPlainTextContent } from '@/utils/journalEntryMapper';
 import { useJournal } from '@/contexts/JournalContext';
-import { useToast } from '@/hooks/use-toast';
+
 import { Button } from '@/components/ui/button';
 import MusicSection from '@/components/music/MusicSection';
 import { useWeatherData } from '@/hooks/useWeatherData';
@@ -24,7 +24,6 @@ const JournalEditorInline: React.FC<JournalEditorInlineProps> = ({
   onCancel
 }) => {
   const { updateEntry } = useJournal();
-  const { toast } = useToast();
 
   const {
     weatherData,
@@ -39,11 +38,6 @@ const JournalEditorInline: React.FC<JournalEditorInlineProps> = ({
 
   const handleSave = async () => {
     if (!getPlainTextContent(content)) {
-      toast({
-        title: "Cannot save empty entry",
-        description: "Please write something in your journal before saving.",
-        variant: "destructive"
-      });
       return;
     }
 
@@ -57,7 +51,6 @@ const JournalEditorInline: React.FC<JournalEditorInlineProps> = ({
         track: selectedTrack,
       };
       await updateEntry(updatedEntry);
-      toast({ title: "Entry updated", description: "Your journal entry has been saved." });
       onSave();
     } catch (error) {
       console.error('Error saving journal entry:', error);

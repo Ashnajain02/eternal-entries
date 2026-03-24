@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { JournalEntry } from '@/types';
 import { getPlainTextContent } from '@/utils/journalEntryMapper';
-import { useToast } from '@/hooks/use-toast';
+
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -31,8 +31,6 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   onAutoSave,
   lastAutoSave
 }) => {
-  const { toast } = useToast();
-
   const [entry, setEntry] = useState<JournalEntry>(initialEntry);
   const {
     weatherData,
@@ -81,11 +79,6 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
 
   const handlePublish = async () => {
     if (!getPlainTextContent(content)) {
-      toast({
-        title: "Cannot publish empty entry",
-        description: "Please write something in your journal before publishing.",
-        variant: "destructive"
-      });
       return;
     }
     setIsPublishing(true);
@@ -103,10 +96,6 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   };
 
   const handleSaveAndClose = () => {
-    const hasContent = getPlainTextContent(content) || selectedTrack || selectedMood !== 'neutral';
-    if (hasContent) {
-      toast({ title: "Draft saved", description: "Your entry has been saved as a draft." });
-    }
     onClose();
   };
 

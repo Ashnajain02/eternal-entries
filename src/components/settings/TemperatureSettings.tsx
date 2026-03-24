@@ -6,13 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+
 import { TemperatureUnit } from '@/types';
 
 export const TemperatureSettings: React.FC = () => {
   const { authState } = useAuth();
-  const { toast } = useToast();
-  
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['temperature-settings', authState.user?.id],
     queryFn: async () => {
@@ -46,17 +44,9 @@ export const TemperatureSettings: React.FC = () => {
     },
     onSuccess: () => {
       refetch();
-      toast({
-        title: "Settings saved",
-        description: "Temperature unit preference has been updated"
-      });
     },
     onError: (error) => {
-      toast({
-        title: "Error saving settings",
-        description: error.message,
-        variant: "destructive"
-      });
+      console.error('Error saving temperature settings:', error);
     }
   });
 

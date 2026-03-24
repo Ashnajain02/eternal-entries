@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Bold, Italic, Underline as UnderlineIcon, ImagePlus, List, ListOrdered, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+
 
 interface RichTextEditorProps {
   content: string;
@@ -26,7 +26,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   placeholder = "Write your thoughts...",
   className
 }) => {
-  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
@@ -87,31 +86,16 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload an image file.",
-        variant: "destructive"
-      });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please upload an image smaller than 5MB.",
-        variant: "destructive"
-      });
       return;
     }
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        toast({
-          title: "Not authenticated",
-          description: "Please sign in to upload images.",
-          variant: "destructive"
-        });
         return;
       }
 
@@ -138,20 +122,10 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       if (editor && signedData) {
         editor.chain().focus().setImage({ src: signedData.signedUrl }).run();
       }
-
-      toast({
-        title: "Image uploaded",
-        description: "Your image has been added to the entry."
-      });
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast({
-        title: "Upload failed",
-        description: "Failed to upload image. Please try again.",
-        variant: "destructive"
-      });
     }
-  }, [editor, toast]);
+  }, [editor]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
