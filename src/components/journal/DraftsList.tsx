@@ -1,7 +1,8 @@
 import React from 'react';
 import { JournalEntry } from '@/types';
 import { Button } from '@/components/ui/button';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
+import { formatShortDateNoYear } from '@/utils/dateUtils';
 import { FileText, Trash2, Edit } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getPlainTextContent } from '@/utils/journalEntryMapper';
@@ -61,7 +62,7 @@ const DraftsList: React.FC<DraftsListProps> = ({
                   {preview.length > 80 ? `${preview}...` : preview}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {format(new Date(draft.date), 'MMM d')} · {timeAgo}
+                  {formatShortDateNoYear(draft.date)} · {timeAgo}
                 </p>
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

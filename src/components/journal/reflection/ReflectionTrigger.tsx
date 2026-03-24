@@ -13,7 +13,7 @@ const ReflectionTrigger: React.FC<ReflectionTriggerProps> = ({ onClick, isLoadin
     <Button
       onClick={onClick}
       disabled={isLoading}
-      className="w-full mt-4"
+      className="w-full mt-4 bg-white/10 backdrop-blur-sm border-border/30 hover:bg-white/20 hover:border-border/50 transition-all"
       variant="outline"
     >
       {isLoading ? (

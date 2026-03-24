@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDateTimeStamp } from '@/utils/dateUtils';
 
 interface AccountSettingsProps {
   user: User;
@@ -94,7 +94,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({ user }) => {
                   >
                     <div className="space-y-1">
                       <div className="font-medium">
-                        {format(new Date(log.visited_at), 'MMM d, yyyy · h:mm a')}
+                        {formatDateTimeStamp(log.visited_at)}
                       </div>
                       {(log.city || log.country) && (
                         <div className="flex items-center gap-1 text-muted-foreground text-xs">

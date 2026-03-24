@@ -4,12 +4,11 @@ import { getPlainTextContent } from '@/utils/journalEntryMapper';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
-import { getLocalDate, getUtcTimestamp, getUserTimezone } from '@/utils/dateUtils';
+import { getLocalDate, getUtcTimestamp, getUserTimezone, formatEntryTime } from '@/utils/dateUtils';
 import MusicSection from '@/components/music/MusicSection';
 import { useWeatherData } from '@/hooks/useWeatherData';
 import MoodSelector from '@/components/MoodSelector';
-import WeatherDisplay from '@/components/WeatherDisplay';
+
 import RichTextEditor from './RichTextEditor';
 import EntryPageLayout from '@/components/shared/EntryPageLayout';
 import { Trash2, Save, Send } from 'lucide-react';
@@ -100,7 +99,7 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
   };
 
   const autoSaveText = lastAutoSave
-    ? <> &middot; Auto-saved {format(lastAutoSave, 'h:mm a')}</>
+    ? <> &middot; Auto-saved {formatEntryTime(lastAutoSave.getTime())}</>
     : null;
 
   return (
@@ -110,15 +109,6 @@ const JournalEditorContainer: React.FC<JournalEditorContainerProps> = ({
       mood={selectedMood}
       weather={weatherData || undefined}
       metadataExtra={autoSaveText}
-      actions={
-        <div className="flex items-center gap-3">
-          <WeatherDisplay
-            weatherData={weatherData}
-            isLoading={isLoadingWeather}
-            onRefresh={handleGetWeather}
-          />
-        </div>
-      }
     >
       {locationError && (
         <Alert variant="destructive" className="mb-6">

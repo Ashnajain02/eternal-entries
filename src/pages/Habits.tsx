@@ -4,7 +4,7 @@ import { useHabits } from '@/hooks/useHabits';
 import { HabitItem } from '@/components/habits/HabitItem';
 import { AddHabitForm } from '@/components/habits/AddHabitForm';
 import { HabitProgress } from '@/components/habits/HabitProgress';
-import { format } from 'date-fns';
+import { formatFullDate } from '@/utils/dateUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ListChecks } from 'lucide-react';
 
@@ -34,7 +34,7 @@ const Habits: React.FC = () => {
             Daily Habits
           </h1>
           <p className="text-muted-foreground font-body">
-            {format(today, 'EEEE, MMMM d, yyyy')}
+            {formatFullDate(today.getTime())}
           </p>
         </div>
 

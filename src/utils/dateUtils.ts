@@ -81,10 +81,22 @@ export function formatFullDate(dateValue: string | number): string {
   return fnsFormat(parseDate(dateValue), 'EEEE, MMMM d, yyyy');
 }
 
-export function formatCommentDate(dateValue: string | number): string {
+export function formatShortDate(dateValue: string | number): string {
   return fnsFormat(parseDate(dateValue), 'MMM d, yyyy');
 }
 
-export function formatCommentTime(dateValue: string | number): string {
-  return formatTimeWithTz(dateValue);
+export function formatShortDateNoYear(dateValue: string | number): string {
+  return fnsFormat(parseDate(dateValue), 'MMM d');
 }
+
+/**
+ * "Mar 23, 2026 · 10:45 PM EDT" — date + time + timezone in one string.
+ * Use anywhere a full datetime stamp is needed.
+ */
+export function formatDateTimeStamp(dateValue: string | number): string {
+  return `${formatShortDate(dateValue)} · ${formatTimeWithTz(dateValue)}`;
+}
+
+// Aliases for backward compatibility
+export const formatCommentDate = formatShortDate;
+export const formatCommentTime = formatTimeWithTz;

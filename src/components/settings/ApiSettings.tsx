@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Copy, Key, RefreshCw, Trash2, Eye, EyeOff } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatShortDate, formatDateTimeStamp } from '@/utils/dateUtils';
 
 interface KeyMeta {
   created_at: string;
@@ -151,9 +151,9 @@ export const ApiSettings: React.FC = () => {
             {/* Key metadata */}
             {keyMeta && (
               <div className="flex gap-4 text-xs text-muted-foreground">
-                <span>Created: {format(new Date(keyMeta.created_at), 'MMM d, yyyy')}</span>
+                <span>Created: {formatShortDate(keyMeta.created_at)}</span>
                 {keyMeta.last_used_at && (
-                  <span>Last used: {format(new Date(keyMeta.last_used_at), 'MMM d, yyyy · h:mm a')}</span>
+                  <span>Last used: {formatDateTimeStamp(keyMeta.last_used_at)}</span>
                 )}
               </div>
             )}
